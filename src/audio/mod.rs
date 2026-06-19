@@ -14,38 +14,76 @@ pub struct AudioEngine {
     _output_stream: Stream,
 }
 
-pub fn start(params: Arc<Params>, levels: Arc<Levels>) -> Result<AudioEngine> {
+// ── Device discovery ──────────────────────────────────────────────────────────
+
+pub struct InputInfo {
+    pub name: String,
+    pub channels: usize,
+}
+
+pub struct DeviceInfo {
+    pub inputs: Vec<InputInfo>,
+    pub outputs: Vec<String>,
+}
+
+pub fn list_devices() -> Result<DeviceInfo> {
     let host = cpal::default_host();
 
-    // ── 1. Select input device ────────────────────────────────────────────────
-    let (input_device, chosen_name) = select_input_device(&host)?;
+    let inputs = host
+        .input_devices()?
+        .enumerate()
+        .map(|(i, d)| {
+            let name = d
+                .description()
+                .map(|desc| desc.name().to_owned())
+                .unwrap_or_else(|_| format!("device-{i}"));
+            let channels = d
+                .default_input_config()
+                .map(|c| c.channels() as usize)
+                .unwrap_or(1);
+            InputInfo { name, channels }
+        })
+        .collect();
 
-    // ── 2. Select output device ───────────────────────────────────────────────
-    let (output_device, _out_name) = select_output_device(&host)?;
+    let outputs = host
+        .output_devices()?
+        .enumerate()
+        .map(|(i, d)| {
+            d.description()
+                .map(|desc| desc.name().to_owned())
+                .unwrap_or_else(|_| format!("device-{i}"))
+        })
+        .collect();
 
-    // ── 3. Negotiate matching sample rates ────────────────────────────────────
-    let (input_cfg, output_cfg, sr, in_fmt) = negotiate_configs(&input_device, &output_device)?;
+    Ok(DeviceInfo { inputs, outputs })
+}
+
+// ── Stream start ──────────────────────────────────────────────────────────────
+
+pub fn start(
+    input_idx: usize,
+    guitar_ch: usize,
+    output_idx: usize,
+    params: Arc<Params>,
+    levels: Arc<Levels>,
+) -> Result<AudioEngine> {
+    let host = cpal::default_host();
+
+    let input_device: Device = host
+        .input_devices()?
+        .nth(input_idx)
+        .ok_or_else(|| anyhow!("Input device index {input_idx} not found"))?;
+
+    let output_device: Device = host
+        .output_devices()?
+        .nth(output_idx)
+        .ok_or_else(|| anyhow!("Output device index {output_idx} not found"))?;
+
+    let (input_cfg, output_cfg, sr, _in_fmt) = negotiate_configs(&input_device, &output_device)?;
 
     let in_channels = input_cfg.channels as usize;
     let out_channels = output_cfg.channels as usize;
 
-    println!("Input  : {chosen_name}");
-    println!(
-        "         {} Hz  {} ch  {:?}",
-        sr as u32, in_channels, in_fmt
-    );
-    println!("Output : {}", output_device.description()?.name());
-    println!(
-        "         {} Hz  {} ch",
-        output_cfg.sample_rate, out_channels
-    );
-
-    // ── 4. Ask input/output channel mapping ──────────────────────────────────
-    let guitar_ch = ask_channel("guitar input", in_channels)?;
-    println!("  Reading channel {} of {}", guitar_ch + 1, in_channels);
-    println!("  Writing  all {} output channels\n", out_channels);
-
-    // ── 5. Build streams ──────────────────────────────────────────────────────
     build_engine(
         input_device,
         input_cfg,
@@ -60,83 +98,8 @@ pub fn start(params: Arc<Params>, levels: Arc<Levels>) -> Result<AudioEngine> {
     )
 }
 
-// ── Device / config helpers ───────────────────────────────────────────────────
+// ── Config negotiation ────────────────────────────────────────────────────────
 
-fn select_input_device(host: &cpal::Host) -> Result<(Device, String)> {
-    let inputs: Vec<(usize, String, Device)> = host
-        .input_devices()?
-        .enumerate()
-        .map(|(i, d)| {
-            let name = d
-                .description()
-                .map(|desc| desc.name().to_owned())
-                .unwrap_or_else(|_| format!("device-{i}"));
-            (i, name, d)
-        })
-        .collect();
-
-    if inputs.is_empty() {
-        return Err(anyhow!("No audio input devices found"));
-    }
-
-    println!("\nAvailable input devices:");
-    for (i, name, _) in &inputs {
-        println!("  [{i}] {name}");
-    }
-    print!("Select input [0]: ");
-
-    use std::io::{self, Write};
-    io::stdout().flush()?;
-    let mut line = String::new();
-    io::stdin().read_line(&mut line)?;
-    let idx: usize = line.trim().parse().unwrap_or(0);
-
-    inputs
-        .into_iter()
-        .nth(idx)
-        .map(|(_, name, dev)| (dev, name))
-        .ok_or_else(|| anyhow!("Invalid device selection"))
-}
-
-fn select_output_device(host: &cpal::Host) -> Result<(Device, String)> {
-    let outputs: Vec<(usize, String, Device)> = host
-        .output_devices()?
-        .enumerate()
-        .map(|(i, d)| {
-            let name = d
-                .description()
-                .map(|desc| desc.name().to_owned())
-                .unwrap_or_else(|_| format!("device-{i}"));
-            (i, name, d)
-        })
-        .collect();
-
-    if outputs.is_empty() {
-        return Err(anyhow!("No audio output devices found"));
-    }
-
-    println!("\nAvailable output devices:");
-    for (i, name, _) in &outputs {
-        println!("  [{i}] {name}");
-    }
-    print!("Select output [0]: ");
-
-    use std::io::{self, Write};
-    io::stdout().flush()?;
-    let mut line = String::new();
-    io::stdin().read_line(&mut line)?;
-    let idx: usize = line.trim().parse().unwrap_or(0);
-
-    outputs
-        .into_iter()
-        .nth(idx)
-        .map(|(_, name, dev)| (dev, name))
-        .ok_or_else(|| anyhow!("Invalid device selection"))
-}
-
-/// Returns `(input_cfg, output_cfg, sample_rate_hz, input_format)`.
-/// Forces the output to the same sample rate as the input so the ring buffer
-/// never overflows or underflows.
 fn negotiate_configs(
     input: &Device,
     output: &Device,
@@ -151,29 +114,13 @@ fn negotiate_configs(
         .map(|r| r.with_sample_rate(in_sr))
         .unwrap_or_else(|| {
             eprintln!(
-                "Warning: output does not support {} Hz; falling back to its default \
-                 — audio may stutter.",
+                "Warning: output does not support {} Hz; falling back to its default.",
                 in_sr
             );
             output.default_output_config().unwrap()
         });
 
     Ok((in_sup.into(), out_sup.into(), in_sr as f32, in_fmt))
-}
-
-fn ask_channel(label: &str, n_channels: usize) -> Result<usize> {
-    use std::io::{self, Write};
-    print!("Select {label} channel (1-{n_channels}) [1]: ");
-    io::stdout().flush()?;
-    let mut line = String::new();
-    io::stdin().read_line(&mut line)?;
-    let ch = line
-        .trim()
-        .parse::<usize>()
-        .map(|n| n.saturating_sub(1)) // user types 1-based
-        .unwrap_or(0)
-        .min(n_channels - 1);
-    Ok(ch)
 }
 
 // ── Stream construction ───────────────────────────────────────────────────────
@@ -196,7 +143,6 @@ fn build_engine(
 
     let mut chain = DspChain::new(sr, Arc::clone(&params));
 
-    // Envelope: fast attack (~1 ms), slow release (~300 ms)
     let attack = 1.0 - (-1.0 / (0.001 * sr)).exp();
     let release = 1.0 - (-1.0 / (0.300 * sr)).exp();
     let mut in_env = 0.0f32;

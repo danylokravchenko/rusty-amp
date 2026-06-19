@@ -2,6 +2,7 @@ mod config;
 mod draw;
 mod input;
 mod presets;
+mod setup;
 mod styles;
 
 use std::sync::Arc;
@@ -28,9 +29,33 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
     let backend = ratatui::backend::CrosstermBackend::new(stdout);
     let mut terminal = ratatui::Terminal::new(backend)?;
 
+    // ── Device selection (TUI modals before audio starts) ─────────────────────
+    let devices = crate::audio::list_devices()?;
+    let selection = setup::run(&mut terminal, &devices, &params, &levels);
+
+    // Tear down on quit during setup
+    let selection = match selection {
+        Ok(s) => s,
+        Err(_) => {
+            disable_raw_mode()?;
+            execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+            return Ok(());
+        }
+    };
+
+    // ── Start audio engine ────────────────────────────────────────────────────
+    let _engine = crate::audio::start(
+        selection.input_idx,
+        selection.guitar_ch,
+        selection.output_idx,
+        Arc::clone(&params),
+        Arc::clone(&levels),
+    )?;
+
+    // ── Main UI loop ──────────────────────────────────────────────────────────
     let mut focus: Option<usize> = None;
     let mut preset_open = false;
-    let mut preset_cursor = 0usize; // 0 = Default, 1..=N = preset index
+    let mut preset_cursor = 0usize;
 
     loop {
         terminal.draw(|f| {
@@ -44,7 +69,7 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
             && let Event::Key(key) = event::read()?
         {
             if preset_open {
-                let total = presets.len() + 1; // +1 for "Default"
+                let total = presets.len() + 1;
                 match key.code {
                     KeyCode::Up => {
                         preset_cursor = preset_cursor.saturating_sub(1);
@@ -73,11 +98,11 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
                         preset_open = true;
                         preset_cursor = 0;
                     }
-                    KeyCode::Char('c') | KeyCode::Char('C') => {
-                        cycle_cab(&params);
-                    }
                     KeyCode::Char('a') | KeyCode::Char('A') => {
                         cycle_amp(&params, 1);
+                    }
+                    KeyCode::Char('c') | KeyCode::Char('C') => {
+                        cycle_cab(&params);
                     }
                     KeyCode::Tab => focus = next_section(focus),
                     KeyCode::BackTab => focus = prev_section(focus),
