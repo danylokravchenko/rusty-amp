@@ -1,0 +1,40 @@
+name        = "Slipknot — Iowa"
+description = "Mick Thomson & Jim Root's crushing modern metal tone — Mesa Dual Rectifier at full tilt."
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Both Slipknot guitarists run a TS in front of the Rectifier as a tight boost.
+# Low drive preserves the amp's own character; hot level saturates the input stage.
+# The TS also tightens the low end, which is critical in drop-B/drop-A tunings.
+[tube_screamer]
+enabled = true
+drive = 0.22   # nearly clean — the Mesa supplies all the real dirt
+tone  = 0.72   # bright to cut through dense, down-tuned low end
+level = 0.90   # very hot input — slams the Rectifier's first gain stage
+
+# DS-1 off — Slipknot's tone comes from the Rectifier, not additional pedals.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Mesa Dual Rectifier, Modern channel — the definitive modern metal amp.
+# Near-maximum gain, heavy bass for the drop tuning, controlled mid scoop,
+# high treble for pick-attack clarity through the dense mix.
+[amp]
+model  = "mesa"
+gain   = 0.91  # cranked — the Rectifier's three-stage silicon compression
+bass   = 0.76  # heavy — compensates for the bass loss in extreme down-tunings
+mid    = 0.30  # moderate scoop — modern but not as extreme as Pantera
+treble = 0.78  # sharp, defined — keeps the pick attack audible
+master = 0.62
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Heavy rhythm tones stay dry. Even a little reverb smears palm mutes
+# when the gain is this high — the silicon rectifier already compresses heavily.
+[reverb]
+enabled = false
+room = 0.20
+damp = 0.80
+mix  = 0.05

@@ -1,0 +1,42 @@
+name        = "Pantera — Vulgar Display of Power"
+description = "Dimebag's crushing rhythm tone: DS-1 + extreme gain, brutal mid-scoop, bone dry."
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Bypassed for Pantera — Dimebag's clean boost came from hitting the amp
+# directly with the DS-1. Keeping TS here as a reference if you want to layer.
+[tube_screamer]
+enabled = false
+drive = 0.18   # barely any drive — pure clean boost (if re-enabled)
+tone  = 0.78   # bright, helps cut through dense low-end
+level = 0.92   # very hot; the real distortion comes from the amp
+
+# ── Boss DS-1 Distortion ──────────────────────────────────────────────────────
+# Dimebag Darrell used a Boss DS-1 in his early career to push the amp harder.
+# High drive for maximum aggression; tone on the bright side preserves pick attack.
+[distortion]
+enabled = true
+drive = 0.72   # hard DS-1 clipping — adds the sharp, percussive edge
+tone  = 0.68   # slightly bright — keeps pick-attack definition cutting through
+level = 0.80   # hot signal into the amp's already cranked preamp
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Dimebag's actual rig was Randall solid-state, but the JCM800 pushed to
+# extremes captures the same hyper-compressed, percussive character.
+# Signature: maximum gain, bass heavy, treble aggressive, mids nearly absent
+# (he used a Furman PQ-3 EQ for the deep mid cut on record).
+[amp]
+model  = "randall"
+gain   = 0.93  # near maximum — every bit of preamp saturation
+bass   = 0.82  # thunderous low end
+mid    = 0.12  # aggressive mid scoop — deeper than Metallica
+treble = 0.86  # sharp, cutting highs for pick-attack definition
+master = 0.65
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Pantera's rhythm tone is completely dry. Any reverb tail would smear
+# the brutal palm-mute articulation that defines the sound.
+[reverb]
+enabled = false
+room = 0.10    # tiny room
+damp = 0.92    # almost fully damped
+mix  = 0.02    # effectively dry

@@ -1,0 +1,40 @@
+name        = "Pantera — Floods Solo"
+description = "Dimebag's singing lead tone from Floods — emotional, sustained, unexpectedly melodic."
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Off — the DS-1 alone handles the boost and saturation for the solo.
+[tube_screamer]
+enabled = false
+drive = 0.20
+tone  = 0.65
+level = 0.80
+
+# ── Boss DS-1 Distortion ──────────────────────────────────────────────────────
+# Light DS-1 as a lead boost — adds sustain and compression without the
+# wall-of-sound aggression of the rhythm tone. The key to the singing quality.
+[distortion]
+enabled = true
+drive = 0.38   # moderate — enough for infinite sustain, not so much it smears legato
+tone  = 0.58   # slightly warm — smooths the Randall's glassy top end for lead work
+level = 0.75
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Randall with more headroom than the rhythm preset — lets pick dynamics breathe.
+# Mid knob raised significantly: that mid presence is what makes a lead "sing"
+# where the rhythm is deliberately hollow.
+[amp]
+model  = "randall"
+gain   = 0.72   # pulled back from rhythm's 0.93 — more note, less wall
+bass   = 0.52   # neutral bass — keeps the low end tight without being thunderous
+mid    = 0.48   # near-flat mids — the opposite of the scooped rhythm tone
+treble = 0.70   # present but not ice-pick; the DS-1 tone control warms it further
+master = 0.65
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Some room depth — the Floods solo has a palpable sense of space in the studio
+# recording. Keeps the sustain from sounding dry and lifeless.
+[reverb]
+enabled = true
+room = 0.45   # medium room — audible tail without washing out articulation
+damp = 0.55   # partially damped — rolls off highs in the tail, stays warm
+mix  = 0.16   # tasteful — present but not drowning the dry signal

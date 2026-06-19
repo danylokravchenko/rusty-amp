@@ -1,0 +1,78 @@
+# This configuration enforces strict coding standards for a high-performance,
+# async Rust project dealing with database operations and networking.
+
+# ------------------------------------------------------------------------------
+# COGNITIVE COMPLEXITY
+# ------------------------------------------------------------------------------
+# Limit function complexity to maintain readability and testability
+cognitive-complexity-threshold = 15
+
+# ------------------------------------------------------------------------------
+# TYPE COMPLEXITY
+# ------------------------------------------------------------------------------
+# Warn on overly complex type signatures
+type-complexity-threshold = 250
+
+# ------------------------------------------------------------------------------
+# DOCUMENTATION
+# ------------------------------------------------------------------------------
+# Enforce documentation for public items
+missing-docs-in-crate-items = true
+
+# ------------------------------------------------------------------------------
+# PERFORMANCE
+# ------------------------------------------------------------------------------
+# Warn on unnecessary allocations and clones
+too-many-lines-threshold = 200
+single-char-binding-names-threshold = 4
+
+# ------------------------------------------------------------------------------
+# NAMING CONVENTIONS
+# ------------------------------------------------------------------------------
+# Enforce consistent naming (snake_case, CamelCase, SCREAMING_SNAKE_CASE)
+# These are enforced by default but explicitly listed for clarity
+enum-variant-name-threshold = 3
+max-struct-bools = 3
+struct-field-name-threshold = 20
+
+# ------------------------------------------------------------------------------
+# FUNCTION PARAMETERS
+# ------------------------------------------------------------------------------
+too-many-arguments-threshold = 7
+max-fn-params-bools = 3
+
+# ------------------------------------------------------------------------------
+# ASYNC/AWAIT
+# ------------------------------------------------------------------------------
+# Ensure proper async patterns in tokio-based code
+# (Most async lints are enabled by default in pedantic/restriction groups)
+future-size-threshold = 16384
+
+# ------------------------------------------------------------------------------
+# SAFETY
+# ------------------------------------------------------------------------------
+# Maximum strictness on unsafe code (should never be used per guidelines)
+# This is enforced through lint groups below
+
+# ------------------------------------------------------------------------------
+# VECTOR OPERATIONS
+# ------------------------------------------------------------------------------
+# Optimize vector usage patterns
+vec-box-size-threshold = 4096
+
+# ------------------------------------------------------------------------------
+# ARRAY AND STACK
+# ------------------------------------------------------------------------------
+array-size-threshold = 512000
+stack-size-threshold = 512000
+
+# ------------------------------------------------------------------------------
+# LITERAL HANDLING
+# ------------------------------------------------------------------------------
+literal-representation-threshold = 16384
+unreadable-literal-lint-fractions = true
+
+# ------------------------------------------------------------------------------
+# ERROR TYPES
+# ------------------------------------------------------------------------------
+large-error-threshold = 128

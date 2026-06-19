@@ -1,0 +1,42 @@
+name        = "Death — Human"
+description = "Chuck Schuldiner's articulate death metal tone — technical clarity over brute force."
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Chuck used a TS-style boost in front of the Rectifier to tighten the attack
+# and add sustain without smearing the fast, complex legato runs.
+# Slightly more drive than a pure clean boost to add harmonic density.
+[tube_screamer]
+enabled = true
+drive = 0.28   # light overdrive — adds density without masking individual notes
+tone  = 0.68   # bright enough to preserve articulation on fast technical passages
+level = 0.85   # hot input into the Rectifier
+
+# DS-1 off — the Rectifier + TS combination is the whole tone.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Mesa Dual Rectifier, the amp Chuck moved to for the "Human" / "Symbolic" era.
+# The defining characteristic of Death's tone vs other death metal of the time:
+# mids are NOT fully scooped — keeping them present lets individual notes speak
+# through dense palm-muted passages. This is what made Chuck's riffs readable.
+[amp]
+model  = "mesa"
+gain   = 0.82  # high but not maxed — leaves dynamic range for pick attack
+bass   = 0.68  # heavy low end for the tuned-down E-standard / D-standard feel
+mid    = 0.42  # key detail: mids raised well above the Pantera/Slipknot scoop
+treble = 0.75  # clear, defined — pick-attack cut without becoming shrill
+master = 0.60
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Death's studio sound is very dry and tight. The Mesa's compression provides
+# natural sustain; adding reverb would wash out the interlocking guitar lines
+# and obscure the technical detail that defines the band's sound.
+[reverb]
+enabled = false
+room = 0.20
+damp = 0.80
+mix  = 0.05

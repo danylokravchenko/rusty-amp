@@ -1,0 +1,29 @@
+name        = "Metallica — Master of Puppets"
+description = "Hetfield's tight rhythm tone: TS clean boost into high-gain JCM800, scooped mids, bone-dry."
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Used as a clean boost only — low drive, hot level slams the JCM800 preamp.
+[tube_screamer]
+enabled = true
+drive = 0.30   # minimal drive — just a boost
+tone  = 0.70   # slightly bright to cut through the mix
+level = 0.88   # hot output drives the preamp into saturation
+
+# No distortion pedal — Hetfield's dirt comes entirely from the JCM800 preamp.
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+[amp]
+model  = "marshall"
+gain   = 0.87
+bass   = 0.72
+mid    = 0.22  # scooped mids — the Metallica hollow crunch
+treble = 0.80
+master = 0.60
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Nearly dry — reverb would blur the palm-mute attack.
+[reverb]
+enabled = true
+room = 0.15
+damp = 0.85
+mix  = 0.04

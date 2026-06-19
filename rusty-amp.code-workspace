@@ -1,0 +1,17 @@
+{
+    // see https://code.visualstudio.com/docs/editor/workspaces
+    "folders": [
+        {
+            "path": "."
+        }
+    ],
+    "settings": {
+        "[rust]": {
+            "editor.defaultFormatter": "rust-lang.rust-analyzer",
+            "editor.formatOnSave": true
+        },
+        "files.insertFinalNewline": true,
+        "files.trimFinalNewlines": true,
+        "workbench.iconTheme": "vscode-icons"
+    }
+}
