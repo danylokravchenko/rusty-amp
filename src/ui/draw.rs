@@ -91,9 +91,15 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params) {
 
     let mut chain: Vec<Span> = vec![Span::raw("  ")];
 
-    chain.push(Span::styled("TS-808", Style::default().fg(pedal_color(ts_on))));
+    chain.push(Span::styled(
+        "TS-808",
+        Style::default().fg(pedal_color(ts_on)),
+    ));
     chain.push(arrow.clone());
-    chain.push(Span::styled("DS-1", Style::default().fg(pedal_color(ds_on))));
+    chain.push(Span::styled(
+        "DS-1",
+        Style::default().fg(pedal_color(ds_on)),
+    ));
     chain.push(arrow.clone());
     chain.push(Span::styled("PREAMP", Style::default().fg(amp_color)));
     chain.push(arrow.clone());
@@ -101,7 +107,10 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params) {
     chain.push(arrow.clone());
     chain.push(Span::styled("POWER AMP", Style::default().fg(amp_color)));
     chain.push(arrow.clone());
-    chain.push(Span::styled("REVERB", Style::default().fg(pedal_color(rev_on))));
+    chain.push(Span::styled(
+        "REVERB",
+        Style::default().fg(pedal_color(rev_on)),
+    ));
     chain.push(arrow.clone());
     chain.push(Span::styled("OUTPUT", Style::default().fg(CHROME)));
 
@@ -153,7 +162,13 @@ fn render_meters(f: &mut Frame, area: Rect, levels: &Levels) {
         Span::styled(
             format!("{:.0}W", watts),
             Style::default()
-                .fg(if watts > 80.0 { HOT } else if watts > 40.0 { WARN } else { SAFE })
+                .fg(if watts > 80.0 {
+                    HOT
+                } else if watts > 40.0 {
+                    WARN
+                } else {
+                    SAFE
+                })
                 .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
@@ -175,7 +190,10 @@ fn render_vu_row(f: &mut Frame, area: Rect, label: &str, level: f32) {
     let yellow_end = (bar_width as f64 * 0.88) as usize;
 
     let mut spans = vec![
-        Span::styled(label, Style::default().fg(CHROME).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            label,
+            Style::default().fg(CHROME).add_modifier(Modifier::BOLD),
+        ),
         Span::styled("▐", Style::default().fg(DIM)),
     ];
 
@@ -199,7 +217,11 @@ fn render_vu_row(f: &mut Frame, area: Rect, label: &str, level: f32) {
 }
 
 fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool) {
-    let border_color = if focused { ORANGE } else { ratatui::style::Color::Rgb(60, 40, 0) };
+    let border_color = if focused {
+        ORANGE
+    } else {
+        ratatui::style::Color::Rgb(60, 40, 0)
+    };
 
     let block = Block::default()
         .borders(Borders::ALL)
@@ -221,11 +243,17 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
     for m in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
         let selected = m == model;
         let label_style = if selected {
-            Style::default().fg(ORANGE).add_modifier(Modifier::BOLD | Modifier::REVERSED)
+            Style::default()
+                .fg(ORANGE)
+                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
         } else {
             Style::default().fg(ratatui::style::Color::Rgb(80, 60, 0))
         };
-        let (bl, br) = if selected { ("◀ ", " ▶") } else { ("[ ", " ]") };
+        let (bl, br) = if selected {
+            ("◀ ", " ▶")
+        } else {
+            ("[ ", " ]")
+        };
         let bracket_color = if selected { AMBER } else { DIM };
         spans.push(Span::styled(bl, Style::default().fg(bracket_color)));
         spans.push(Span::styled(m.short_name(), label_style));
@@ -237,7 +265,10 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         spans.push(Span::styled("  ↑/↓ to switch", Style::default().fg(DIM)));
     }
 
-    f.render_widget(Paragraph::new(Line::from(spans)).alignment(Alignment::Left), inner);
+    f.render_widget(
+        Paragraph::new(Line::from(spans)).alignment(Alignment::Left),
+        inner,
+    );
 }
 
 fn render_section_row(
@@ -304,17 +335,23 @@ fn render_section(
         vec![
             Span::styled(
                 format!(" {title} "),
-                Style::default().fg(title_color).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(title_color)
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 if on { "● " } else { "○ " },
-                Style::default().fg(badge_color).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(badge_color)
+                    .add_modifier(Modifier::BOLD),
             ),
         ]
     } else {
         vec![Span::styled(
             format!(" {title} "),
-            Style::default().fg(title_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(title_color)
+                .add_modifier(Modifier::BOLD),
         )]
     };
 
@@ -329,7 +366,9 @@ fn render_section(
     f.render_widget(block, area);
 
     let count = end - start;
-    let constraints: Vec<Constraint> = (0..count).map(|_| Constraint::Ratio(1, count as u32)).collect();
+    let constraints: Vec<Constraint> = (0..count)
+        .map(|_| Constraint::Ratio(1, count as u32))
+        .collect();
 
     let cols = Layout::default()
         .direction(Direction::Horizontal)
@@ -342,17 +381,14 @@ fn render_section(
     }
 }
 
-fn render_knob(
-    f: &mut Frame,
-    area: Rect,
-    label: &str,
-    value: f32,
-    focused: bool,
-    active: bool,
-) {
+fn render_knob(f: &mut Frame, area: Rect, label: &str, value: f32, focused: bool, active: bool) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(3), Constraint::Length(1), Constraint::Length(1)])
+        .constraints([
+            Constraint::Min(3),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
         .split(area);
 
     let dial_color = if focused {
@@ -416,7 +452,11 @@ fn render_knob(
         OFF
     };
     let value_color = if focused {
-        if active { ORANGE } else { ratatui::style::Color::Rgb(130, 90, 0) }
+        if active {
+            ORANGE
+        } else {
+            ratatui::style::Color::Rgb(130, 90, 0)
+        }
     } else if active {
         ratatui::style::Color::Rgb(120, 80, 0)
     } else {
@@ -426,14 +466,21 @@ fn render_knob(
     let label_line = Line::from(vec![
         Span::styled(
             format!("{label} "),
-            Style::default().fg(label_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(label_color)
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!("{num:.1}"),
-            Style::default().fg(value_color).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(value_color)
+                .add_modifier(Modifier::BOLD),
         ),
     ]);
-    f.render_widget(Paragraph::new(label_line).alignment(Alignment::Center), rows[2]);
+    f.render_widget(
+        Paragraph::new(label_line).alignment(Alignment::Center),
+        rows[2],
+    );
 }
 
 fn render_help(f: &mut Frame, area: Rect) {
@@ -459,15 +506,18 @@ fn render_help(f: &mut Frame, area: Rect) {
 fn build_dial(value: f32, focused: bool) -> Vec<String> {
     use std::f32::consts::PI;
 
-    let start = 225.0_f32;
-    let sweep = 300.0_f32;
-    let angle = (start - value * sweep) * PI / 180.0;
+    let start_deg = 225.0_f32;
+    let sweep = 270.0_f32;
+    let angle = (start_deg - value * sweep) * PI / 180.0;
 
-    let r = 2.0_f32;
+    // rx:ry = 2:1 compensates for terminal char aspect ratio (~2x taller than wide)
+    let rx = 4.0_f32;
+    let ry = 2.0_f32;
     let cx = 4.0_f32;
     let cy = 2.0_f32;
-    let ix = (cx + angle.cos() * r).round() as isize;
-    let iy = (cy - angle.sin() * r).round() as isize;
+
+    let ix = (cx + angle.cos() * rx).round() as isize;
+    let iy = (cy - angle.sin() * ry).round() as isize;
 
     let dot = if focused { '◆' } else { '◇' };
 
@@ -475,17 +525,18 @@ fn build_dial(value: f32, focused: bool) -> Vec<String> {
         .map(|row| {
             (0..9isize)
                 .map(|col| {
-                    let dc = (col as f32 - cx) as isize;
-                    let dr = (row as f32 - cy) as isize;
-                    let dist = ((dc * dc + dr * dr) as f32).sqrt();
+                    let dx = (col as f32 - cx) / rx;
+                    let dy = (row as f32 - cy) / ry;
+                    let dist = (dx * dx + dy * dy).sqrt();
 
                     if col == cx as isize && row == cy as isize {
                         '●'
                     } else if col == ix && row == iy {
                         dot
-                    } else if (dist - r).abs() < 0.55 {
+                    } else if (dist - 1.0).abs() < 0.25 {
                         let a = (-(row as f32 - cy)).atan2(col as f32 - cx).to_degrees();
-                        let rel = (a - start).rem_euclid(360.0);
+                        // CCW distance from start: (start - a) mod 360
+                        let rel = (start_deg - a).rem_euclid(360.0);
                         if rel <= sweep { '·' } else { ' ' }
                     } else {
                         ' '

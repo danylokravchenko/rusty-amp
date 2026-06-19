@@ -97,6 +97,7 @@ pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
     ),
 ];
 
-pub(super) const AMP_SECTIONS: &[SectionDef] = &[(|p| format!("⚡ {}", p.amp_model().name()), 9, 14, |_| None)];
+pub(super) const AMP_SECTIONS: &[SectionDef] =
+    &[(|p| format!("⚡ {}", p.amp_model().name()), 9, 14, |_| None)];
 
 pub(super) const SECTION_STARTS: &[Option<usize>] = &[None, Some(0), Some(3), Some(6), Some(9)];

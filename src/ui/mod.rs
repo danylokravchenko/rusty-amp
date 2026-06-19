@@ -11,7 +11,7 @@ use anyhow::Result;
 use crossterm::{
     event::{self, Event, KeyCode, KeyModifiers},
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
 use crate::dsp::{Levels, Params};
@@ -41,7 +41,7 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
         })?;
 
         if event::poll(Duration::from_millis(30))?
-            && let Event::Key(key) = event::read()? 
+            && let Event::Key(key) = event::read()?
         {
             if preset_open {
                 let total = presets.len() + 1; // +1 for "Default"

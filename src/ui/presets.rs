@@ -6,8 +6,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use crate::preset::Preset;
 use super::styles::{AMBER, CHROME, DIM, ORANGE};
+use crate::preset::Preset;
 
 pub(super) fn render_preset_modal(f: &mut Frame, presets: &[Preset], cursor: usize) {
     let area = centered_rect(60, f.area());
@@ -38,7 +38,9 @@ pub(super) fn render_preset_modal(f: &mut Frame, presets: &[Preset], cursor: usi
         let (prefix, name_style, desc_style) = if selected {
             (
                 "▶ ",
-                Style::default().fg(ORANGE).add_modifier(Modifier::BOLD | Modifier::REVERSED),
+                Style::default()
+                    .fg(ORANGE)
+                    .add_modifier(Modifier::BOLD | Modifier::REVERSED),
                 Style::default().fg(AMBER).add_modifier(Modifier::REVERSED),
             )
         } else {
@@ -52,7 +54,10 @@ pub(super) fn render_preset_modal(f: &mut Frame, presets: &[Preset], cursor: usi
         };
 
         Line::from(vec![
-            Span::styled(prefix.to_string(), Style::default().fg(if selected { ORANGE } else { DIM })),
+            Span::styled(
+                prefix.to_string(),
+                Style::default().fg(if selected { ORANGE } else { DIM }),
+            ),
             Span::styled(label, name_style),
             Span::styled(desc.to_string(), desc_style),
         ])
@@ -65,7 +70,11 @@ pub(super) fn render_preset_modal(f: &mut Frame, presets: &[Preset], cursor: usi
     }
 
     let visible = rows[0].height as usize;
-    let offset = if cursor >= visible { cursor - visible + 1 } else { 0 };
+    let offset = if cursor >= visible {
+        cursor - visible + 1
+    } else {
+        0
+    };
     let visible_lines: Vec<Line> = lines.into_iter().skip(offset).collect();
 
     f.render_widget(Paragraph::new(visible_lines), rows[0]);
