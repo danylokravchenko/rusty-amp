@@ -1,8 +1,7 @@
-/// Freeverb mono reverb by Jezar at Dreampoint (public domain algorithm).
-///
-/// Architecture: input × gain → 8 parallel comb filters (summed) → 4 series allpass filters
-/// Comb filters provide the dense reflections; allpass filters diffuse them.
-
+//! Freeverb mono reverb by Jezar at Dreampoint (public domain algorithm).
+//!
+//! Architecture: input × gain → 8 parallel comb filters (summed) → 4 series allpass filters
+//! Comb filters provide the dense reflections; allpass filters diffuse them
 const FIXED_GAIN: f32 = 0.015;
 const SCALE_WET: f32 = 3.0;
 const SCALE_ROOM: f32 = 0.28;

@@ -10,18 +10,15 @@ fn main() -> Result<()> {
     let params = Arc::new(dsp::Params::new());
     let levels = Arc::new(dsp::Levels::new());
 
-    // ── Preset selection (before audio starts so values are ready) ────────────
+    // Presets are loaded once at startup and passed into the TUI,
+    // where the user can browse and apply them at any time with P.
     let presets = preset::load_all();
-    if let Some(chosen) = preset::prompt_user(&presets) {
-        chosen.apply(&params);
-        println!("Loaded: {}\n", chosen.name);
-    }
 
-    // ── Audio engine (device selection + probe + stream start) ────────────────
+    // ── Audio engine (device selection + stream start) ────────────────────────
     let _engine = audio::start(Arc::clone(&params), Arc::clone(&levels))?;
 
     // ── TUI (blocks until user quits) ─────────────────────────────────────────
-    ui::run(params, levels)?;
+    ui::run(params, levels, presets)?;
 
     Ok(())
 }

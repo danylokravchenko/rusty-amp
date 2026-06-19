@@ -9,37 +9,37 @@ use crate::dsp::{AmpModel, Params};
 
 #[derive(Debug, Deserialize)]
 pub struct Preset {
-    pub name:          String,
-    pub description:   Option<String>,
+    pub name: String,
+    pub description: Option<String>,
     pub tube_screamer: TsSection,
-    pub distortion:    Option<DsSection>,
-    pub amp:           AmpSection,
-    pub reverb:        ReverbSection,
+    pub distortion: Option<DsSection>,
+    pub amp: AmpSection,
+    pub reverb: ReverbSection,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TsSection {
     pub enabled: Option<bool>,
-    pub drive:   f32,
-    pub tone:    f32,
-    pub level:   f32,
+    pub drive: f32,
+    pub tone: f32,
+    pub level: f32,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DsSection {
     pub enabled: Option<bool>,
-    pub drive:   f32,
-    pub tone:    f32,
-    pub level:   f32,
+    pub drive: f32,
+    pub tone: f32,
+    pub level: f32,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AmpSection {
     /// "marshall" (default) or "mesa"
-    pub model:  Option<String>,
-    pub gain:   f32,
-    pub bass:   f32,
-    pub mid:    f32,
+    pub model: Option<String>,
+    pub gain: f32,
+    pub bass: f32,
+    pub mid: f32,
     pub treble: f32,
     pub master: f32,
 }
@@ -49,7 +49,7 @@ pub struct ReverbSection {
     pub enabled: Option<bool>,
     pub room: f32,
     pub damp: f32,
-    pub mix:  f32,
+    pub mix: f32,
 }
 
 impl Preset {
@@ -64,13 +64,13 @@ impl Preset {
         let ts = &self.tube_screamer;
         params.ts_enabled.store(ts.enabled.unwrap_or(true), Relaxed);
         params.ts_drive.store(ts.drive.clamp(0.0, 1.0), Relaxed);
-        params.ts_tone .store(ts.tone .clamp(0.0, 1.0), Relaxed);
+        params.ts_tone.store(ts.tone.clamp(0.0, 1.0), Relaxed);
         params.ts_level.store(ts.level.clamp(0.0, 1.0), Relaxed);
 
         if let Some(ds) = &self.distortion {
             params.ds_enabled.store(ds.enabled.unwrap_or(true), Relaxed);
             params.ds_drive.store(ds.drive.clamp(0.0, 1.0), Relaxed);
-            params.ds_tone .store(ds.tone .clamp(0.0, 1.0), Relaxed);
+            params.ds_tone.store(ds.tone.clamp(0.0, 1.0), Relaxed);
             params.ds_level.store(ds.level.clamp(0.0, 1.0), Relaxed);
         } else {
             params.ds_enabled.store(false, Relaxed);
@@ -78,22 +78,24 @@ impl Preset {
 
         let amp = &self.amp;
         let model = match amp.model.as_deref() {
-            Some("mesa")    => AmpModel::Mesa,
+            Some("mesa") => AmpModel::Mesa,
             Some("randall") => AmpModel::Randall,
-            _               => AmpModel::Marshall,
+            _ => AmpModel::Marshall,
         };
-        params.amp_model .store(model as u8, Relaxed);
-        params.amp_gain  .store(amp.gain  .clamp(0.0, 1.0), Relaxed);
-        params.amp_bass  .store(amp.bass  .clamp(0.0, 1.0), Relaxed);
-        params.amp_mid   .store(amp.mid   .clamp(0.0, 1.0), Relaxed);
+        params.amp_model.store(model as u8, Relaxed);
+        params.amp_gain.store(amp.gain.clamp(0.0, 1.0), Relaxed);
+        params.amp_bass.store(amp.bass.clamp(0.0, 1.0), Relaxed);
+        params.amp_mid.store(amp.mid.clamp(0.0, 1.0), Relaxed);
         params.amp_treble.store(amp.treble.clamp(0.0, 1.0), Relaxed);
         params.amp_master.store(amp.master.clamp(0.0, 1.0), Relaxed);
 
         let rev = &self.reverb;
-        params.rev_enabled.store(rev.enabled.unwrap_or(true), Relaxed);
+        params
+            .rev_enabled
+            .store(rev.enabled.unwrap_or(true), Relaxed);
         params.rev_room.store(rev.room.clamp(0.0, 1.0), Relaxed);
         params.rev_damp.store(rev.damp.clamp(0.0, 1.0), Relaxed);
-        params.rev_mix .store(rev.mix .clamp(0.0, 1.0), Relaxed);
+        params.rev_mix.store(rev.mix.clamp(0.0, 1.0), Relaxed);
     }
 }
 
@@ -112,7 +114,7 @@ pub fn find_preset_files() -> Vec<PathBuf> {
             let mut dir_files: Vec<PathBuf> = entries
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
-                .filter(|p| p.extension().map_or(false, |ext| ext == "toml"))
+                .filter(|p| p.extension().is_some_and(|ext| ext == "toml"))
                 .collect();
             dir_files.sort();
             files.extend(dir_files);
@@ -130,26 +132,4 @@ pub fn load_all() -> Vec<Preset> {
                 .ok()
         })
         .collect()
-}
-
-pub fn prompt_user(presets: &[Preset]) -> Option<&Preset> {
-    println!("\nAvailable presets:");
-    println!("  [0] Default (built-in starting values)");
-    for (i, p) in presets.iter().enumerate() {
-        let desc = p.description.as_deref().unwrap_or("");
-        println!("  [{}] {}  {}", i + 1, p.name, desc);
-    }
-    print!("Select preset [0]: ");
-
-    use std::io::{self, Write};
-    io::stdout().flush().ok();
-    let mut line = String::new();
-    io::stdin().read_line(&mut line).ok();
-
-    let idx: usize = line.trim().parse().unwrap_or(0);
-    if idx == 0 || idx > presets.len() {
-        None
-    } else {
-        Some(&presets[idx - 1])
-    }
 }

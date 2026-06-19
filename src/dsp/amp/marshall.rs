@@ -1,5 +1,5 @@
-use crate::dsp::biquad::Biquad;
 use super::Amplifier;
+use crate::dsp::biquad::Biquad;
 
 /// Marshall JCM800 amplifier simulation.
 ///
@@ -10,32 +10,32 @@ use super::Amplifier;
 /// Middle 25 kΩ) as three cascaded biquad filters with parametric interaction.
 pub struct Marshall {
     sr: f32,
-    dc_block:     Biquad,
-    input_hp:     Biquad,
+    dc_block: Biquad,
+    input_hp: Biquad,
     // Tone stack filters — rebuilt only when knob values change
-    bass_shelf:   Biquad,
-    mid_peak:     Biquad,
+    bass_shelf: Biquad,
+    mid_peak: Biquad,
     treble_shelf: Biquad,
-    last_bass:    f32,
-    last_mid:     f32,
-    last_treble:  f32,
+    last_bass: f32,
+    last_mid: f32,
+    last_treble: f32,
     // Power amp envelope follower (sag simulation)
-    envelope:     f32,
+    envelope: f32,
 }
 
 impl Marshall {
     pub fn new(sr: f32) -> Self {
         let mut m = Self {
             sr,
-            dc_block:     Biquad::highpass(sr, 10.0,   0.707),
-            input_hp:     Biquad::highpass(sr, 60.0,   0.707),
-            bass_shelf:   Biquad::low_shelf (sr, 80.0,   0.0),
-            mid_peak:     Biquad::peak_eq   (sr, 400.0, 0.7, 0.0),
+            dc_block: Biquad::highpass(sr, 10.0, 0.707),
+            input_hp: Biquad::highpass(sr, 60.0, 0.707),
+            bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
+            mid_peak: Biquad::peak_eq(sr, 400.0, 0.7, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 2500.0, 0.0),
-            last_bass:   -1.0,
-            last_mid:    -1.0,
+            last_bass: -1.0,
+            last_mid: -1.0,
             last_treble: -1.0,
-            envelope:     0.0,
+            envelope: 0.0,
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m
@@ -43,11 +43,11 @@ impl Marshall {
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
         // Marshall characteristic: bass and treble ±15 dB, mid ±12 dB with slight default scoop
-        self.bass_shelf   = Biquad::low_shelf (self.sr, 80.0,   (bass   - 0.5) * 30.0);
-        self.mid_peak     = Biquad::peak_eq   (self.sr, 400.0, 0.7, (mid - 0.5) * 24.0);
+        self.bass_shelf = Biquad::low_shelf(self.sr, 80.0, (bass - 0.5) * 30.0);
+        self.mid_peak = Biquad::peak_eq(self.sr, 400.0, 0.7, (mid - 0.5) * 24.0);
         self.treble_shelf = Biquad::high_shelf(self.sr, 2500.0, (treble - 0.5) * 30.0);
-        self.last_bass   = bass;
-        self.last_mid    = mid;
+        self.last_bass = bass;
+        self.last_mid = mid;
         self.last_treble = treble;
     }
 
@@ -76,15 +76,15 @@ impl Amplifier for Marshall {
     fn process(
         &mut self,
         sample: f32,
-        gain:   f32,
-        bass:   f32,
-        mid:    f32,
+        gain: f32,
+        bass: f32,
+        mid: f32,
         treble: f32,
         master: f32,
     ) -> f32 {
-        if (bass   - self.last_bass).abs()   > 0.001
-        || (mid    - self.last_mid).abs()    > 0.001
-        || (treble - self.last_treble).abs() > 0.001
+        if (bass - self.last_bass).abs() > 0.001
+            || (mid - self.last_mid).abs() > 0.001
+            || (treble - self.last_treble).abs() > 0.001
         {
             self.update_tone_stack(bass, mid, treble);
         }

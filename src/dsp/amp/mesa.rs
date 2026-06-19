@@ -1,5 +1,5 @@
-use crate::dsp::biquad::Biquad;
 use super::Amplifier;
+use crate::dsp::biquad::Biquad;
 
 /// Mesa/Boogie Dual Rectifier — Modern channel simulation.
 ///
@@ -14,30 +14,30 @@ use super::Amplifier;
 ///   • Third stage uses a harder exponential waveshaper (rectifier character)
 pub struct Mesa {
     sr: f32,
-    dc_block:     Biquad,
-    input_hp:     Biquad,
-    bass_shelf:   Biquad,
-    mid_peak:     Biquad,
+    dc_block: Biquad,
+    input_hp: Biquad,
+    bass_shelf: Biquad,
+    mid_peak: Biquad,
     treble_shelf: Biquad,
-    last_bass:    f32,
-    last_mid:     f32,
-    last_treble:  f32,
-    envelope:     f32,
+    last_bass: f32,
+    last_mid: f32,
+    last_treble: f32,
+    envelope: f32,
 }
 
 impl Mesa {
     pub fn new(sr: f32) -> Self {
         let mut m = Self {
             sr,
-            dc_block:     Biquad::highpass(sr, 10.0,   0.707),
-            input_hp:     Biquad::highpass(sr, 60.0,   0.707),
-            bass_shelf:   Biquad::low_shelf (sr, 100.0,  0.0),
-            mid_peak:     Biquad::peak_eq   (sr, 750.0, 0.5, 0.0),
+            dc_block: Biquad::highpass(sr, 10.0, 0.707),
+            input_hp: Biquad::highpass(sr, 60.0, 0.707),
+            bass_shelf: Biquad::low_shelf(sr, 100.0, 0.0),
+            mid_peak: Biquad::peak_eq(sr, 750.0, 0.5, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 3300.0, 0.0),
-            last_bass:   -1.0,
-            last_mid:    -1.0,
+            last_bass: -1.0,
+            last_mid: -1.0,
             last_treble: -1.0,
-            envelope:     0.0,
+            envelope: 0.0,
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m
@@ -45,11 +45,11 @@ impl Mesa {
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
         // ±15 dB for bass / treble, ±12 dB for mid (same range as Marshall)
-        self.bass_shelf   = Biquad::low_shelf (self.sr, 100.0,  (bass   - 0.5) * 30.0);
-        self.mid_peak     = Biquad::peak_eq   (self.sr, 750.0, 0.5, (mid - 0.5) * 24.0);
+        self.bass_shelf = Biquad::low_shelf(self.sr, 100.0, (bass - 0.5) * 30.0);
+        self.mid_peak = Biquad::peak_eq(self.sr, 750.0, 0.5, (mid - 0.5) * 24.0);
         self.treble_shelf = Biquad::high_shelf(self.sr, 3300.0, (treble - 0.5) * 30.0);
-        self.last_bass   = bass;
-        self.last_mid    = mid;
+        self.last_bass = bass;
+        self.last_mid = mid;
         self.last_treble = treble;
     }
 
@@ -59,9 +59,9 @@ impl Mesa {
     fn power_amp(&mut self, x: f32) -> f32 {
         let abs_x = x.abs();
         let coeff = if abs_x > self.envelope {
-            1.0 - (-1.0 / (0.0005 * self.sr)).exp()  // 0.5 ms attack
+            1.0 - (-1.0 / (0.0005 * self.sr)).exp() // 0.5 ms attack
         } else {
-            1.0 - (-1.0 / (0.080  * self.sr)).exp()  // 80 ms release
+            1.0 - (-1.0 / (0.080 * self.sr)).exp() // 80 ms release
         };
         self.envelope += coeff * (abs_x - self.envelope);
 
@@ -76,15 +76,15 @@ impl Amplifier for Mesa {
     fn process(
         &mut self,
         sample: f32,
-        gain:   f32,
-        bass:   f32,
-        mid:    f32,
+        gain: f32,
+        bass: f32,
+        mid: f32,
         treble: f32,
         master: f32,
     ) -> f32 {
-        if (bass   - self.last_bass).abs()   > 0.001
-        || (mid    - self.last_mid).abs()    > 0.001
-        || (treble - self.last_treble).abs() > 0.001
+        if (bass - self.last_bass).abs() > 0.001
+            || (mid - self.last_mid).abs() > 0.001
+            || (treble - self.last_treble).abs() > 0.001
         {
             self.update_tone_stack(bass, mid, treble);
         }
@@ -93,7 +93,7 @@ impl Amplifier for Mesa {
         let x = self.input_hp.process(x);
 
         // Stage 1: first 12AX7 — moderate gain, soft atan clip
-        let pregain = 1.0 + gain * 35.0;   // 1× – 36×
+        let pregain = 1.0 + gain * 35.0; // 1× – 36×
         let x = tube_clip(x * pregain) / pregain.sqrt();
 
         // Stage 2: second 12AX7 — fixed extra compression

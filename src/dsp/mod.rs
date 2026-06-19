@@ -19,8 +19,8 @@ use tube_screamer::TubeScreamer;
 #[repr(u8)]
 pub enum AmpModel {
     Marshall = 0,
-    Mesa     = 1,
-    Randall  = 2,
+    Mesa = 1,
+    Randall = 2,
 }
 
 impl AmpModel {
@@ -35,8 +35,8 @@ impl AmpModel {
     pub fn name(self) -> &'static str {
         match self {
             Self::Marshall => "Marshall JCM800",
-            Self::Mesa     => "Mesa Dual Rectifier",
-            Self::Randall  => "Randall Warhead",
+            Self::Mesa => "Mesa Dual Rectifier",
+            Self::Randall => "Randall Warhead",
         }
     }
 
@@ -44,24 +44,24 @@ impl AmpModel {
     pub fn short_name(self) -> &'static str {
         match self {
             Self::Marshall => "JCM800",
-            Self::Mesa     => "DUAL RECT",
-            Self::Randall  => "RANDALL",
+            Self::Mesa => "DUAL RECT",
+            Self::Randall => "RANDALL",
         }
     }
 
     pub fn next(self) -> Self {
         match self {
             Self::Marshall => Self::Mesa,
-            Self::Mesa     => Self::Randall,
-            Self::Randall  => Self::Marshall,
+            Self::Mesa => Self::Randall,
+            Self::Randall => Self::Marshall,
         }
     }
 
     pub fn prev(self) -> Self {
         match self {
             Self::Marshall => Self::Randall,
-            Self::Mesa     => Self::Marshall,
-            Self::Randall  => Self::Mesa,
+            Self::Mesa => Self::Marshall,
+            Self::Randall => Self::Mesa,
         }
     }
 }
@@ -74,58 +74,60 @@ pub struct Params {
 
     // TS-808
     pub ts_enabled: Arc<AtomicBool>,
-    pub ts_drive:   Arc<AtomicF32>,
-    pub ts_tone:    Arc<AtomicF32>,
-    pub ts_level:   Arc<AtomicF32>,
+    pub ts_drive: Arc<AtomicF32>,
+    pub ts_tone: Arc<AtomicF32>,
+    pub ts_level: Arc<AtomicF32>,
 
     // Boss DS-1 Distortion
     pub ds_enabled: Arc<AtomicBool>,
-    pub ds_drive:   Arc<AtomicF32>,
-    pub ds_tone:    Arc<AtomicF32>,
-    pub ds_level:   Arc<AtomicF32>,
+    pub ds_drive: Arc<AtomicF32>,
+    pub ds_tone: Arc<AtomicF32>,
+    pub ds_level: Arc<AtomicF32>,
 
     // Amp (shared by all models)
-    pub amp_gain:   Arc<AtomicF32>,
-    pub amp_bass:   Arc<AtomicF32>,
-    pub amp_mid:    Arc<AtomicF32>,
+    pub amp_gain: Arc<AtomicF32>,
+    pub amp_bass: Arc<AtomicF32>,
+    pub amp_mid: Arc<AtomicF32>,
     pub amp_treble: Arc<AtomicF32>,
     pub amp_master: Arc<AtomicF32>,
 
     // Reverb
     pub rev_enabled: Arc<AtomicBool>,
-    pub rev_room:    Arc<AtomicF32>,
-    pub rev_damp:    Arc<AtomicF32>,
-    pub rev_mix:     Arc<AtomicF32>,
+    pub rev_room: Arc<AtomicF32>,
+    pub rev_damp: Arc<AtomicF32>,
+    pub rev_mix: Arc<AtomicF32>,
 }
 
 impl Params {
     pub fn new() -> Self {
         macro_rules! p {
-            ($v:expr) => { Arc::new(AtomicF32::new($v)) };
+            ($v:expr) => {
+                Arc::new(AtomicF32::new($v))
+            };
         }
         Self {
-            amp_model:  Arc::new(AtomicU8::new(AmpModel::Marshall as u8)),
+            amp_model: Arc::new(AtomicU8::new(AmpModel::Marshall as u8)),
 
             ts_enabled: Arc::new(AtomicBool::new(true)),
-            ts_drive:   p!(0.45),
-            ts_tone:    p!(0.60),
-            ts_level:   p!(0.70),
+            ts_drive: p!(0.45),
+            ts_tone: p!(0.60),
+            ts_level: p!(0.70),
 
             ds_enabled: Arc::new(AtomicBool::new(false)),
-            ds_drive:   p!(0.40),
-            ds_tone:    p!(0.50),
-            ds_level:   p!(0.65),
+            ds_drive: p!(0.40),
+            ds_tone: p!(0.50),
+            ds_level: p!(0.65),
 
-            amp_gain:   p!(0.65),
-            amp_bass:   p!(0.50),
-            amp_mid:    p!(0.45),
+            amp_gain: p!(0.65),
+            amp_bass: p!(0.50),
+            amp_mid: p!(0.45),
             amp_treble: p!(0.65),
             amp_master: p!(0.55),
 
             rev_enabled: Arc::new(AtomicBool::new(true)),
-            rev_room:    p!(0.55),
-            rev_damp:    p!(0.40),
-            rev_mix:     p!(0.25),
+            rev_room: p!(0.55),
+            rev_damp: p!(0.40),
+            rev_mix: p!(0.25),
         }
     }
 
@@ -137,14 +139,14 @@ impl Params {
 // ── Signal levels (written by audio thread, read by UI) ───────────────────────
 
 pub struct Levels {
-    pub input:  Arc<AtomicF32>,
+    pub input: Arc<AtomicF32>,
     pub output: Arc<AtomicF32>,
 }
 
 impl Levels {
     pub fn new() -> Self {
         Self {
-            input:  Arc::new(AtomicF32::new(0.0)),
+            input: Arc::new(AtomicF32::new(0.0)),
             output: Arc::new(AtomicF32::new(0.0)),
         }
     }
@@ -153,9 +155,9 @@ impl Levels {
 // ── DSP chain (owned by audio thread, never shared) ───────────────────────────
 
 pub struct DspChain {
-    ts:     TubeScreamer,
-    ds:     Distortion,
-    amp:    AmpBank,
+    ts: TubeScreamer,
+    ds: Distortion,
+    amp: AmpBank,
     reverb: Reverb,
     params: Arc<Params>,
 }
@@ -163,9 +165,9 @@ pub struct DspChain {
 impl DspChain {
     pub fn new(sr: f32, params: Arc<Params>) -> Self {
         Self {
-            ts:     TubeScreamer::new(sr),
-            ds:     Distortion::new(sr),
-            amp:    AmpBank::new(sr),
+            ts: TubeScreamer::new(sr),
+            ds: Distortion::new(sr),
+            amp: AmpBank::new(sr),
             reverb: Reverb::new(sr),
             params,
         }
@@ -202,9 +204,9 @@ impl DspChain {
         let x = self.amp.process(
             p.amp_model(),
             x,
-            p.amp_gain  .load(Relaxed),
-            p.amp_bass  .load(Relaxed),
-            p.amp_mid   .load(Relaxed),
+            p.amp_gain.load(Relaxed),
+            p.amp_bass.load(Relaxed),
+            p.amp_mid.load(Relaxed),
             p.amp_treble.load(Relaxed),
             p.amp_master.load(Relaxed),
         );
@@ -215,7 +217,7 @@ impl DspChain {
                 x,
                 p.rev_room.load(Relaxed),
                 p.rev_damp.load(Relaxed),
-                p.rev_mix .load(Relaxed),
+                p.rev_mix.load(Relaxed),
             )
         } else {
             x
