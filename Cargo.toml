@@ -2,6 +2,13 @@
 name = "rusty-amp"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.95"
+description = "A guitar amplifier and effects simulator in your terminal"
+repository = "https://github.com/danylokravchenko/rusty-amp"
+authors = ["danylo.kravchenko.r@gmail.com"]
+license-file = "LICENSE"
+readme = "README.md"
+publish = false
 
 [dependencies]
 cpal = "0.15"
@@ -16,3 +23,104 @@ dirs = "5"
 
 [profile.release]
 opt-level = 3
+
+
+[workspace.lints.rust]
+unsafe_code = "warn"             # Warn unsafe code
+missing_docs = "allow"           # Allow missing documentation
+unused_must_use = "deny"         # Deny ignoring Result/Option returns
+
+[workspace.lints.clippy]
+multiple_crate_versions = "allow"
+# ==============================================================================
+# RESTRICTION GROUP - Explicitly opt-in to strict checks
+# ==============================================================================
+# These lints catch patterns that should never appear in the codebase
+
+# Error Handling - No panics, unwraps, or expects
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unimplemented = "deny"
+todo = "warn"
+unreachable = "deny"
+panic_in_result_fn = "deny"
+
+# Memory & Performance
+clone_on_ref_ptr = "warn"        # Cloning Arc/Rc is cheap, document it
+unnecessary_cast = "warn"
+redundant_clone = "warn"
+large_stack_arrays = "warn"
+large_types_passed_by_value = "warn"
+
+# Async patterns
+await_holding_lock = "deny"      # Never hold locks across await points
+await_holding_refcell_ref = "deny"
+
+# Code Quality
+dbg_macro = "warn"               # Remove debug prints before commit
+print_stdout = "warn"            # Use proper logging instead
+print_stderr = "warn"
+exit = "deny"                    # Don't call std::process::exit
+mem_forget = "deny"              # Don't forget to drop resources
+
+# String handling
+string_add = "warn"              # Prefer format! or push_str
+string_slice = "warn"            # Can panic on invalid UTF-8 boundaries
+
+# ==============================================================================
+# PEDANTIC GROUP - High quality code standards
+# ==============================================================================
+pedantic = { level = "warn", priority = -1 }
+
+# Selectively allow some pedantic lints that may be too strict
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"     # Can be too noisy
+missing_panics_doc = "allow"     # We don't panic anyway
+cast_possible_truncation = "allow"
+cast_precision_loss = "allow"
+cast_sign_loss = "allow"
+cast_possible_wrap = "allow"
+similar_names = "allow"          # Sometimes similar names are fine
+too_many_lines = "allow"         # Handled by cognitive complexity
+
+# ==============================================================================
+# NURSERY GROUP - Experimental but useful lints
+# ==============================================================================
+# These are newer lints that may have false positives but catch real issues
+use_self = "warn"
+option_if_let_else = "warn"
+redundant_pub_crate = "warn"
+suboptimal_flops = "warn"
+imprecise_flops = "warn"
+
+# ==============================================================================
+# CARGO GROUP - Cargo.toml best practices
+# ==============================================================================
+cargo = { level = "warn", priority = -1 }
+
+# ==============================================================================
+# PERFORMANCE GROUP - Optimize hot paths
+# ==============================================================================
+perf = { level = "warn", priority = -1 }
+
+# ==============================================================================
+# STYLE GROUP - Consistent code style
+# ==============================================================================
+style = { level = "warn", priority = -1 }
+
+# ==============================================================================
+# COMPLEXITY GROUP - Reduce cognitive load
+# ==============================================================================
+complexity = { level = "warn", priority = -1 }
+
+# ==============================================================================
+# CORRECTNESS GROUP - Catch bugs
+# ==============================================================================
+correctness = { level = "deny", priority = -1 }
+
+# ==============================================================================
+# SUSPICIOUS GROUP - Likely bugs
+# ==============================================================================
+suspicious = { level = "warn", priority = -1 }

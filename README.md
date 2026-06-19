@@ -34,23 +34,15 @@ Output soft limiter (tanh)
 ## Requirements
 
 - **macOS** (uses CoreAudio via cpal)
-- **Rust** 1.80+ (`rustup` recommended)
+- **Rust** 1.95+ (`rustup` recommended)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
 - macOS **microphone permission** granted to Terminal.app  
   → System Settings › Privacy & Security › Microphone
 
-## Build
-
-```bash
-git clone https://github.com/you/rusty-amp
-cd rusty-amp
-cargo build --release
-```
-
 ## Run
 
 ```bash
-cargo run --release
+cargo run
 # or after building:
 ./target/release/rusty-amp
 ```
@@ -188,44 +180,6 @@ mix  = 0.25
 
 Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset browser next time you run.
 
-## Project structure
-
-```text
-src/
-├── main.rs               Entry point: audio device selection → TUI
-├── audio/
-│   └── mod.rs            Device enumeration, sample-rate negotiation, stream construction
-├── dsp/
-│   ├── mod.rs            Params (AtomicF32/AtomicBool/AtomicU8), Levels, DspChain
-│   ├── biquad.rs         Second-order IIR filter (Audio EQ Cookbook coefficients)
-│   ├── tube_screamer.rs  TS-808: DC block, 720 Hz HP, asymmetric diode clip, tone LP
-│   ├── distortion.rs     DS-1: DC block, 100 Hz HP, asymmetric hard-clip, active tone stack
-│   ├── reverb.rs         Freeverb: 8 comb + 4 allpass, sample-rate scaled
-│   └── amp/
-│       ├── mod.rs        Amplifier trait + AmpBank (all models alive simultaneously)
-│       ├── marshall.rs   JCM800: dual 12AX7 stages, passive tone stack, tube rectifier sag
-│       ├── mesa.rs       Dual Rectifier: 3-stage gain, higher tone centres, silicon rectifier sag
-│       └── randall.rs    Warhead: FET+BJT+rail-clip, active tone stack, fixed presence shelf
-├── preset.rs             TOML schema, file discovery, apply-to-params
-└── ui.rs                 ratatui TUI: header, VU meters, pedals row, amp row, preset browser
-presets/
-├── metallica.toml
-├── pantera.toml
-├── pantera_floods.toml
-├── slipknot.toml
-└── death.toml
-```
-
-## Audio thread safety
-
-Parameters are `Arc<AtomicF32>` / `Arc<AtomicBool>` / `Arc<AtomicU8>` — the UI thread writes with `Relaxed` stores, the audio callback reads with `Relaxed` loads. No locks in the hot path. The ring buffer between input and output callbacks is `rtrb` (lock-free SPSC).
-
-The input and output streams are forced to the same sample rate (the interface's native rate, typically 48 000 Hz) to prevent the ring buffer from overflowing or underflowing.
-
-Pedal bypass is implemented as a true bypass in the DSP chain — when a pedal is disabled its entire processing block is skipped and the unmodified sample passes straight through to the next stage.
-
-All three amp model instances are kept alive simultaneously inside `AmpBank`. Switching models preserves each instance's filter delay-line state, so switching back to a model doesn't produce an audible click.
-
 ## License
 
-MIT
+Apache 2.0
