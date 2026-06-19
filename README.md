@@ -69,7 +69,8 @@ cargo run
 1. **Select input device** — your audio interface appears in the list
 2. **Select guitar input channel** — Focusrite 2i2 has 2; guitar is usually channel 2 if plugged into Input 2
 3. **Select output device** — pick your speakers or headphones
-4. **Select output channel** — which speaker/headphone channel to route the processed signal to
+
+The processed signal is written to **all output channels** — both left and right on a stereo interface or headphones.
 
 The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing.
 
@@ -197,6 +198,7 @@ Press **`P`** while playing to open the preset browser and apply a preset withou
 | `pantera_floods.toml` | Randall Warhead | Mesa V30 | Floods solo — DS-1 light, open mids, delay + reverb |
 | `slipknot.toml` | Mesa Dual Rectifier | Mesa V30 | Mick Thomson / Jim Root — TS boost, modern EQ scoop, full saturation |
 | `death.toml` | Mesa Dual Rectifier | Mesa V30 | Chuck Schuldiner — TS boost, mids-up for note clarity |
+| `slayer.toml` | Marshall JCM800 | Marshall Greenback | Hanneman & King's thrash assault — straight into a cranked JCM800, extreme mid-scoop, zero mercy |
 | `metalcore_shred.toml` | Mesa Dual Rectifier | Mesa V30 | Modern metalcore shred — TS tight boost, djent-adjacent EQ, slapback delay |
 
 ### Writing your own preset

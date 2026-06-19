@@ -1,0 +1,83 @@
+name        = "Slayer — Reign in Blood"
+description = "Hanneman & King's thrash assault: straight into a cranked JCM800, surgical mid-scoop, zero mercy."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# Slayer plays at extreme tempos — the gate has to be razor sharp or the gaps
+# between tremolo-picked runs turn into a wall of amp noise. Very tight
+# threshold; the fastest possible release so lightning-fast riffs hit clean.
+[noise_gate]
+enabled   = true
+threshold = 0.32   # very tight — at this speed, even brief noise is audible
+release   = 0.10   # fastest sensible release — riffs are too fast for a slow gate
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Hanneman and King went straight into the Marshall — no TS in the Reign in
+# Blood rig. The JCM800 alone at near-maximum gain is the entire preamp stage.
+[tube_screamer]
+enabled = false
+drive = 0.20
+tone  = 0.70
+level = 0.85
+
+# ── Boss DS-1 Distortion ──────────────────────────────────────────────────────
+# No additional dirt pedal — Slayer's philosophy is amp-only saturation.
+# Any pedal in front would soften the attack transients that make the
+# tremolo picking sound violent rather than blurred.
+[distortion]
+enabled = false
+drive = 0.45
+tone  = 0.60
+level = 0.70
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Marshall JCM800 — the definitive thrash metal amp. Hanneman and King both
+# ran multiple JCM800 heads stacked in the studio for "Reign in Blood".
+# Gain near maximum; bass heavy but not flabby (the JCM800 stays tighter at
+# high gain than the Mesa); mids severely scooped; treble very high for the
+# ice-pick attack that cuts through at extreme tempos.
+[amp]
+model  = "marshall"
+gain   = 0.90  # near-maximum — the JCM800 preamp pushed to its limit
+bass   = 0.75  # heavy low end — gives the riffs physical weight
+mid    = 0.16  # extreme mid scoop — more aggressive than Metallica
+treble = 0.88  # very high — the pick attack needs to be violent and immediate
+master = 0.68
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Marshall 4×12 with Greenbacks — the natural partner for the JCM800. The
+# Greenback's mid-forward character slightly counteracts the amp's extreme
+# mid scoop, keeping the tone cutting rather than hollow; its smooth top-end
+# rolloff prevents the very high treble setting from becoming unbearable.
+[cabinet]
+model = "marshall"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# One final surgical cut in the mid-range — layering multiple JCM800s in
+# the studio created a combined tone that was even more scooped than a single
+# head. The extra treble lift adds the almost painful brightness that
+# makes "Angel of Death" and "Raining Blood" sound like they're attacking you.
+# mid=0.15 ≈ −10.5 dB at 800 Hz; high=0.65 ≈ +4.5 dB at 5 kHz.
+[eq]
+enabled = true
+low  = 0.50   # flat — the amp's bass knob already does the heavy lifting
+mid  = 0.15   # extreme additional scoop — layered-Marshall studio sound
+high = 0.65   # brightness lift — that signature Slayer "ice pick" quality
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# No delay — at 250 BPM you cannot have any trail behind the notes. Even a
+# 60 ms delay would turn tremolo picking into an indistinct roar.
+[delay]
+enabled  = false
+time     = 0.15
+feedback = 0.20
+mix      = 0.00
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Completely dry — "Reign in Blood" is famously in-your-face with no spatial
+# ambience on the guitars. The aggression depends on the sound being immediate
+# and unprocessed; reverb would add a politeness the music explicitly rejects.
+[reverb]
+enabled = false
+room = 0.10
+damp = 0.95
+mix  = 0.02

@@ -43,9 +43,7 @@ pub fn start(params: Arc<Params>, levels: Arc<Levels>) -> Result<AudioEngine> {
     // ── 4. Ask input/output channel mapping ──────────────────────────────────
     let guitar_ch = ask_channel("guitar input", in_channels)?;
     println!("  Reading channel {} of {}", guitar_ch + 1, in_channels);
-
-    let out_ch = ask_channel("output", out_channels)?;
-    println!("  Writing  channel {} of {}\n", out_ch + 1, out_channels);
+    println!("  Writing  all {} output channels\n", out_channels);
 
     // ── 5. Build streams ──────────────────────────────────────────────────────
     build_engine(
@@ -56,7 +54,6 @@ pub fn start(params: Arc<Params>, levels: Arc<Levels>) -> Result<AudioEngine> {
         output_device,
         output_cfg,
         out_channels,
-        out_ch,
         sr,
         params,
         levels,
@@ -190,7 +187,6 @@ fn build_engine(
     output_device: Device,
     output_cfg: StreamConfig,
     out_channels: usize,
-    out_ch: usize,
     sr: f32,
     params: Arc<Params>,
     levels: Arc<Levels>,
@@ -220,9 +216,8 @@ fn build_engine(
                 let a = processed.abs();
                 out_env += if a > out_env { attack } else { release } * (a - out_env);
 
-                for ch in 0..out_channels {
-                    let s = if ch == out_ch { processed } else { 0.0 };
-                    let _ = producer.push(s);
+                for _ in 0..out_channels {
+                    let _ = producer.push(processed);
                 }
             }
             levels.input.store(in_env, Relaxed);
