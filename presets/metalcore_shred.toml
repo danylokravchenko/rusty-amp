@@ -1,0 +1,87 @@
+name        = "Metalcore — Shred Seeker"
+description = "Modern metalcore shred tone: tight djent-adjacent rhythm, singing high-gain leads with harmonic pinches."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# Metalcore rhythm playing is percussive and syncopated — the gate has to snap
+# shut between every chug to keep the mix tight. Moderately fast release so
+# the initial thwack of each downstroke hits full-force without fade-in.
+[noise_gate]
+enabled   = true
+threshold = 0.26   # tight — kills noise between syncopated chug patterns
+release   = 0.16   # fast enough for chug rhythms, not so fast it clips picked notes
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# The TS is the metalcore secret weapon — it tightens the low end of the
+# Mesa dramatically, turning a loose "rectifier sag" into the punchy, focused
+# low-string response that makes chug rhythms sound controlled. Low drive
+# preserves the amp's own character; the level does the real work.
+[tube_screamer]
+enabled = true
+drive = 0.18   # nearly clean — just enough for a slight mid-frequency push
+tone  = 0.75   # bright — cuts through a dense mix with bass guitar and triggers
+level = 0.92   # very hot — slams the Rectifier's front end for maximum tightness
+
+# DS-1 off — the Mesa + TS is the metalcore standard; adding more dirt would
+# make the low strings indistinct and collapse the dynamic range needed for
+# the clean-to-heavy contrast that defines the genre.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.55
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Mesa Dual Rectifier on Modern channel — the genre's defining amp since
+# the early 2000s (Killswitch Engage, As I Lay Dying, Parkway Drive).
+# Gain pulled slightly below maximum: in metalcore you need the low strings
+# to chunk cleanly, not compress into a wall — headroom is part of the tone.
+# Mid scoop is present but not extreme — some mid body keeps chord voicings
+# readable when the whole band drops in at the breakdown.
+[amp]
+model  = "mesa"
+gain   = 0.86  # high but not fully cranked — preserves low-string definition
+bass   = 0.70  # heavy but controlled — the TS tightens what the amp adds
+mid    = 0.35  # modern scoop — enough to sit the guitar in the mix, not hollow
+treble = 0.76  # defined highs — pick attack cuts through without becoming harsh
+master = 0.64
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Mesa 4×12 with Vintage 30s — the V30's presence peak at 3.5 kHz is what
+# gives metalcore rhythm guitars their characteristic "cut" in the mix alongside
+# heavy bass and triggered kick drums. Standard for the genre.
+[cabinet]
+model = "mesa"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# Three-way EQ sculpt for the shred/metalcore sweet spot:
+#   - Low: slight boost compensates for bass lost in drop tunings (drop-D/drop-C)
+#   - Mid: additional scoop on top of the amp creates the modern "djent-adjacent"
+#     hollow but articulate character without going full Pantera extreme
+#   - High: presence lift adds "air" to pinch harmonics and makes them squeal
+#     with authority; also helps legato runs speak over the rhythm section
+[eq]
+enabled = true
+low  = 0.54   # +1.2 dB — slight compensation for drop-tuning bass loss
+mid  = 0.28   # −6.6 dB — modern mid scoop, tighter than Slipknot
+high = 0.64   # +4.2 dB — harmonic content lift, pinch harmonics sing
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Short slapback delay on the shred lead — adds perceived depth and width to
+# solo lines without obvious echo. At 120 ms it's below the threshold of
+# conscious perception as a repeat but adds spaciousness that makes single-note
+# lines feel larger. Pull the time down to 0.00 for pure rhythm playing.
+[delay]
+enabled  = true
+time     = 0.24   # ~120 ms slapback — subliminal depth, not an audible echo
+feedback = 0.20   # barely one repeat — no stacking, stays clean in fast passages
+mix      = 0.18   # subtle — the dry signal always dominates
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# A whisper of room reverb — not enough to hear as "reverb" but enough to
+# prevent the high-gain tone from sounding like it was recorded in a closet.
+# Fully damped so the tail never smears into the next chugged chord.
+[reverb]
+enabled = true
+room = 0.22   # small room — creates the sense of a real physical space
+damp = 0.88   # heavily damped — kills the tail fast, reverb doesn't stack
+mix  = 0.06   # barely there — air, not ambience

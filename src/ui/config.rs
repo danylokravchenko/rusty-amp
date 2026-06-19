@@ -18,6 +18,16 @@ pub(super) type SectionDef = (
 );
 
 pub(super) const KNOBS: &[Knob] = &[
+    // 0–1: Noise Gate
+    Knob {
+        label: "THRESH",
+        param: |p| &p.ng_threshold,
+    },
+    Knob {
+        label: "RELEASE",
+        param: |p| &p.ng_release,
+    },
+    // 2–4: TS-808
     Knob {
         label: "DRIVE",
         param: |p| &p.ts_drive,
@@ -30,6 +40,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ts_level,
     },
+    // 5–7: DS-1
     Knob {
         label: "DRIVE",
         param: |p| &p.ds_drive,
@@ -42,6 +53,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ds_level,
     },
+    // 8–10: Reverb
     Knob {
         label: "ROOM",
         param: |p| &p.rev_room,
@@ -54,6 +66,33 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.rev_mix,
     },
+    // 11–13: Parametric EQ
+    Knob {
+        label: "LOW",
+        param: |p| &p.eq_low,
+    },
+    Knob {
+        label: "MID",
+        param: |p| &p.eq_mid,
+    },
+    Knob {
+        label: "HIGH",
+        param: |p| &p.eq_high,
+    },
+    // 14–16: Delay
+    Knob {
+        label: "TIME",
+        param: |p| &p.delay_time,
+    },
+    Knob {
+        label: "FEEDBACK",
+        param: |p| &p.delay_feedback,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.delay_mix,
+    },
+    // 17–21: Amp
     Knob {
         label: "GAIN",
         param: |p| &p.amp_gain,
@@ -78,26 +117,55 @@ pub(super) const KNOBS: &[Knob] = &[
 
 pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
     (
-        |_| "⚡ TS-808".into(),
+        |_| "🔇 NOISE GATE".into(),
         0,
-        3,
+        2,
+        |p| Some(p.ng_enabled.load(Relaxed)),
+    ),
+    (
+        |_| "⚡ TS-808".into(),
+        2,
+        5,
         |p| Some(p.ts_enabled.load(Relaxed)),
     ),
     (
         |_| "⚡ DS-1 DISTORTION".into(),
-        3,
-        6,
+        5,
+        8,
         |p| Some(p.ds_enabled.load(Relaxed)),
     ),
     (
         |_| "⚡ SPRING REVERB".into(),
-        6,
-        9,
+        8,
+        11,
         |p| Some(p.rev_enabled.load(Relaxed)),
     ),
 ];
 
-pub(super) const AMP_SECTIONS: &[SectionDef] =
-    &[(|p| format!("⚡ {}", p.amp_model().name()), 9, 14, |_| None)];
+pub(super) const AMP_SECTIONS: &[SectionDef] = &[
+    (|p| format!("⚡ {}", p.amp_model().name()), 17, 22, |_| None),
+    (
+        |_| "🎛 PARAMETRIC EQ".into(),
+        11,
+        14,
+        |p| Some(p.eq_enabled.load(Relaxed)),
+    ),
+    (
+        |_| "⏱ DELAY".into(),
+        14,
+        17,
+        |p| Some(p.delay_enabled.load(Relaxed)),
+    ),
+];
 
-pub(super) const SECTION_STARTS: &[Option<usize>] = &[None, Some(0), Some(3), Some(6), Some(9)];
+// Tab order: None (selectors) → NG → TS → DS → Rev → EQ → Delay → Amp
+pub(super) const SECTION_STARTS: &[Option<usize>] = &[
+    None,
+    Some(0),
+    Some(2),
+    Some(5),
+    Some(8),
+    Some(11),
+    Some(14),
+    Some(17),
+];

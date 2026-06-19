@@ -1,6 +1,15 @@
 name        = "Metallica — Master of Puppets"
 description = "Hetfield's tight rhythm tone: TS clean boost into high-gain JCM800, scooped mids, bone-dry."
 
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# Hetfield used a noise gate to keep the between-riff silence dead silent —
+# the JCM800 at this gain is not a quiet amp. Moderate threshold and release
+# preserve the natural palm-mute chunk while gating the open-string hiss.
+[noise_gate]
+enabled   = true
+threshold = 0.22   # moderate — tames amp hiss without clipping the attack
+release   = 0.20   # medium — gate releases cleanly after each palm-mute chunk
+
 # ── Tube Screamer ─────────────────────────────────────────────────────────────
 # Used as a clean boost only — low drive, hot level slams the JCM800 preamp.
 [tube_screamer]
@@ -19,6 +28,31 @@ bass   = 0.72
 mid    = 0.22  # scooped mids — the Metallica hollow crunch
 treble = 0.80
 master = 0.60
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Hetfield and Hammett used Marshall 1960A cabs loaded with Celestion
+# Greenbacks — the classic JCM800 + Greenback pairing that defined 80s metal.
+[cabinet]
+model = "marshall"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# No extra EQ — the JCM800 + TS boost combination is the entire tone.
+# The amp's own mid scoop at 0.22 is already dramatic enough; adding external
+# EQ on top would thin the sound further and lose the JCM800's natural character.
+[eq]
+enabled = false
+low  = 0.50
+mid  = 0.50
+high = 0.50
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Rhythm tone is completely dry — delay would smear palm-mute articulation
+# and blur the tight, locked-in feel of Hetfield's rhythm playing.
+[delay]
+enabled  = false
+time     = 0.25
+feedback = 0.30
+mix      = 0.00
 
 # ── Reverb ────────────────────────────────────────────────────────────────────
 # Nearly dry — reverb would blur the palm-mute attack.

@@ -1,6 +1,15 @@
 name        = "Pantera — Floods Solo"
 description = "Dimebag's singing lead tone from Floods — emotional, sustained, unexpectedly melodic."
 
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# Looser gate for the lead — the threshold sits lower so quiet sustain tails
+# pass through. Long release keeps the gate open while bent notes decay
+# naturally without being cut off mid-sustain.
+[noise_gate]
+enabled   = true
+threshold = 0.18   # lower — allows quiet sustain tails and harmonics through
+release   = 0.45   # slow — gate stays open while notes decay naturally
+
 # ── Tube Screamer ─────────────────────────────────────────────────────────────
 # Off — the DS-1 alone handles the boost and saturation for the solo.
 [tube_screamer]
@@ -29,6 +38,31 @@ bass   = 0.52   # neutral bass — keeps the low end tight without being thunder
 mid    = 0.48   # near-flat mids — the opposite of the scooped rhythm tone
 treble = 0.70   # present but not ice-pick; the DS-1 tone control warms it further
 master = 0.65
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Same Mesa V30 cab as the rhythm tone — consistent projection character
+# across the song; the tone difference comes from amp settings and the EQ.
+[cabinet]
+model = "mesa"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# No extra EQ on the lead — the amp's own tone stack with mids up is enough.
+# The DS-1 tone control at 0.58 already warms the top end sufficiently.
+[eq]
+enabled = false
+low  = 0.50
+mid  = 0.50
+high = 0.50
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Subtle single-repeat delay — adds depth and sustains the singing quality of
+# the lead. At 180 ms it sits just behind the note, giving space without
+# smearing fast bends and vibrato.
+[delay]
+enabled  = true
+time     = 0.36   # ~180 ms — present but not turning into obvious slap-back echo
+feedback = 0.32   # one clear repeat, then gone — no buildup of repeats
+mix      = 0.22   # audible but subordinate to the dry attack
 
 # ── Reverb ────────────────────────────────────────────────────────────────────
 # Some room depth — the Floods solo has a palpable sense of space in the studio

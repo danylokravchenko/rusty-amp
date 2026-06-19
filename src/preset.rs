@@ -3,7 +3,7 @@ use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::Relaxed;
 
-use crate::dsp::{AmpModel, Params};
+use crate::dsp::{AmpModel, CabModel, Params};
 
 // ── TOML schema ───────────────────────────────────────────────────────────────
 
@@ -11,10 +11,21 @@ use crate::dsp::{AmpModel, Params};
 pub struct Preset {
     pub name: String,
     pub description: Option<String>,
+    pub noise_gate: Option<NgSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
     pub amp: AmpSection,
+    pub cabinet: Option<CabSection>,
+    pub eq: Option<EqSection>,
+    pub delay: Option<DelaySection>,
     pub reverb: ReverbSection,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct NgSection {
+    pub enabled: Option<bool>,
+    pub threshold: f32,
+    pub release: f32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,13 +46,35 @@ pub struct DsSection {
 
 #[derive(Debug, Deserialize)]
 pub struct AmpSection {
-    /// "marshall" (default) or "mesa"
+    /// "marshall" | "mesa" | "randall"
     pub model: Option<String>,
     pub gain: f32,
     pub bass: f32,
     pub mid: f32,
     pub treble: f32,
     pub master: f32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CabSection {
+    /// "mesa" (default) | "marshall"
+    pub model: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EqSection {
+    pub enabled: Option<bool>,
+    pub low: f32,
+    pub mid: f32,
+    pub high: f32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DelaySection {
+    pub enabled: Option<bool>,
+    pub time: f32,
+    pub feedback: f32,
+    pub mix: f32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +94,14 @@ impl Preset {
 
     /// Write all preset values into the shared atomic params.
     pub fn apply(&self, params: &Params) {
+        if let Some(ng) = &self.noise_gate {
+            params.ng_enabled.store(ng.enabled.unwrap_or(true), Relaxed);
+            params
+                .ng_threshold
+                .store(ng.threshold.clamp(0.0, 1.0), Relaxed);
+            params.ng_release.store(ng.release.clamp(0.0, 1.0), Relaxed);
+        }
+
         let ts = &self.tube_screamer;
         params.ts_enabled.store(ts.enabled.unwrap_or(true), Relaxed);
         params.ts_drive.store(ts.drive.clamp(0.0, 1.0), Relaxed);
@@ -88,6 +129,36 @@ impl Preset {
         params.amp_mid.store(amp.mid.clamp(0.0, 1.0), Relaxed);
         params.amp_treble.store(amp.treble.clamp(0.0, 1.0), Relaxed);
         params.amp_master.store(amp.master.clamp(0.0, 1.0), Relaxed);
+
+        if let Some(cab) = &self.cabinet {
+            let cab_model = match cab.model.as_deref() {
+                Some("marshall") => CabModel::Marshall,
+                _ => CabModel::Mesa,
+            };
+            params.cab_model.store(cab_model as u8, Relaxed);
+        }
+
+        if let Some(eq) = &self.eq {
+            params.eq_enabled.store(eq.enabled.unwrap_or(true), Relaxed);
+            params.eq_low.store(eq.low.clamp(0.0, 1.0), Relaxed);
+            params.eq_mid.store(eq.mid.clamp(0.0, 1.0), Relaxed);
+            params.eq_high.store(eq.high.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.eq_enabled.store(false, Relaxed);
+        }
+
+        if let Some(dly) = &self.delay {
+            params
+                .delay_enabled
+                .store(dly.enabled.unwrap_or(true), Relaxed);
+            params.delay_time.store(dly.time.clamp(0.0, 1.0), Relaxed);
+            params
+                .delay_feedback
+                .store(dly.feedback.clamp(0.0, 1.0), Relaxed);
+            params.delay_mix.store(dly.mix.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.delay_enabled.store(false, Relaxed);
+        }
 
         let rev = &self.reverb;
         params

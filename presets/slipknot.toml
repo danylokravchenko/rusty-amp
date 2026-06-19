@@ -1,6 +1,16 @@
 name        = "Slipknot — Iowa"
 description = "Mick Thomson & Jim Root's crushing modern metal tone — Mesa Dual Rectifier at full tilt."
 
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# In drop-B and drop-A tunings the low strings ring uncontrollably between
+# hits. A tight gate is essential — both Slipknot guitarists use one in their
+# live rig. Fast release so the initial thud of each downstroke comes through
+# uncompromised.
+[noise_gate]
+enabled   = true
+threshold = 0.30   # tight — drop tunings create extra sympathetic string noise
+release   = 0.14   # fast — lets every chunk hit hard and clean
+
 # ── Tube Screamer ─────────────────────────────────────────────────────────────
 # Both Slipknot guitarists run a TS in front of the Rectifier as a tight boost.
 # Low drive preserves the amp's own character; hot level saturates the input stage.
@@ -29,6 +39,32 @@ bass   = 0.76  # heavy — compensates for the bass loss in extreme down-tunings
 mid    = 0.30  # moderate scoop — modern but not as extreme as Pantera
 treble = 0.78  # sharp, defined — keeps the pick attack audible
 master = 0.62
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Slipknot's guitarists run Mesa 4×12 cabs with Vintage 30s — the Rectifier
+# was designed around this cab and the V30's presence peak complements the
+# Mesa's aggressive top end perfectly.
+[cabinet]
+model = "mesa"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# Subtle EQ to tighten the modern metal sound — a slight mid cut to push the
+# Rectifier's scoop further, and a treble lift for extra pick definition in
+# the dense drop-tuning mix. high=0.60 ≈ +3 dB at 5 kHz.
+[eq]
+enabled = true
+low  = 0.52   # very slight low boost — compensates for bass lost in the drop tuning
+mid  = 0.32   # extra mid cut on top of the amp's already-scooped tone
+high = 0.60   # presence lift — keeps pick attack cutting through the bass-heavy mix
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Heavy rhythm tones stay dry. Even a little delay smears palm mutes
+# when the gain is this high — the silicon rectifier already compresses heavily.
+[delay]
+enabled  = false
+time     = 0.25
+feedback = 0.30
+mix      = 0.00
 
 # ── Reverb ────────────────────────────────────────────────────────────────────
 # Heavy rhythm tones stay dry. Even a little reverb smears palm mutes

@@ -7,7 +7,7 @@ use ratatui::{
 };
 use std::sync::atomic::Ordering::Relaxed;
 
-use crate::dsp::{AmpModel, Levels, Params};
+use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
 use super::config::{AMP_SECTIONS, KNOBS, PEDAL_SECTIONS};
 use super::styles::*;
@@ -80,8 +80,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params) {
     ]));
     f.render_widget(title, rows[0]);
 
+    let ng_on = params.ng_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
     let ds_on = params.ds_enabled.load(Relaxed);
+    let eq_on = params.eq_enabled.load(Relaxed);
+    let delay_on = params.delay_enabled.load(Relaxed);
     let rev_on = params.rev_enabled.load(Relaxed);
 
     let arrow = Span::styled(" ──▶ ", Style::default().fg(DIM));
@@ -92,6 +95,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params) {
     let mut chain: Vec<Span> = vec![Span::raw("  ")];
 
     chain.push(Span::styled(
+        "GATE",
+        Style::default().fg(pedal_color(ng_on)),
+    ));
+    chain.push(arrow.clone());
+    chain.push(Span::styled(
         "TS-808",
         Style::default().fg(pedal_color(ts_on)),
     ));
@@ -101,11 +109,16 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params) {
         Style::default().fg(pedal_color(ds_on)),
     ));
     chain.push(arrow.clone());
-    chain.push(Span::styled("PREAMP", Style::default().fg(amp_color)));
+    chain.push(Span::styled("AMP", Style::default().fg(amp_color)));
     chain.push(arrow.clone());
-    chain.push(Span::styled("TONE STACK", Style::default().fg(amp_color)));
+    chain.push(Span::styled("CAB", Style::default().fg(amp_color)));
     chain.push(arrow.clone());
-    chain.push(Span::styled("POWER AMP", Style::default().fg(amp_color)));
+    chain.push(Span::styled("EQ", Style::default().fg(pedal_color(eq_on))));
+    chain.push(arrow.clone());
+    chain.push(Span::styled(
+        "DELAY",
+        Style::default().fg(pedal_color(delay_on)),
+    ));
     chain.push(arrow.clone());
     chain.push(Span::styled(
         "REVERB",
@@ -231,18 +244,24 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    let model = params.amp_model();
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+        .split(inner);
 
-    let mut spans = vec![Span::styled(
-        "  AMP MODEL  ",
+    // ── Amp model selector ────────────────────────────────────────────────────
+    let amp_model = params.amp_model();
+    let label_color = if focused { AMBER } else { DIM };
+
+    let mut amp_spans = vec![Span::styled(
+        "  AMP  ",
         Style::default()
-            .fg(if focused { AMBER } else { DIM })
+            .fg(label_color)
             .add_modifier(Modifier::BOLD),
     )];
-
     for m in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
-        let selected = m == model;
-        let label_style = if selected {
+        let selected = m == amp_model;
+        let style = if selected {
             Style::default()
                 .fg(ORANGE)
                 .add_modifier(Modifier::BOLD | Modifier::REVERSED)
@@ -254,21 +273,49 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         } else {
             ("[ ", " ]")
         };
-        let bracket_color = if selected { AMBER } else { DIM };
-        spans.push(Span::styled(bl, Style::default().fg(bracket_color)));
-        spans.push(Span::styled(m.short_name(), label_style));
-        spans.push(Span::styled(br, Style::default().fg(bracket_color)));
-        spans.push(Span::raw("  "));
+        let bc = if selected { AMBER } else { DIM };
+        amp_spans.push(Span::styled(bl, Style::default().fg(bc)));
+        amp_spans.push(Span::styled(m.short_name(), style));
+        amp_spans.push(Span::styled(br, Style::default().fg(bc)));
+        amp_spans.push(Span::raw("  "));
     }
-
     if focused {
-        spans.push(Span::styled("  ↑/↓ to switch", Style::default().fg(DIM)));
+        amp_spans.push(Span::styled("↑/↓  A", Style::default().fg(DIM)));
     }
+    f.render_widget(Paragraph::new(Line::from(amp_spans)), cols[0]);
 
-    f.render_widget(
-        Paragraph::new(Line::from(spans)).alignment(Alignment::Left),
-        inner,
-    );
+    // ── Cabinet model selector ────────────────────────────────────────────────
+    let cab_model = params.cab_model();
+    let mut cab_spans = vec![Span::styled(
+        "  CAB  ",
+        Style::default()
+            .fg(label_color)
+            .add_modifier(Modifier::BOLD),
+    )];
+    for m in [CabModel::Mesa, CabModel::Marshall] {
+        let selected = m == cab_model;
+        let style = if selected {
+            Style::default()
+                .fg(ORANGE)
+                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        } else {
+            Style::default().fg(ratatui::style::Color::Rgb(80, 60, 0))
+        };
+        let (bl, br) = if selected {
+            ("◀ ", " ▶")
+        } else {
+            ("[ ", " ]")
+        };
+        let bc = if selected { AMBER } else { DIM };
+        cab_spans.push(Span::styled(bl, Style::default().fg(bc)));
+        cab_spans.push(Span::styled(m.short_name(), style));
+        cab_spans.push(Span::styled(br, Style::default().fg(bc)));
+        cab_spans.push(Span::raw("  "));
+    }
+    if focused {
+        cab_spans.push(Span::styled("C to toggle", Style::default().fg(DIM)));
+    }
+    f.render_widget(Paragraph::new(Line::from(cab_spans)), cols[1]);
 }
 
 fn render_section_row(
@@ -492,7 +539,11 @@ fn render_help(f: &mut Frame, area: Rect) {
         Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
         Span::styled(" adjust  ", Style::default().fg(DIM)),
         Span::styled("Space", Style::default().fg(AMBER)),
-        Span::styled(" toggle pedal  ", Style::default().fg(DIM)),
+        Span::styled(" toggle  ", Style::default().fg(DIM)),
+        Span::styled("A", Style::default().fg(AMBER)),
+        Span::styled(" amp  ", Style::default().fg(DIM)),
+        Span::styled("C", Style::default().fg(AMBER)),
+        Span::styled(" cab  ", Style::default().fg(DIM)),
         Span::styled("P", Style::default().fg(AMBER)),
         Span::styled(" presets  ", Style::default().fg(DIM)),
         Span::styled("Q", Style::default().fg(AMBER)),

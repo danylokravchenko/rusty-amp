@@ -18,7 +18,7 @@ use crate::dsp::{Levels, Params};
 use crate::preset::Preset;
 
 use draw::draw;
-use input::{cycle_amp, next_section, nudge, prev_section, toggle_pedal};
+use input::{cycle_amp, cycle_cab, next_section, nudge, prev_section, toggle_pedal};
 use presets::render_preset_modal;
 
 pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Result<()> {
@@ -72,6 +72,12 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
                     KeyCode::Char('p') | KeyCode::Char('P') => {
                         preset_open = true;
                         preset_cursor = 0;
+                    }
+                    KeyCode::Char('c') | KeyCode::Char('C') => {
+                        cycle_cab(&params);
+                    }
+                    KeyCode::Char('a') | KeyCode::Char('A') => {
+                        cycle_amp(&params, 1);
                     }
                     KeyCode::Tab => focus = next_section(focus),
                     KeyCode::BackTab => focus = prev_section(focus),

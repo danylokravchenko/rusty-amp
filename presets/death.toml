@@ -1,6 +1,15 @@
 name        = "Death — Human"
 description = "Chuck Schuldiner's articulate death metal tone — technical clarity over brute force."
 
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# Chuck's tone is high-gain but not wall-of-sound — the gate needs to be
+# present to control feedback on the fast legato runs, but the release has
+# to be slow enough that sustaining lines don't get choked mid-phrase.
+[noise_gate]
+enabled   = true
+threshold = 0.20   # moderate — tames hiss without cutting off sustain
+release   = 0.28   # medium-slow — lets legato phrases sustain without choking
+
 # ── Tube Screamer ─────────────────────────────────────────────────────────────
 # Chuck used a TS-style boost in front of the Rectifier to tighten the attack
 # and add sustain without smearing the fast, complex legato runs.
@@ -30,6 +39,34 @@ bass   = 0.68  # heavy low end for the tuned-down E-standard / D-standard feel
 mid    = 0.42  # key detail: mids raised well above the Pantera/Slipknot scoop
 treble = 0.75  # clear, defined — pick-attack cut without becoming shrill
 master = 0.60
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Mesa 4×12 with Vintage 30s — Chuck's recorded tones had the characteristic
+# V30 presence peak that sits the guitar clearly in the dense mix alongside
+# the complex bass lines and drumming.
+[cabinet]
+model = "mesa"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# Subtle EQ to enhance technical clarity — a slight mid presence boost
+# reinforces the decision to not scoop the mids in the amp. This is what
+# separates Death's tone from every other death metal band of the era.
+# mid=0.56 ≈ +1.8 dB at 800 Hz — barely noticeable but audibly more present.
+[eq]
+enabled = true
+low  = 0.50   # flat — the amp's bass setting already handles the low end
+mid  = 0.56   # subtle mid presence boost — reinforces note clarity in dense passages
+high = 0.50   # flat — no extra treble; the V30 cab provides enough presence
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Death's studio recordings have no audible delay on the guitar — any trail
+# would obscure the interlocking guitar lines and the fast legato runs that
+# define Chuck's technical style.
+[delay]
+enabled  = false
+time     = 0.25
+feedback = 0.25
+mix      = 0.00
 
 # ── Reverb ────────────────────────────────────────────────────────────────────
 # Death's studio sound is very dry and tight. The Mesa's compression provides
