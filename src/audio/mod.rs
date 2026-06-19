@@ -34,10 +34,10 @@ pub fn start(params: Arc<Params>, levels: Arc<Levels>) -> Result<AudioEngine> {
         "         {} Hz  {} ch  {:?}",
         sr as u32, in_channels, in_fmt
     );
-    println!("Output : {}", output_device.name()?);
+    println!("Output : {}", output_device.description()?.name());
     println!(
         "         {} Hz  {} ch",
-        output_cfg.sample_rate.0, out_channels
+        output_cfg.sample_rate, out_channels
     );
 
     // ── 4. Ask input/output channel mapping ──────────────────────────────────
@@ -70,7 +70,10 @@ fn select_input_device(host: &cpal::Host) -> Result<(Device, String)> {
         .input_devices()?
         .enumerate()
         .map(|(i, d)| {
-            let name = d.name().unwrap_or_else(|_| format!("device-{i}"));
+            let name = d
+                .description()
+                .map(|desc| desc.name().to_owned())
+                .unwrap_or_else(|_| format!("device-{i}"));
             (i, name, d)
         })
         .collect();
@@ -103,7 +106,10 @@ fn select_output_device(host: &cpal::Host) -> Result<(Device, String)> {
         .output_devices()?
         .enumerate()
         .map(|(i, d)| {
-            let name = d.name().unwrap_or_else(|_| format!("device-{i}"));
+            let name = d
+                .description()
+                .map(|desc| desc.name().to_owned())
+                .unwrap_or_else(|_| format!("device-{i}"));
             (i, name, d)
         })
         .collect();
@@ -150,12 +156,12 @@ fn negotiate_configs(
             eprintln!(
                 "Warning: output does not support {} Hz; falling back to its default \
                  — audio may stutter.",
-                in_sr.0
+                in_sr
             );
             output.default_output_config().unwrap()
         });
 
-    Ok((in_sup.into(), out_sup.into(), in_sr.0 as f32, in_fmt))
+    Ok((in_sup.into(), out_sup.into(), in_sr as f32, in_fmt))
 }
 
 fn ask_channel(label: &str, n_channels: usize) -> Result<usize> {
@@ -201,7 +207,7 @@ fn build_engine(
     let mut out_env = 0.0f32;
 
     let input_stream = input_device.build_input_stream(
-        &input_cfg,
+        input_cfg,
         move |data: &[f32], _| {
             for frame in data.chunks(in_channels) {
                 let sample = frame.get(guitar_ch).copied().unwrap_or(0.0);
@@ -227,7 +233,7 @@ fn build_engine(
     )?;
 
     let output_stream = output_device.build_output_stream(
-        &output_cfg,
+        output_cfg,
         move |data: &mut [f32], _| {
             for s in data.iter_mut() {
                 *s = consumer.pop().unwrap_or(0.0);
