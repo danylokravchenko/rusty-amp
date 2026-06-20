@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{DspChain, Levels, Params};
+use crate::recording::RecordingState;
 
 pub struct AudioEngine {
     _input_stream: Stream,
@@ -66,6 +67,7 @@ pub fn start(
     output_idx: usize,
     params: Arc<Params>,
     levels: Arc<Levels>,
+    recording: Arc<RecordingState>,
 ) -> Result<AudioEngine> {
     let host = cpal::default_host();
 
@@ -95,6 +97,7 @@ pub fn start(
         sr,
         params,
         levels,
+        recording,
     )
 }
 
@@ -137,7 +140,10 @@ fn build_engine(
     sr: f32,
     params: Arc<Params>,
     levels: Arc<Levels>,
+    recording: Arc<RecordingState>,
 ) -> Result<AudioEngine> {
+    recording.sample_rate.store(sr as u32, Relaxed);
+
     let buf_samples = (sr as usize) / 5 * out_channels * 2;
     let (mut producer, mut consumer) = RingBuffer::<f32>::new(buf_samples);
 
@@ -161,6 +167,12 @@ fn build_engine(
 
                 let a = processed.abs();
                 out_env += if a > out_env { attack } else { release } * (a - out_env);
+
+                if recording.active.load(Relaxed)
+                    && let Ok(mut buf) = recording.buffer.try_lock()
+                {
+                    buf.push(processed);
+                }
 
                 for _ in 0..out_channels {
                     let _ = producer.push(processed);

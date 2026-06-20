@@ -12,7 +12,15 @@ use crate::dsp::{AmpModel, CabModel, Levels, Params};
 use super::config::{AMP_SECTIONS, KNOBS, PEDAL_SECTIONS};
 use super::styles::*;
 
-pub(super) fn draw(f: &mut Frame, params: &Params, levels: &Levels, focus: Option<usize>) {
+pub(super) fn draw(
+    f: &mut Frame,
+    params: &Params,
+    levels: &Levels,
+    focus: Option<usize>,
+    recording: bool,
+    blink: bool,
+    status: Option<&str>,
+) {
     let area = f.area();
 
     let outer = Block::default()
@@ -35,15 +43,15 @@ pub(super) fn draw(f: &mut Frame, params: &Params, levels: &Levels, focus: Optio
         ])
         .split(inner);
 
-    render_header(f, rows[0], params);
+    render_header(f, rows[0], params, recording, blink);
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
     render_section_row(f, rows[3], PEDAL_SECTIONS, params, focus);
     render_section_row(f, rows[4], AMP_SECTIONS, params, focus);
-    render_help(f, rows[5]);
+    render_help(f, rows[5], status);
 }
 
-fn render_header(f: &mut Frame, area: Rect, params: &Params) {
+fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, blink: bool) {
     let block = Block::default()
         .borders(Borders::BOTTOM)
         .border_type(BorderType::Double)
@@ -77,6 +85,17 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params) {
             "  ● POWER ON  ",
             Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
         ),
+        Span::styled("▐", Style::default().fg(WARM)),
+        if recording && blink {
+            Span::styled(
+                "  ● ON AIR  ",
+                Style::default().fg(HOT).add_modifier(Modifier::BOLD),
+            )
+        } else if recording {
+            Span::styled("  ○ ON AIR  ", Style::default().fg(HOT))
+        } else {
+            Span::styled("  ○ OFF AIR  ", Style::default().fg(OFF))
+        },
     ]));
     f.render_widget(title, rows[0]);
 
@@ -530,27 +549,37 @@ fn render_knob(f: &mut Frame, area: Rect, label: &str, value: f32, focused: bool
     );
 }
 
-fn render_help(f: &mut Frame, area: Rect) {
-    let help = Paragraph::new(Line::from(vec![
-        Span::styled(" Tab ", Style::default().fg(AMBER)),
-        Span::styled("section  ", Style::default().fg(DIM)),
-        Span::styled("←/→", Style::default().fg(AMBER)),
-        Span::styled(" knob  ", Style::default().fg(DIM)),
-        Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
-        Span::styled(" adjust  ", Style::default().fg(DIM)),
-        Span::styled("Space", Style::default().fg(AMBER)),
-        Span::styled(" toggle  ", Style::default().fg(DIM)),
-        Span::styled("A", Style::default().fg(AMBER)),
-        Span::styled(" amp  ", Style::default().fg(DIM)),
-        Span::styled("C", Style::default().fg(AMBER)),
-        Span::styled(" cab  ", Style::default().fg(DIM)),
-        Span::styled("P", Style::default().fg(AMBER)),
-        Span::styled(" presets  ", Style::default().fg(DIM)),
-        Span::styled("Q", Style::default().fg(AMBER)),
-        Span::styled(" quit", Style::default().fg(DIM)),
-    ]))
-    .alignment(Alignment::Center)
-    .style(Style::default().bg(ratatui::style::Color::Black));
+fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
+    let line = if let Some(msg) = status {
+        Line::from(vec![Span::styled(
+            format!(" {msg} "),
+            Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
+        )])
+    } else {
+        Line::from(vec![
+            Span::styled(" Tab ", Style::default().fg(AMBER)),
+            Span::styled("section  ", Style::default().fg(DIM)),
+            Span::styled("←/→", Style::default().fg(AMBER)),
+            Span::styled(" knob  ", Style::default().fg(DIM)),
+            Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
+            Span::styled(" adjust  ", Style::default().fg(DIM)),
+            Span::styled("Space", Style::default().fg(AMBER)),
+            Span::styled(" toggle  ", Style::default().fg(DIM)),
+            Span::styled("A", Style::default().fg(AMBER)),
+            Span::styled(" amp  ", Style::default().fg(DIM)),
+            Span::styled("C", Style::default().fg(AMBER)),
+            Span::styled(" cab  ", Style::default().fg(DIM)),
+            Span::styled("P", Style::default().fg(AMBER)),
+            Span::styled(" presets  ", Style::default().fg(DIM)),
+            Span::styled("R", Style::default().fg(AMBER)),
+            Span::styled(" record  ", Style::default().fg(DIM)),
+            Span::styled("Q", Style::default().fg(AMBER)),
+            Span::styled(" quit", Style::default().fg(DIM)),
+        ])
+    };
+    let help = Paragraph::new(line)
+        .alignment(Alignment::Center)
+        .style(Style::default().bg(ratatui::style::Color::Black));
     f.render_widget(help, area);
 }
 

@@ -72,7 +72,7 @@ cargo run
 
 The processed signal is written to **all output channels** — both left and right on a stereo interface or headphones.
 
-The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing. Press **`S`** at any time to save the current state as a new preset.
+The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing. Press **`S`** at any time to save the current state as a new preset. Press **`R`** to start or stop recording the processed output to a WAV file.
 
 ## Controls
 
@@ -87,6 +87,7 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `Space` | Toggle the focused pedal / effect on / off |
 | `P` | Open the preset browser overlay |
 | `S` | Save the current state as a new user preset |
+| `R` | Start / stop recording — saves a WAV file to your home directory when stopped |
 | `Q` / `Ctrl-C` | Quit |
 
 ### Preset browser (`P`)
@@ -277,6 +278,12 @@ mix  = 0.25
 ```
 
 Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset browser the next time you open it (or save another preset to trigger a reload).
+
+## Recording
+
+Press **`R`** to start recording. The header switches from `○ OFF AIR` to a blinking `● ON AIR` indicator next to `POWER ON`. Press **`R`** again to stop — the file is written immediately and the saved path is shown briefly in the footer.
+
+Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float mono WAV at the same sample rate as your audio interface. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
 
 ## License
 
