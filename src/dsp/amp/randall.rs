@@ -3,53 +3,84 @@ use crate::dsp::biquad::Biquad;
 
 /// Randall Warhead solid-state amp simulation.
 ///
-/// Dimebag Darrell's amp of choice — a 300W solid-state head known for
-/// its crushing tightness and completely different character from tube amps.
-///
 /// Signal path:
-///   DC block → input HP (60 Hz) → FET stage → BJT stage → op-amp rail clipper
-///   → active tone stack → stiff solid-state power section
+///   DC block → input HP → [2× OS: FET + HP + BJT + HP + rail clip] → active tone stack → presence → stiff power section
 ///
-/// Key differences from tube amps:
-///   • Three progressively harder clipping stages (FET → BJT → rail clip)
-///   • No power-supply sag — solid-state rails are stiff and consistent
-///   • Higher treble shelf at 4.5 kHz ("glassy" top end) vs JCM800 at 2.5 kHz
-///   • Mid peak at 500 Hz — when scooped, the hollow rests below the Mesa's 750 Hz
-///   • Fixed presence shelf (+3 dB at 5 kHz) built into the output section
-///   • Asymmetric headroom: very tight on bass, explosive on treble transients
+/// Improvements over the naive model:
+///   • 2× oversampling through all three gain stages eliminates aliasing
+///   • Asymmetric FET waveshaper adds subtle even harmonics
+///   • Two inter-stage HPs (500 Hz and 800 Hz) tighten the solid-state response
+///   • Presence knob replaces the old fixed +3 dB shelf (user-adjustable)
 pub struct Randall {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
+    // 2× oversampling half-band LP (built for sr*2)
+    os_up_a: Biquad,
+    os_up_b: Biquad,
+    os_dn_a: Biquad,
+    os_dn_b: Biquad,
+    // Pre-clip HP at 2× rate — the Warhead's tight solid-state input coupling
+    // cuts harder than tube amps (100 Hz vs 60-80 Hz), which is why it feels
+    // "tighter" — less sub-bass energy enters the gain stages
+    pre_clip_hp: Biquad,
+    // Inter-stage HPs at 2× rate
+    stage_hp_1: Biquad,
+    stage_hp_2: Biquad,
+    // Power section bass cut — prevents the output tanh from distorting bass frequencies;
+    // real solid-state amps have tight output stage coupling (no output transformer warmth)
+    power_hp: Biquad,
+    // Active tone stack (base rate)
     bass_shelf: Biquad,
     mid_peak: Biquad,
     treble_shelf: Biquad,
-    presence_shelf: Biquad,
     last_bass: f32,
     last_mid: f32,
     last_treble: f32,
+    // Presence — replaces the old fixed shelf (base rate)
+    presence_shelf: Biquad,
+    last_presence: f32,
 }
 
 impl Randall {
     pub fn new(sr: f32) -> Self {
+        let sr2 = sr * 2.0;
+        let half_nyq = sr / 2.0;
         let mut r = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
-            input_hp: Biquad::highpass(sr, 60.0, 0.707),
+            // 75 Hz: tighter than tube amps (60 Hz) but doesn't cut the 82 Hz low-E
+            input_hp: Biquad::highpass(sr, 75.0, 0.707),
+            os_up_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
+            os_up_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
+            os_dn_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
+            os_dn_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
+            // Warhead pre-clip HP: 55 Hz — tighter than Marshall/Mesa (solid-state characteristic)
+            // but still below the 82 Hz low-E so the fundamental enters the FET stage intact
+            pre_clip_hp: Biquad::highpass(sr2, 55.0, 0.707),
+            // After FET stage: 500 Hz (Warhead input coupling)
+            stage_hp_1: Biquad::highpass(sr2, 500.0, 0.707),
+            // After BJT stage: 800 Hz (driver stage coupling)
+            stage_hp_2: Biquad::highpass(sr2, 800.0, 0.707),
+            // Output stage HP at 80 Hz: lets the fundamental (82 Hz) through with
+            // only ~-3 dB attenuation while blocking sub-rumble from the tanh stage
+            power_hp: Biquad::highpass(sr, 80.0, 0.707),
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 500.0, 0.4, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 4500.0, 0.0),
-            presence_shelf: Biquad::high_shelf(sr, 5000.0, 3.0), // fixed presence boost
+            // Fixed presence knob (was hard-coded +3 dB; now user-controlled)
+            presence_shelf: Biquad::high_shelf(sr, 5000.0, 3.0),
             last_bass: -1.0,
             last_mid: -1.0,
             last_treble: -1.0,
+            last_presence: -1.0,
         };
-        r.update_tone_stack(0.5, 0.3, 0.75); // Dime default: scooped mids, cranked treble
+        r.update_tone_stack(0.5, 0.3, 0.75);
+        r.update_presence(0.5);
         r
     }
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
-        // Wider Q on mid (0.4 vs 0.5) → deeper scoop achievable at lower mid settings
         self.bass_shelf = Biquad::low_shelf(self.sr, 80.0, (bass - 0.5) * 30.0);
         self.mid_peak = Biquad::peak_eq(self.sr, 500.0, 0.4, (mid - 0.5) * 24.0);
         self.treble_shelf = Biquad::high_shelf(self.sr, 4500.0, (treble - 0.5) * 30.0);
@@ -57,9 +88,17 @@ impl Randall {
         self.last_mid = mid;
         self.last_treble = treble;
     }
+
+    fn update_presence(&mut self, presence: f32) {
+        // Randall presence at 5 kHz (glassy solid-state top end), +3 dB at noon → ±6 dB range
+        let gain_db = 3.0 + (presence - 0.5) * 12.0;
+        self.presence_shelf = Biquad::high_shelf(self.sr, 5000.0, gain_db);
+        self.last_presence = presence;
+    }
 }
 
 impl Amplifier for Randall {
+    #[allow(clippy::too_many_arguments)]
     #[inline]
     fn process(
         &mut self,
@@ -68,6 +107,7 @@ impl Amplifier for Randall {
         bass: f32,
         mid: f32,
         treble: f32,
+        presence: f32,
         master: f32,
     ) -> f32 {
         if (bass - self.last_bass).abs() > 0.001
@@ -76,49 +116,72 @@ impl Amplifier for Randall {
         {
             self.update_tone_stack(bass, mid, treble);
         }
+        if (presence - self.last_presence).abs() > 0.001 {
+            self.update_presence(presence);
+        }
 
         let x = self.dc_block.process(sample);
         let x = self.input_hp.process(x);
 
-        // Stage 1 — FET preamp: high gain, smooth asymptotic saturation.
-        // x / sqrt(1 + x²) approaches ±1 faster than atan, softer than tanh.
-        let pregain = 1.0 + gain * 45.0; // 1× – 46×
-        let x = fet_clip(x * pregain) / pregain.sqrt();
+        let pregain = 1.0 + gain * 45.0;
 
-        // Stage 2 — BJT driver: tanh-based, harder knee than FET
-        let x = bjt_clip(x * 6.0) / 6.0_f32.sqrt();
+        // ── 2× oversampled nonlinear section ──────────────────────────────────
+        // Even sample
+        let up = self.os_up_b.process(self.os_up_a.process(x * 2.0));
+        let up = self.pre_clip_hp.process(up); // cut sub-bass before FET stage
+        let s = fet_clip_asym(up * pregain) / pregain.sqrt();
+        let s = self.stage_hp_1.process(s);
+        let s = bjt_clip(s * 6.0) / 6.0_f32.sqrt();
+        let s = self.stage_hp_2.process(s);
+        let s = rail_clip(s * 3.0) / 3.0_f32.sqrt();
+        let x_os = self.os_dn_b.process(self.os_dn_a.process(s));
 
-        // Stage 3 — op-amp rail clipper: asymmetric, very hard approach to ±1
-        let x = rail_clip(x * 3.0) / 3.0_f32.sqrt();
+        // Odd sample — advance filter states, discard output
+        let up_z = self.os_up_b.process(self.os_up_a.process(0.0));
+        let up_z = self.pre_clip_hp.process(up_z);
+        let s_z = fet_clip_asym(up_z * pregain) / pregain.sqrt();
+        let s_z = self.stage_hp_1.process(s_z);
+        let s_z = bjt_clip(s_z * 6.0) / 6.0_f32.sqrt();
+        let s_z = self.stage_hp_2.process(s_z);
+        let s_z = rail_clip(s_z * 3.0) / 3.0_f32.sqrt();
+        self.os_dn_b.process(self.os_dn_a.process(s_z));
+        // ── end oversampled section ───────────────────────────────────────────
 
-        // Active tone stack
-        let x = self.bass_shelf.process(x);
+        let x = self.bass_shelf.process(x_os);
         let x = self.mid_peak.process(x);
         let x = self.treble_shelf.process(x);
         let x = self.presence_shelf.process(x);
 
-        // Solid-state power section — no sag, stiff output
+        // Solid-state power section — stiff rails, no sag
+        // HP before tanh: prevents the output stage from distorting sub-bass
+        let x = self.power_hp.process(x);
         let x = (x * 2.0).tanh() * 0.5;
 
         x * master * 0.8
     }
 }
 
-/// FET soft saturation — smooth approach to ±1, softer knee than tanh.
-/// f(x) = x / sqrt(1 + x²)
+/// Asymmetric FET saturation.
+///
+/// f(x) = x / sqrt(1 + x²) — smooth approach to ±1, softer than tanh.
+/// Negative half uses 1.08× input scale to simulate FET pinch-off asymmetry.
 #[inline]
-fn fet_clip(x: f32) -> f32 {
-    x / (1.0 + x * x).sqrt()
+fn fet_clip_asym(x: f32) -> f32 {
+    if x >= 0.0 {
+        x / (1.0 + x * x).sqrt()
+    } else {
+        let x2 = x * 1.08;
+        x2 / (1.0 + x2 * x2).sqrt()
+    }
 }
 
-/// BJT transistor clip — standard tanh, harder knee than the FET stage.
+/// BJT transistor clip — standard tanh, harder knee than FET.
 #[inline]
 fn bjt_clip(x: f32) -> f32 {
     x.tanh()
 }
 
 /// Op-amp rail limiter — hard clip with a brief soft knee above 0.85.
-/// Produces the tight, unforgiving character of a solid-state output stage.
 #[inline]
 fn rail_clip(x: f32) -> f32 {
     let lim = 0.85_f32;

@@ -110,6 +110,10 @@ pub(super) const KNOBS: &[Knob] = &[
         param: |p| &p.amp_treble,
     },
     Knob {
+        label: "PRESENCE",
+        param: |p| &p.amp_presence,
+    },
+    Knob {
         label: "MASTER",
         param: |p| &p.amp_master,
     },
@@ -143,7 +147,7 @@ pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
 ];
 
 pub(super) const AMP_SECTIONS: &[SectionDef] = &[
-    (|p| format!("⚡ {}", p.amp_model().name()), 17, 22, |_| None),
+    (|p| format!("⚡ {}", p.amp_model().name()), 17, 23, |_| None),
     (
         |_| "🎛 PARAMETRIC EQ".into(),
         11,

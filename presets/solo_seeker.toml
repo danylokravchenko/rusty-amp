@@ -1,0 +1,81 @@
+name        = "Solo Seeker"
+description = "Fire Seeker amp cranked with no pedals — pure amp lead tone, singing sustain, Twin Delay depth."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# No pedals in the chain means the gate only has to deal with the amp's own
+# noise floor. Looser threshold so quiet sustain tails survive; slow release
+# keeps the gate open across the full arc of a held bend.
+[noise_gate]
+enabled   = true
+threshold = 0.16
+release   = 0.50
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# No Skreamer in the signal flow — the Fire Seeker is driven directly.
+# The amp at near-maximum gain is the entire gain source.
+[tube_screamer]
+enabled = false
+drive = 0.30
+tone  = 0.55
+level = 0.75
+
+# ── Boss DS-1 Distortion ──────────────────────────────────────────────────────
+# No distortion pedal — same reasoning: the amp runs alone.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.55
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Fire Seeker (Mesa equivalent) with gain nearly maxed. Without a pedal in
+# front, the amp's own three-stage compression provides all the sustain.
+# Knob positions from the image:
+#   Gain ~9.5/10 → 0.93   Low ~4/10 → 0.40   Mid ~5.5/10 → 0.54
+#   Treble ~7/10 → 0.70   Master ~5/10 → 0.50
+#
+# Mid is left near noon — a solo tone needs mids to cut through; the
+# "scoop" approach that works on rhythm sounds hollow on single-note lines.
+# Presence pulled slightly above noon to add air to sustained notes.
+[amp]
+model    = "mesa"
+gain     = 0.93
+bass     = 0.40  # below noon — keeps the low end tight so sustained notes don't bloom
+mid      = 0.54  # near noon — mids present for lead cut, not scooped like rhythm
+treble   = 0.70  # defined top end; pick attack and harmonics speak clearly
+presence = 0.65  # slight 4 kHz boost — adds air and dimension to single-note lines
+master   = 0.50
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Fire Seeker matched cabinet = V30 4×12. Mesa is the direct equivalent.
+[cabinet]
+model = "mesa"
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# No post EQ — the amp's own EQ at these settings is already well-shaped for
+# a lead tone. Adding EQ on top of a near-maxed amp compresses the character.
+[eq]
+enabled = false
+low  = 0.50
+mid  = 0.50
+high = 0.50
+
+# ── Delay (Twin Delay — R channel only, L muted) ─────────────────────────────
+# The Guitar Rig preset shows Twin Delay with the L channel Mute active,
+# so only the R channel is running. This gives a single-tap delay on one
+# side — classic lead enhancement that widens the sound without obvious echo.
+# R Time knob ~5.5/10 → ~275 ms; Feedback ~3.5/10; Level ~6/10; Mix ~5/10.
+[delay]
+enabled  = true
+time     = 0.55   # ~275 ms — sits clearly behind the note, not a slapback
+feedback = 0.35   # one strong repeat, quickly fading — no cascading echo
+mix      = 0.30   # audible dimension without competing with the dry attack
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# No reverb block in the Guitar Rig signal flow — the delay provides all
+# the spatial character needed. Keeping it off preserves transient clarity.
+[reverb]
+enabled = false
+room = 0.30
+damp = 0.65
+mix  = 0.08

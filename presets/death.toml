@@ -38,6 +38,7 @@ gain   = 0.82  # high but not maxed — leaves dynamic range for pick attack
 bass   = 0.68  # heavy low end for the tuned-down E-standard / D-standard feel
 mid    = 0.42  # key detail: mids raised well above the Pantera/Slipknot scoop
 treble = 0.75  # clear, defined — pick-attack cut without becoming shrill
+presence = 0.55  # moderate — mids are raised for clarity; presence just adds air
 master = 0.60
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────

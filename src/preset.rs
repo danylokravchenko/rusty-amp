@@ -65,7 +65,13 @@ pub struct AmpSection {
     pub bass: f32,
     pub mid: f32,
     pub treble: f32,
+    #[serde(default = "presence_default")]
+    pub presence: f32,
     pub master: f32,
+}
+
+fn presence_default() -> f32 {
+    0.5
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -157,6 +163,7 @@ impl Preset {
                 bass: params.amp_bass.load(Relaxed),
                 mid: params.amp_mid.load(Relaxed),
                 treble: params.amp_treble.load(Relaxed),
+                presence: params.amp_presence.load(Relaxed),
                 master: params.amp_master.load(Relaxed),
             },
             cabinet: Some(CabSection {
@@ -237,6 +244,9 @@ impl Preset {
         params.amp_bass.store(amp.bass.clamp(0.0, 1.0), Relaxed);
         params.amp_mid.store(amp.mid.clamp(0.0, 1.0), Relaxed);
         params.amp_treble.store(amp.treble.clamp(0.0, 1.0), Relaxed);
+        params
+            .amp_presence
+            .store(amp.presence.clamp(0.0, 1.0), Relaxed);
         params.amp_master.store(amp.master.clamp(0.0, 1.0), Relaxed);
 
         if let Some(cab) = &self.cabinet {

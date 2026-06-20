@@ -38,6 +38,7 @@ gain   = 0.91  # cranked — the Rectifier's three-stage silicon compression
 bass   = 0.76  # heavy — compensates for the bass loss in extreme down-tunings
 mid    = 0.30  # moderate scoop — modern but not as extreme as Pantera
 treble = 0.78  # sharp, defined — keeps the pick attack audible
+presence = 0.64  # moderate-high — Mesa 4 kHz shelf; V30 cab already has presence
 master = 0.62
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────

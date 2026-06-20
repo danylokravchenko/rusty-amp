@@ -13,6 +13,7 @@ pub use randall::Randall;
 /// Common interface every amp model must satisfy.
 /// All knobs are normalised 0–1.
 pub trait Amplifier {
+    #[allow(clippy::too_many_arguments)]
     fn process(
         &mut self,
         sample: f32,
@@ -20,6 +21,7 @@ pub trait Amplifier {
         bass: f32,
         mid: f32,
         treble: f32,
+        presence: f32,
         master: f32,
     ) -> f32;
 }
@@ -53,16 +55,19 @@ impl AmpBank {
         bass: f32,
         mid: f32,
         treble: f32,
+        presence: f32,
         master: f32,
     ) -> f32 {
         match model {
             AmpModel::Marshall => self
                 .marshall
-                .process(sample, gain, bass, mid, treble, master),
-            AmpModel::Mesa => self.mesa.process(sample, gain, bass, mid, treble, master),
+                .process(sample, gain, bass, mid, treble, presence, master),
+            AmpModel::Mesa => self
+                .mesa
+                .process(sample, gain, bass, mid, treble, presence, master),
             AmpModel::Randall => self
                 .randall
-                .process(sample, gain, bass, mid, treble, master),
+                .process(sample, gain, bass, mid, treble, presence, master),
         }
     }
 }

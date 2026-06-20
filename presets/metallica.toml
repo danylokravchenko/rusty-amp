@@ -27,6 +27,7 @@ gain   = 0.87
 bass   = 0.72
 mid    = 0.22  # scooped mids — the Metallica hollow crunch
 treble = 0.80
+presence = 0.65  # moderate-high — JCM800 NFB shelf at 3.5 kHz for mix cut
 master = 0.60
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────

@@ -37,6 +37,7 @@ gain   = 0.72   # pulled back from rhythm's 0.93 — more note, less wall
 bass   = 0.52   # neutral bass — keeps the low end tight without being thunderous
 mid    = 0.48   # near-flat mids — the opposite of the scooped rhythm tone
 treble = 0.70   # present but not ice-pick; the DS-1 tone control warms it further
+presence = 0.58  # pulled back from rhythm — sustained lead notes need a warmer top
 master = 0.65
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────

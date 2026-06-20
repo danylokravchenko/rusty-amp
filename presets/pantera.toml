@@ -39,6 +39,7 @@ gain   = 0.93  # near maximum — every bit of preamp saturation
 bass   = 0.82  # thunderous low end
 mid    = 0.12  # aggressive mid scoop — deeper than Metallica
 treble = 0.86  # sharp, cutting highs for pick-attack definition
+presence = 0.73  # high — Randall shelf at 5 kHz reproduces the glassy top end
 master = 0.65
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────

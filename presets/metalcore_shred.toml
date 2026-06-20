@@ -2,28 +2,25 @@ name        = "Metalcore — Shred Seeker"
 description = "Modern metalcore shred tone: tight djent-adjacent rhythm, singing high-gain leads with harmonic pinches."
 
 # ── Noise Gate ────────────────────────────────────────────────────────────────
-# Metalcore rhythm playing is percussive and syncopated — the gate has to snap
-# shut between every chug to keep the mix tight. Moderately fast release so
-# the initial thwack of each downstroke hits full-force without fade-in.
+# The Skreamer at this drive level adds its own hiss on top of the amp's noise.
+# Moderate threshold keeps the gate silent between runs without snapping shut
+# on the tail of sustained bends.
 [noise_gate]
 enabled   = true
-threshold = 0.26   # tight — kills noise between syncopated chug patterns
-release   = 0.16   # fast enough for chug rhythms, not so fast it clips picked notes
+threshold = 0.24
+release   = 0.18
 
-# ── Tube Screamer ─────────────────────────────────────────────────────────────
-# The TS is the metalcore secret weapon — it tightens the low end of the
-# Mesa dramatically, turning a loose "rectifier sag" into the punchy, focused
-# low-string response that makes chug rhythms sound controlled. Low drive
-# preserves the amp's own character; the level does the real work.
+# ── Tube Screamer (Skreamer) ──────────────────────────────────────────────────
+# Guitar Rig's Skreamer Drive is cranked to ~7/10 — far more than a clean boost.
+# This pushes the amp's front end hard and adds harmonic density before the
+# preamp stages. Tone at noon; Volume hot so the amp's input is slammed.
 [tube_screamer]
 enabled = true
-drive = 0.18   # nearly clean — just enough for a slight mid-frequency push
-tone  = 0.75   # bright — cuts through a dense mix with bass guitar and triggers
-level = 0.92   # very hot — slams the Rectifier's front end for maximum tightness
+drive = 0.68   # ~7/10 on the Skreamer — genuine overdrive, not just a boost
+tone  = 0.52   # neutral tone — the amp's own EQ does the sculpting
+level = 0.82   # hot into the amp — saturates the first gain stage further
 
-# DS-1 off — the Mesa + TS is the metalcore standard; adding more dirt would
-# make the low strings indistinct and collapse the dynamic range needed for
-# the clean-to-heavy contrast that defines the genre.
+# DS-1 off — Skreamer is already doing the dirt work in front of the amp.
 [distortion]
 enabled = false
 drive = 0.40
@@ -31,57 +28,57 @@ tone  = 0.55
 level = 0.65
 
 # ── Amp ───────────────────────────────────────────────────────────────────────
-# Mesa Dual Rectifier on Modern channel — the genre's defining amp since
-# the early 2000s (Killswitch Engage, As I Lay Dying, Parkway Drive).
-# Gain pulled slightly below maximum: in metalcore you need the low strings
-# to chunk cleanly, not compress into a wall — headroom is part of the tone.
-# Mid scoop is present but not extreme — some mid body keeps chord voicings
-# readable when the whole band drops in at the breakdown.
+# Guitar Rig's Fire Seeker is a modern high-gain amp in the Diezel / Mesa
+# tradition — three gain stages, tight low end, aggressive upper-mids.
+# Mesa Dual Rectifier is the closest model in our chain.
+#
+# Knob positions read from the image:
+#   Gain ~8/10 → 0.80   Low ~6/10 → 0.60   Mid ~4.5/10 → 0.44
+#   Treble ~6.5/10 → 0.64   Master ~5/10 → 0.52
+#
+# Presence: modern high-gain amps typically run presence high for pick attack
+# definition; the Skreamer's extra mid push at the front means we can keep
+# the presence moderate rather than maxing it.
 [amp]
-model  = "mesa"
-gain   = 0.86  # high but not fully cranked — preserves low-string definition
-bass   = 0.70  # heavy but controlled — the TS tightens what the amp adds
-mid    = 0.35  # modern scoop — enough to sit the guitar in the mix, not hollow
-treble = 0.76  # defined highs — pick attack cuts through without becoming harsh
-master = 0.64
+model    = "mesa"
+gain     = 0.80  # cranked — three-stage Rectifier compression at near-maximum
+bass     = 0.60  # slightly above noon — solid low end without flabbiness
+mid      = 0.44  # light scoop — articulate without going full Pantera hollow
+treble   = 0.64  # defined — pick attack cuts through the Skreamer's mid push
+presence = 0.62  # moderate — 4 kHz Mesa shelf adds air without harshness
+master   = 0.52
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────
-# Mesa 4×12 with Vintage 30s — the V30's presence peak at 3.5 kHz is what
-# gives metalcore rhythm guitars their characteristic "cut" in the mix alongside
-# heavy bass and triggered kick drums. Standard for the genre.
+# Guitar Rig uses the "Fire Seeker" matched cabinet — a V30-loaded 4×12.
+# Mesa V30 is the direct equivalent.
 [cabinet]
 model = "mesa"
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
-# Three-way EQ sculpt for the shred/metalcore sweet spot:
-#   - Low: slight boost compensates for bass lost in drop tunings (drop-D/drop-C)
-#   - Mid: additional scoop on top of the amp creates the modern "djent-adjacent"
-#     hollow but articulate character without going full Pantera extreme
-#   - High: presence lift adds "air" to pinch harmonics and makes them squeal
-#     with authority; also helps legato runs speak over the rhythm section
+# No post-EQ — the Skreamer + Mesa combination is already well-shaped.
+# The TS mid-push into the scooped amp creates a self-balancing EQ curve;
+# adding more sculpting on top would lose the natural character.
 [eq]
-enabled = true
-low  = 0.54   # +1.2 dB — slight compensation for drop-tuning bass loss
-mid  = 0.28   # −6.6 dB — modern mid scoop, tighter than Slipknot
-high = 0.64   # +4.2 dB — harmonic content lift, pinch harmonics sing
+enabled = false
+low  = 0.50
+mid  = 0.50
+high = 0.50
 
-# ── Delay ─────────────────────────────────────────────────────────────────────
-# Short slapback delay on the shred lead — adds perceived depth and width to
-# solo lines without obvious echo. At 120 ms it's below the threshold of
-# conscious perception as a repeat but adds spaciousness that makes single-note
-# lines feel larger. Pull the time down to 0.00 for pure rhythm playing.
+# ── Delay (Delay Man) ─────────────────────────────────────────────────────────
+# The Guitar Rig preset has a Delay Man active. From the signal flow it looks
+# like a moderate single-repeat at medium time — adds dimension to leads
+# without cluttering fast rhythm playing. Increase mix for lead lines.
 [delay]
 enabled  = true
-time     = 0.24   # ~120 ms slapback — subliminal depth, not an audible echo
-feedback = 0.20   # barely one repeat — no stacking, stays clean in fast passages
-mix      = 0.18   # subtle — the dry signal always dominates
+time     = 0.30   # ~150 ms — sits behind the note, not an obvious slap-back
+feedback = 0.28   # one clear repeat, then fades — no cascading buildup
+mix      = 0.20   # noticeable depth but the dry signal still dominates
 
 # ── Reverb ────────────────────────────────────────────────────────────────────
-# A whisper of room reverb — not enough to hear as "reverb" but enough to
-# prevent the high-gain tone from sounding like it was recorded in a closet.
-# Fully damped so the tail never smears into the next chugged chord.
+# The Guitar Rig preset has no reverb block visible — keeping it off here
+# to match. The delay already provides spatial depth on lead lines.
 [reverb]
-enabled = true
-room = 0.22   # small room — creates the sense of a real physical space
-damp = 0.88   # heavily damped — kills the tail fast, reverb doesn't stack
-mix  = 0.06   # barely there — air, not ambience
+enabled = false
+room = 0.25
+damp = 0.75
+mix  = 0.05

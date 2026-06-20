@@ -162,6 +162,7 @@ pub struct Params {
     pub amp_bass: Arc<AtomicF32>,
     pub amp_mid: Arc<AtomicF32>,
     pub amp_treble: Arc<AtomicF32>,
+    pub amp_presence: Arc<AtomicF32>,
     pub amp_master: Arc<AtomicF32>,
 }
 
@@ -214,6 +215,7 @@ impl Params {
             amp_bass: p!(0.50),
             amp_mid: p!(0.45),
             amp_treble: p!(0.65),
+            amp_presence: p!(0.50),
             amp_master: p!(0.55),
         }
     }
@@ -318,6 +320,7 @@ impl DspChain {
             p.amp_bass.load(Relaxed),
             p.amp_mid.load(Relaxed),
             p.amp_treble.load(Relaxed),
+            p.amp_presence.load(Relaxed),
             p.amp_master.load(Relaxed),
         );
 
@@ -360,6 +363,19 @@ impl DspChain {
             x
         };
 
-        x.tanh()
+        soft_limit(x)
+    }
+}
+
+/// Transparent soft limiter: unity for |x| < 0.95, gentle knee above.
+/// Replaces the old x.tanh() which colored the signal even at normal levels.
+#[inline]
+fn soft_limit(x: f32) -> f32 {
+    let a = x.abs();
+    if a < 0.95 {
+        x
+    } else {
+        let excess = a - 0.95;
+        x.signum() * (0.95 + excess / (1.0 + excess * 5.0))
     }
 }

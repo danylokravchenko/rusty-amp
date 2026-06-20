@@ -41,6 +41,7 @@ gain   = 0.90  # near-maximum — the JCM800 preamp pushed to its limit
 bass   = 0.75  # heavy low end — gives the riffs physical weight
 mid    = 0.16  # extreme mid scoop — more aggressive than Metallica
 treble = 0.88  # very high — the pick attack needs to be violent and immediate
+presence = 0.72  # high — JCM800 NFB shelf at 3.5 kHz adds the ice-pick cut
 master = 0.68
 
 # ── Cabinet ───────────────────────────────────────────────────────────────────
