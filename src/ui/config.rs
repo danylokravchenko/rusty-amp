@@ -15,19 +15,11 @@ pub(super) type SectionDef = (
     usize,
     usize,
     fn(&Params) -> Option<bool>,
+    u32, // relative width weight
 );
 
 pub(super) const KNOBS: &[Knob] = &[
-    // 0–1: Noise Gate
-    Knob {
-        label: "THRESH",
-        param: |p| &p.ng_threshold,
-    },
-    Knob {
-        label: "RELEASE",
-        param: |p| &p.ng_release,
-    },
-    // 2–4: TS-808
+    // 0–2: TS-808
     Knob {
         label: "DRIVE",
         param: |p| &p.ts_drive,
@@ -40,7 +32,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ts_level,
     },
-    // 5–7: DS-1
+    // 3–5: DS-1
     Knob {
         label: "DRIVE",
         param: |p| &p.ds_drive,
@@ -53,7 +45,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ds_level,
     },
-    // 8–10: Reverb
+    // 6–8: Reverb
     Knob {
         label: "ROOM",
         param: |p| &p.rev_room,
@@ -66,20 +58,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.rev_mix,
     },
-    // 11–13: Parametric EQ
-    Knob {
-        label: "LOW",
-        param: |p| &p.eq_low,
-    },
-    Knob {
-        label: "MID",
-        param: |p| &p.eq_mid,
-    },
-    Knob {
-        label: "HIGH",
-        param: |p| &p.eq_high,
-    },
-    // 14–16: Delay
+    // 9–11: Delay
     Knob {
         label: "TIME",
         param: |p| &p.delay_time,
@@ -92,7 +71,16 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.delay_mix,
     },
-    // 17–21: Amp
+    // 12–13: Noise Gate
+    Knob {
+        label: "THRESH",
+        param: |p| &p.ng_threshold,
+    },
+    Knob {
+        label: "RELEASE",
+        param: |p| &p.ng_release,
+    },
+    // 14–19: Amp
     Knob {
         label: "GAIN",
         param: |p| &p.amp_gain,
@@ -117,59 +105,86 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MASTER",
         param: |p| &p.amp_master,
     },
+    // 20–22: Parametric EQ
+    Knob {
+        label: "LOW",
+        param: |p| &p.eq_low,
+    },
+    Knob {
+        label: "MID",
+        param: |p| &p.eq_mid,
+    },
+    Knob {
+        label: "HIGH",
+        param: |p| &p.eq_high,
+    },
 ];
 
+// Row 1: TS-808, DS-1, Reverb, Delay, Noise Gate
 pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
     (
-        |_| "🔇 NOISE GATE".into(),
-        0,
-        2,
-        |p| Some(p.ng_enabled.load(Relaxed)),
-    ),
-    (
         |_| "⚡ TS-808".into(),
-        2,
-        5,
+        0,
+        3,
         |p| Some(p.ts_enabled.load(Relaxed)),
+        3,
     ),
     (
         |_| "⚡ DS-1 DISTORTION".into(),
-        5,
-        8,
+        3,
+        6,
         |p| Some(p.ds_enabled.load(Relaxed)),
+        3,
     ),
     (
         |_| "⚡ SPRING REVERB".into(),
-        8,
-        11,
+        6,
+        9,
         |p| Some(p.rev_enabled.load(Relaxed)),
-    ),
-];
-
-pub(super) const AMP_SECTIONS: &[SectionDef] = &[
-    (|p| format!("⚡ {}", p.amp_model().name()), 17, 23, |_| None),
-    (
-        |_| "🎛 PARAMETRIC EQ".into(),
-        11,
-        14,
-        |p| Some(p.eq_enabled.load(Relaxed)),
+        3,
     ),
     (
         |_| "⏱ DELAY".into(),
-        14,
-        17,
+        9,
+        12,
         |p| Some(p.delay_enabled.load(Relaxed)),
+        3,
+    ),
+    (
+        |_| "🔇 NOISE GATE".into(),
+        12,
+        14,
+        |p| Some(p.ng_enabled.load(Relaxed)),
+        2,
     ),
 ];
 
-// Tab order: None (selectors) → NG → TS → DS → Rev → EQ → Delay → Amp
+// Row 2: Amp (wider), Parametric EQ
+pub(super) const AMP_SECTIONS: &[SectionDef] = &[
+    (
+        |p| format!("⚡ {}", p.amp_model().name()),
+        14,
+        20,
+        |_| None,
+        2,
+    ),
+    (
+        |_| "🎛 PARAMETRIC EQ".into(),
+        20,
+        23,
+        |p| Some(p.eq_enabled.load(Relaxed)),
+        1,
+    ),
+];
+
+// Tab order: None (selectors) → TS → DS → Rev → Delay → NG → Amp → EQ
 pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     None,
     Some(0),
-    Some(2),
-    Some(5),
-    Some(8),
-    Some(11),
+    Some(3),
+    Some(6),
+    Some(9),
+    Some(12),
     Some(14),
-    Some(17),
+    Some(20),
 ];

@@ -344,15 +344,18 @@ fn render_section_row(
     params: &Params,
     focus: Option<usize>,
 ) {
-    let n = sections.len() as u32;
-    let constraints: Vec<Constraint> = (0..n).map(|_| Constraint::Ratio(1, n)).collect();
+    let total_weight: u32 = sections.iter().map(|s| s.4).sum();
+    let constraints: Vec<Constraint> = sections
+        .iter()
+        .map(|s| Constraint::Ratio(s.4, total_weight))
+        .collect();
 
     let cols = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(constraints)
         .split(area);
 
-    for (i, (title_fn, start, end, enabled_fn)) in sections.iter().enumerate() {
+    for (i, (title_fn, start, end, enabled_fn, _)) in sections.iter().enumerate() {
         let title = title_fn(params);
         let enabled = enabled_fn(params);
         render_section(f, cols[i], &title, params, *start, *end, enabled, focus);
