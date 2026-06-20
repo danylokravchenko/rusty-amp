@@ -72,7 +72,7 @@ cargo run
 
 The processed signal is written to **all output channels** — both left and right on a stereo interface or headphones.
 
-The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing.
+The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing. Press **`S`** at any time to save the current state as a new preset.
 
 ## Controls
 
@@ -86,6 +86,7 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `C` | Toggle cabinet model between Mesa V30 and Marshall Greenback |
 | `Space` | Toggle the focused pedal / effect on / off |
 | `P` | Open the preset browser overlay |
+| `S` | Save the current state as a new user preset |
 | `Q` / `Ctrl-C` | Quit |
 
 ### Preset browser (`P`)
@@ -94,7 +95,21 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | ----- | -------- |
 | `↑` / `↓` | Navigate the preset list |
 | `Enter` | Apply the selected preset (takes effect immediately, audio is uninterrupted) |
+| `S` | Open the save dialog to capture the current state as a new preset |
+| `D` | Delete the selected preset (user presets only — bundled presets cannot be deleted) |
 | `Esc` / `P` | Close without changing anything |
+
+User presets are marked with a `[user]` tag in the list. The `D` hint appears in the footer only when the cursor is on a deletable preset.
+
+### Save dialog (`S`)
+
+| Key | Action |
+| ----- | -------- |
+| `Tab` | Switch between Name and Description fields |
+| `Enter` | Save the preset and return to the browser |
+| `Esc` | Cancel without saving |
+
+The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears in the browser immediately — no restart required.
 
 Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals row and cycles through sections.
 
@@ -182,12 +197,14 @@ Toggle between them with `C` at any time. The cabinet state is preserved when sw
 
 ## Presets
 
-Presets are `.toml` files. rusty-amp searches these directories at startup, in order:
+Presets are `.toml` files. rusty-amp searches these directories, in order:
 
-1. `./presets/` — relative to your working directory (bundled with the repo)
+1. `./presets/` — bundled presets (read-only, shipped with the repo)
 2. `~/.config/rusty-amp/presets/` — your personal presets
 
-Press **`P`** while playing to open the preset browser and apply a preset without interrupting audio.
+Press **`P`** while playing to open the preset browser. Press **`S`** (from anywhere) to save the current state as a new user preset. The browser updates instantly — no restart required.
+
+Bundled presets are marked as system presets and cannot be deleted from within the app. User presets show a `[user]` tag and can be deleted with **`D`**.
 
 ### Bundled presets
 
@@ -259,7 +276,7 @@ damp = 0.40
 mix  = 0.25
 ```
 
-Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset browser next time you run.
+Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset browser the next time you open it (or save another preset to trigger a reload).
 
 ## License
 

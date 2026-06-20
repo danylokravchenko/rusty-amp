@@ -20,7 +20,7 @@ use crate::preset::Preset;
 
 use draw::draw;
 use input::{cycle_amp, cycle_cab, next_section, nudge, prev_section, toggle_pedal};
-use presets::render_preset_modal;
+use presets::{render_preset_modal, render_save_dialog};
 
 pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Result<()> {
     enable_raw_mode()?;
@@ -56,6 +56,12 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
     let mut focus: Option<usize> = None;
     let mut preset_open = false;
     let mut preset_cursor = 0usize;
+    let mut presets = presets;
+    let mut save_open = false;
+    let mut save_name = String::new();
+    let mut save_desc = String::new();
+    let mut save_field = 0usize; // 0 = name, 1 = description
+    let mut save_error: Option<String> = None;
 
     loop {
         terminal.draw(|f| {
@@ -63,12 +69,69 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
             if preset_open {
                 render_preset_modal(f, &presets, preset_cursor);
             }
+            if save_open {
+                render_save_dialog(f, &save_name, &save_desc, save_field, save_error.as_deref());
+            }
         })?;
 
         if event::poll(Duration::from_millis(30))?
             && let Event::Key(key) = event::read()?
         {
-            if preset_open {
+            if save_open {
+                match key.code {
+                    KeyCode::Esc => {
+                        save_open = false;
+                        save_error = None;
+                    }
+                    KeyCode::Tab => {
+                        save_field = 1 - save_field;
+                    }
+                    KeyCode::Enter => {
+                        if save_name.trim().is_empty() {
+                            save_error = Some("Name cannot be empty".to_string());
+                        } else {
+                            let preset = crate::preset::Preset::from_params(
+                                save_name.trim().to_string(),
+                                if save_desc.trim().is_empty() {
+                                    None
+                                } else {
+                                    Some(save_desc.trim().to_string())
+                                },
+                                &params,
+                            );
+                            match preset.save_to_user_dir() {
+                                Ok(_) => {
+                                    presets = crate::preset::load_all();
+                                    save_open = false;
+                                    save_name.clear();
+                                    save_desc.clear();
+                                    save_error = None;
+                                }
+                                Err(e) => {
+                                    save_error = Some(format!("Save failed: {e}"));
+                                }
+                            }
+                        }
+                    }
+                    KeyCode::Backspace => {
+                        if save_field == 0 {
+                            save_name.pop();
+                        } else {
+                            save_desc.pop();
+                        }
+                        save_error = None;
+                    }
+                    KeyCode::Char(c) => {
+                        if save_field == 0 {
+                            save_name.push(c);
+                        } else {
+                            save_desc.push(c);
+                        }
+                        save_error = None;
+                    }
+                    _ => {}
+                }
+            } else if preset_open {
                 let total = presets.len() + 1;
                 match key.code {
                     KeyCode::Up => {
@@ -82,6 +145,22 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
                             presets[preset_cursor - 1].apply(&params);
                         }
                         preset_open = false;
+                    }
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        preset_open = false;
+                        save_open = true;
+                        save_name.clear();
+                        save_desc.clear();
+                        save_field = 0;
+                        save_error = None;
+                    }
+                    KeyCode::Char('d') | KeyCode::Char('D') if preset_cursor > 0 => {
+                        let p = &presets[preset_cursor - 1];
+                        if p.source == crate::preset::PresetSource::User {
+                            let _ = p.delete();
+                            presets = crate::preset::load_all();
+                            preset_cursor = preset_cursor.saturating_sub(1);
+                        }
                     }
                     KeyCode::Esc | KeyCode::Char('p') | KeyCode::Char('P') => {
                         preset_open = false;
@@ -97,6 +176,13 @@ pub fn run(params: Arc<Params>, levels: Arc<Levels>, presets: Vec<Preset>) -> Re
                     KeyCode::Char('p') | KeyCode::Char('P') => {
                         preset_open = true;
                         preset_cursor = 0;
+                    }
+                    KeyCode::Char('s') | KeyCode::Char('S') => {
+                        save_open = true;
+                        save_name.clear();
+                        save_desc.clear();
+                        save_field = 0;
+                        save_error = None;
                     }
                     KeyCode::Char('a') | KeyCode::Char('A') => {
                         cycle_amp(&params, 1);

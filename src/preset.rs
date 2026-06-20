@@ -1,16 +1,29 @@
 use anyhow::{Context, Result};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{AmpModel, CabModel, Params};
 
+// ── Preset source ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PresetSource {
+    System,
+    #[default]
+    User,
+}
+
 // ── TOML schema ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Preset {
     pub name: String,
     pub description: Option<String>,
+    #[serde(skip)]
+    pub source: PresetSource,
+    #[serde(skip)]
+    pub path: Option<PathBuf>,
     pub noise_gate: Option<NgSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
@@ -21,14 +34,14 @@ pub struct Preset {
     pub reverb: ReverbSection,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct NgSection {
     pub enabled: Option<bool>,
     pub threshold: f32,
     pub release: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct TsSection {
     pub enabled: Option<bool>,
     pub drive: f32,
@@ -36,7 +49,7 @@ pub struct TsSection {
     pub level: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DsSection {
     pub enabled: Option<bool>,
     pub drive: f32,
@@ -44,7 +57,7 @@ pub struct DsSection {
     pub level: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct AmpSection {
     /// "marshall" | "mesa" | "randall"
     pub model: Option<String>,
@@ -55,13 +68,13 @@ pub struct AmpSection {
     pub master: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct CabSection {
     /// "mesa" (default) | "marshall"
     pub model: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct EqSection {
     pub enabled: Option<bool>,
     pub low: f32,
@@ -69,7 +82,7 @@ pub struct EqSection {
     pub high: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct DelaySection {
     pub enabled: Option<bool>,
     pub time: f32,
@@ -77,7 +90,7 @@ pub struct DelaySection {
     pub mix: f32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReverbSection {
     pub enabled: Option<bool>,
     pub room: f32,
@@ -86,10 +99,106 @@ pub struct ReverbSection {
 }
 
 impl Preset {
-    pub fn load(path: &Path) -> Result<Self> {
+    pub fn load(path: &Path, source: PresetSource) -> Result<Self> {
         let src =
             std::fs::read_to_string(path).with_context(|| format!("reading {}", path.display()))?;
-        toml::from_str(&src).with_context(|| format!("parsing {}", path.display()))
+        let mut preset: Self =
+            toml::from_str(&src).with_context(|| format!("parsing {}", path.display()))?;
+        preset.source = source;
+        preset.path = Some(path.to_path_buf());
+        Ok(preset)
+    }
+
+    pub fn delete(&self) -> Result<()> {
+        let path = self
+            .path
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("preset has no file path"))?;
+        std::fs::remove_file(path).with_context(|| format!("deleting {}", path.display()))
+    }
+
+    pub fn from_params(name: String, description: Option<String>, params: &Params) -> Self {
+        let amp_model = AmpModel::from_u8(params.amp_model.load(Relaxed));
+        let amp_model_str = match amp_model {
+            AmpModel::Marshall => "marshall",
+            AmpModel::Mesa => "mesa",
+            AmpModel::Randall => "randall",
+        };
+        let cab_model = CabModel::from_u8(params.cab_model.load(Relaxed));
+        let cab_model_str = match cab_model {
+            CabModel::Mesa => "mesa",
+            CabModel::Marshall => "marshall",
+        };
+        Self {
+            name,
+            description,
+            source: PresetSource::User,
+            path: None,
+            noise_gate: Some(NgSection {
+                enabled: Some(params.ng_enabled.load(Relaxed)),
+                threshold: params.ng_threshold.load(Relaxed),
+                release: params.ng_release.load(Relaxed),
+            }),
+            tube_screamer: TsSection {
+                enabled: Some(params.ts_enabled.load(Relaxed)),
+                drive: params.ts_drive.load(Relaxed),
+                tone: params.ts_tone.load(Relaxed),
+                level: params.ts_level.load(Relaxed),
+            },
+            distortion: Some(DsSection {
+                enabled: Some(params.ds_enabled.load(Relaxed)),
+                drive: params.ds_drive.load(Relaxed),
+                tone: params.ds_tone.load(Relaxed),
+                level: params.ds_level.load(Relaxed),
+            }),
+            amp: AmpSection {
+                model: Some(amp_model_str.to_string()),
+                gain: params.amp_gain.load(Relaxed),
+                bass: params.amp_bass.load(Relaxed),
+                mid: params.amp_mid.load(Relaxed),
+                treble: params.amp_treble.load(Relaxed),
+                master: params.amp_master.load(Relaxed),
+            },
+            cabinet: Some(CabSection {
+                model: Some(cab_model_str.to_string()),
+            }),
+            eq: Some(EqSection {
+                enabled: Some(params.eq_enabled.load(Relaxed)),
+                low: params.eq_low.load(Relaxed),
+                mid: params.eq_mid.load(Relaxed),
+                high: params.eq_high.load(Relaxed),
+            }),
+            delay: Some(DelaySection {
+                enabled: Some(params.delay_enabled.load(Relaxed)),
+                time: params.delay_time.load(Relaxed),
+                feedback: params.delay_feedback.load(Relaxed),
+                mix: params.delay_mix.load(Relaxed),
+            }),
+            reverb: ReverbSection {
+                enabled: Some(params.rev_enabled.load(Relaxed)),
+                room: params.rev_room.load(Relaxed),
+                damp: params.rev_damp.load(Relaxed),
+                mix: params.rev_mix.load(Relaxed),
+            },
+        }
+    }
+
+    pub fn save_to_user_dir(&self) -> Result<PathBuf> {
+        let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("cannot find home dir"))?;
+        let dir = home.join(".config").join("rusty-amp").join("presets");
+        std::fs::create_dir_all(&dir)?;
+
+        let filename = self
+            .name
+            .to_lowercase()
+            .chars()
+            .map(|c| if c.is_alphanumeric() { c } else { '_' })
+            .collect::<String>();
+        let path = dir.join(format!("{filename}.toml"));
+
+        let toml_str = toml::to_string_pretty(self).with_context(|| "serializing preset")?;
+        std::fs::write(&path, toml_str)?;
+        Ok(path)
     }
 
     /// Write all preset values into the shared atomic params.
@@ -172,33 +281,39 @@ impl Preset {
 
 // ── Discovery ─────────────────────────────────────────────────────────────────
 
-pub fn find_preset_files() -> Vec<PathBuf> {
-    let mut dirs: Vec<PathBuf> = vec![PathBuf::from("presets")];
+pub fn find_preset_files() -> Vec<(PathBuf, PresetSource)> {
+    let system_dir = PathBuf::from("presets");
+    let mut result: Vec<(PathBuf, PresetSource)> = Vec::new();
 
-    if let Some(home) = dirs::home_dir() {
-        dirs.push(home.join(".config").join("rusty-amp").join("presets"));
-    }
-
-    let mut files: Vec<PathBuf> = Vec::new();
-    for dir in &dirs {
+    let scan = |dir: &PathBuf, source: PresetSource| -> Vec<(PathBuf, PresetSource)> {
         if let Ok(entries) = std::fs::read_dir(dir) {
-            let mut dir_files: Vec<PathBuf> = entries
+            let mut files: Vec<PathBuf> = entries
                 .filter_map(|e| e.ok())
                 .map(|e| e.path())
                 .filter(|p| p.extension().is_some_and(|ext| ext == "toml"))
                 .collect();
-            dir_files.sort();
-            files.extend(dir_files);
+            files.sort();
+            files.into_iter().map(|p| (p, source)).collect()
+        } else {
+            vec![]
         }
+    };
+
+    result.extend(scan(&system_dir, PresetSource::System));
+
+    if let Some(home) = dirs::home_dir() {
+        let user_dir = home.join(".config").join("rusty-amp").join("presets");
+        result.extend(scan(&user_dir, PresetSource::User));
     }
-    files
+
+    result
 }
 
 pub fn load_all() -> Vec<Preset> {
     find_preset_files()
         .into_iter()
-        .filter_map(|path| {
-            Preset::load(&path)
+        .filter_map(|(path, source)| {
+            Preset::load(&path, source)
                 .map_err(|e| eprintln!("Warning: skipping preset {}: {e}", path.display()))
                 .ok()
         })
