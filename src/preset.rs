@@ -78,6 +78,13 @@ fn presence_default() -> f32 {
 pub struct CabSection {
     /// "mesa" (default) | "marshall"
     pub model: Option<String>,
+    /// 0.0 = edge (off-axis, dark) … 1.0 = center (on-axis, bright). Default 0.5.
+    #[serde(default = "mic_pos_default")]
+    pub mic_pos: f32,
+}
+
+fn mic_pos_default() -> f32 {
+    0.5
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -168,6 +175,7 @@ impl Preset {
             },
             cabinet: Some(CabSection {
                 model: Some(cab_model_str.to_string()),
+                mic_pos: params.mic_pos.load(Relaxed),
             }),
             eq: Some(EqSection {
                 enabled: Some(params.eq_enabled.load(Relaxed)),
@@ -255,6 +263,7 @@ impl Preset {
                 _ => CabModel::Mesa,
             };
             params.cab_model.store(cab_model as u8, Relaxed);
+            params.mic_pos.store(cab.mic_pos.clamp(0.0, 1.0), Relaxed);
         }
 
         if let Some(eq) = &self.eq {

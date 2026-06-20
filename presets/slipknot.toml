@@ -47,6 +47,7 @@ master = 0.62
 # Mesa's aggressive top end perfectly.
 [cabinet]
 model = "mesa"
+mic_pos = 0.42   # off-axis — chunky Slipknot low-end sounds heavier with a darker cab
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # Subtle EQ to tighten the modern metal sound — a slight mid cut to push the

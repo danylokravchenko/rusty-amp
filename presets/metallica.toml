@@ -35,6 +35,7 @@ master = 0.60
 # Greenbacks — the classic JCM800 + Greenback pairing that defined 80s metal.
 [cabinet]
 model = "marshall"
+mic_pos = 0.52   # near center — classic Marshall warmth with just a hint of brightness
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No extra EQ — the JCM800 + TS boost combination is the entire tone.

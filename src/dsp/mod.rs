@@ -122,6 +122,9 @@ pub struct Params {
     // Cabinet model selector
     pub cab_model: Arc<AtomicU8>,
 
+    // Mic position (0 = edge/dark, 1 = center/bright)
+    pub mic_pos: Arc<AtomicF32>,
+
     // Noise gate
     pub ng_enabled: Arc<AtomicBool>,
     pub ng_threshold: Arc<AtomicF32>,
@@ -181,6 +184,7 @@ impl Params {
         Self {
             amp_model: Arc::new(AtomicU8::new(AmpModel::Marshall as u8)),
             cab_model: Arc::new(AtomicU8::new(CabModel::Mesa as u8)),
+            mic_pos: p!(0.5),
 
             ng_enabled: b!(true),
             ng_threshold: p!(0.20),
@@ -325,7 +329,7 @@ impl DspChain {
         );
 
         // Cabinet simulation
-        let x = self.cab.process(p.cab_model(), x);
+        let x = self.cab.process(p.cab_model(), x, p.mic_pos.load(Relaxed));
 
         // Parametric EQ
         let x = if p.eq_enabled.load(Relaxed) {

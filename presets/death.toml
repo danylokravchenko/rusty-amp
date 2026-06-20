@@ -46,7 +46,8 @@ master = 0.60
 # V30 presence peak that sits the guitar clearly in the dense mix alongside
 # the complex bass lines and drumming.
 [cabinet]
-model = "mesa"
+model   = "mesa"
+mic_pos = 0.55   # slightly on-axis — V30 presence spike needs a touch of brightness for note clarity
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # Subtle EQ to enhance technical clarity — a slight mid presence boost

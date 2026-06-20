@@ -15,7 +15,7 @@ Noise Gate  [bypassable]
   │
   ▼
 TS-808 Tube Screamer  [bypassable]
-  DC block → 720 Hz HP → asymmetric diode clip → variable tone LP
+  DC block → 340 Hz HP → 720 Hz mid-peak → asymmetric diode clip → variable tone LP
   │
   ▼
 DS-1 Distortion  [bypassable]
@@ -30,7 +30,7 @@ Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in 
   ▼
 Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback — switchable in real time]
   Multi-stage biquad EQ chain modelling a close-mic'd 4×12 cabinet response:
-  sub-bass HPF → low shelf → mid character peak → presence peak → air shelf → fizz LPF
+  sub-bass HPF → low shelf → mid character peak → presence peak → air shelf → fizz LPF → mic position shelf
   │
   ▼
 Parametric EQ  [bypassable]
@@ -116,7 +116,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 
 ## Knob sections
 
-### Pedals row  _(each section is independently bypassable with Space)_
+### Pedals row  _(TS-808 | DS-1 | Spring Reverb | Delay | Noise Gate — each independently bypassable with Space)_
 
 #### Noise Gate
 
@@ -141,7 +141,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | Tone | 0–10 | Active LP/HP blend. 0 = dark & full, 5 = mid-scooped, 10 = bright & cutting |
 | Level | 0–10 | Output volume of the pedal into the next stage |
 
-#### Spring Reverb
+#### Spring Reverb  _(bypassable with Space)_
 
 | Knob | Range | Effect |
 | ------ | ------- | -------- |
@@ -149,7 +149,15 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | Damp | 0–10 | High-frequency absorption in the feedback path |
 | Mix | 0–10 | Dry/wet blend (0 = fully dry, 10 = fully wet) |
 
-### Amp / FX row
+#### Delay  _(bypassable with Space)_
+
+| Knob | Range | Effect |
+| ------ | ------- | -------- |
+| Time | 0–10 | Delay time 0–500 ms |
+| Feedback | 0–10 | Repeat level. Capped at 85% internally to prevent runaway |
+| Mix | 0–10 | Dry/wet blend |
+
+### Amp / FX row  _(Amp | Parametric EQ | Cabinet mic position)_
 
 #### Amp  _(model selected with `↑`/`↓` or `A` on the selector row)_
 
@@ -159,6 +167,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | Bass | 0–10 | Low shelf at 80 Hz (±15 dB) | Low shelf at 100 Hz (±15 dB) | Low shelf at 80 Hz (±15 dB) |
 | Mid | 0–10 | Peak EQ at 400 Hz (±12 dB) | Peak EQ at 750 Hz (±12 dB) | Peak EQ at 500 Hz (±12 dB) |
 | Treble | 0–10 | High shelf at 2.5 kHz (±15 dB) | High shelf at 3.3 kHz (±15 dB) | High shelf at 4.5 kHz (±15 dB) |
+| Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
 | Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
 
 #### Parametric EQ  _(bypassable with Space)_
@@ -171,13 +180,13 @@ All three bands map 0–10 to −15 dB → 0 dB → +15 dB. Centre (5.0) is unit
 | Mid | 800 Hz | Peak (Q 1.5) |
 | High | 5 kHz | High shelf |
 
-#### Delay  _(bypassable with Space)_
+#### Cabinet mic position  _(labeled with the active cabinet model)_
+
+Simulates moving the SM57 between the speaker cone edge and centre.
 
 | Knob | Range | Effect |
 | ------ | ------- | -------- |
-| Time | 0–10 | Delay time 0–500 ms |
-| Feedback | 0–10 | Repeat level. Capped at 85% internally to prevent runaway |
-| Mix | 0–10 | Dry/wet blend |
+| Mic Pos | 0–10 | 0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz) |
 
 ## Amp models
 
@@ -195,6 +204,8 @@ All three bands map 0–10 to −15 dB → 0 dB → +15 dB. Centre (5.0) is unit
 | Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +3 dB body at 800 Hz, +4 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
 
 Toggle between them with `C` at any time. The cabinet state is preserved when switching amp models.
+
+The **Mic Pos** knob applies a high-shelf filter (±6 dB at 5 kHz) after all fixed cab EQ bands, modelling the tonal difference between an on-axis and off-axis microphone placement.
 
 ## Presets
 
@@ -218,6 +229,7 @@ Bundled presets are marked as system presets and cannot be deleted from within t
 | `death.toml` | Mesa Dual Rectifier | Mesa V30 | Chuck Schuldiner — TS boost, mids-up for note clarity |
 | `slayer.toml` | Marshall JCM800 | Marshall Greenback | Hanneman & King's thrash assault — straight into a cranked JCM800, extreme mid-scoop, zero mercy |
 | `metalcore_shred.toml` | Mesa Dual Rectifier | Mesa V30 | Modern metalcore shred — TS tight boost, djent-adjacent EQ, slapback delay |
+| `solo_seeker.toml` | Mesa Dual Rectifier | Mesa V30 | Lead tone — sustain-focused, delay + reverb, on-axis mic for pick-attack clarity |
 
 ### Writing your own preset
 
@@ -256,7 +268,8 @@ treble = 0.65
 master = 0.55
 
 [cabinet]
-model = "mesa"        # "mesa" (default) or "marshall"
+model   = "mesa"      # "mesa" (default) or "marshall"
+mic_pos = 0.5         # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (default 0.5)
 
 [eq]
 enabled = true        # optional, defaults to true

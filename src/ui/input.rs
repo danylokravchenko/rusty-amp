@@ -3,7 +3,7 @@ use std::sync::atomic::Ordering::Relaxed;
 use crate::dsp::{AmpModel, CabModel, Params};
 
 use super::config::{
-    AMP_END, DELAY_END, DS_END, EQ_END, KNOBS, NG_END, REV_END, SECTION_STARTS, TS_END,
+    AMP_END, DELAY_END, DS_END, EQ_END, KNOBS, MIC_END, NG_END, REV_END, SECTION_STARTS, TS_END,
 };
 
 pub(super) fn next_section(focus: Option<usize>) -> Option<usize> {
@@ -60,10 +60,11 @@ pub(super) fn toggle_pedal(params: &Params, knob_idx: usize) {
         let v = params.eq_enabled.load(Relaxed);
         params.eq_enabled.store(!v, Relaxed);
     }
+    // MIC section has no toggle
 }
 
 fn section_of(focus: Option<usize>) -> usize {
-    // Matches SECTION_STARTS order: None, TS, DS, Rev, Delay, NG, Amp, EQ
+    // Matches SECTION_STARTS order: None, TS, DS, Rev, Delay, NG, Amp, EQ, Mic
     match focus {
         None => 0,
         Some(i) if i < TS_END => 1,
@@ -72,6 +73,8 @@ fn section_of(focus: Option<usize>) -> usize {
         Some(i) if i < DELAY_END => 4,
         Some(i) if i < NG_END => 5,
         Some(i) if i < AMP_END => 6,
-        Some(_) => 7,
+        Some(i) if i < EQ_END => 7,
+        Some(i) if i < MIC_END => 8,
+        Some(_) => 8,
     }
 }

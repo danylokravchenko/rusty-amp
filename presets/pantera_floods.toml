@@ -45,6 +45,7 @@ master = 0.65
 # across the song; the tone difference comes from amp settings and the EQ.
 [cabinet]
 model = "mesa"
+mic_pos = 0.58   # slightly on-axis — cleaner Dimebag tone needs presence without harshness
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No extra EQ on the lead — the amp's own tone stack with mids up is enough.

@@ -53,6 +53,7 @@ master   = 0.52
 # Mesa V30 is the direct equivalent.
 [cabinet]
 model = "mesa"
+mic_pos = 0.62   # on-axis — modern tight Mesa tone needs clarity for fast picking
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No post-EQ — the Skreamer + Mesa combination is already well-shaped.

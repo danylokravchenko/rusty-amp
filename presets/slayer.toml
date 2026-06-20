@@ -50,7 +50,8 @@ master = 0.68
 # mid scoop, keeping the tone cutting rather than hollow; its smooth top-end
 # rolloff prevents the very high treble setting from becoming unbearable.
 [cabinet]
-model = "marshall"
+model   = "marshall"
+mic_pos = 0.65   # on-axis — Kerry King's tone is aggressive and cutting, needs presence
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # One final surgical cut in the mid-range — layering multiple JCM800s in

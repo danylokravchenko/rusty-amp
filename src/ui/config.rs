@@ -33,6 +33,8 @@ pub(super) const AMP_START: usize = 14;
 pub(super) const AMP_END: usize = 20;
 pub(super) const EQ_START: usize = 20;
 pub(super) const EQ_END: usize = 23;
+pub(super) const MIC_START: usize = 23;
+pub(super) const MIC_END: usize = 24;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–2: TS-808
@@ -134,6 +136,11 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "HIGH",
         param: |p| &p.eq_high,
     },
+    // 23: Mic position
+    Knob {
+        label: "MIC POS",
+        param: |p| &p.mic_pos,
+    },
 ];
 
 // Row 1: TS-808, DS-1, Reverb, Delay, Noise Gate
@@ -175,25 +182,32 @@ pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
     ),
 ];
 
-// Row 2: Amp (wider), Parametric EQ
+// Row 2: Amp (wider), Parametric EQ, Mic position
 pub(super) const AMP_SECTIONS: &[SectionDef] = &[
     (
         |p| format!("⚡ {}", p.amp_model().name()),
         AMP_START,
         AMP_END,
         |_| None,
-        2,
+        3,
     ),
     (
         |_| "🎛 PARAMETRIC EQ".into(),
         EQ_START,
         EQ_END,
         |p| Some(p.eq_enabled.load(Relaxed)),
+        2,
+    ),
+    (
+        |p| format!("🎙 {}", p.cab_model().short_name()),
+        MIC_START,
+        MIC_END,
+        |_| None,
         1,
     ),
 ];
 
-// Tab order: None (selectors) → TS → DS → Rev → Delay → NG → Amp → EQ
+// Tab order: None (selectors) → TS → DS → Rev → Delay → NG → Amp → EQ → Mic
 pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     None,
     Some(TS_START),
@@ -203,4 +217,5 @@ pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     Some(NG_START),
     Some(AMP_START),
     Some(EQ_START),
+    Some(MIC_START),
 ];
