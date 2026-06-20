@@ -4,15 +4,20 @@ use std::f32::consts::PI;
 /// Ibanez TS-808 Tube Screamer simulation.
 ///
 /// Signal path:
-///   DC block → 720 Hz high-pass → asymmetric diode clipper → variable tone LP → level
+///   DC block → input coupling HP (~60 Hz) → 720 Hz mid-peak boost → asymmetric diode clipper → variable tone LP → level
 ///
-/// The 720 Hz HP before clipping is the key character of the TS sound: it removes low-end
-/// before the gain stage so the distortion stays "focused" rather than flabby.
+/// The real TS-808's 720 Hz characteristic comes from a frequency-dependent feedback network
+/// inside the clipping op-amp: it gives more gain in the mids/highs relative to the bass,
+/// but does NOT block the guitar fundamental from entering the stage. The input coupling cap
+/// only cuts below ~60 Hz. Modeling the 720 Hz as an input HP (as many simulations do)
+/// strips the fundamental from lower notes and causes intermodulation artifacts ("sitar" sound).
+/// We instead model it as a peak boost at 720 Hz before the clipper.
 pub struct TubeScreamer {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
-    tone_z: f32, // 1-pole LP state for variable tone control
+    mid_peak: Biquad, // 720 Hz feedback network peak — TS mid-push character
+    tone_z: f32,      // 1-pole LP state for variable tone control
     last_tone: f32,
     tone_coeff: f32,
 }
@@ -22,7 +27,12 @@ impl TubeScreamer {
         let mut ts = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
-            input_hp: Biquad::highpass(sr, 720.0, 0.707),
+            // TS-808 input coupling cap: 0.047µF into 10kΩ → f = 1/(2π×RC) ≈ 340 Hz.
+            // This cuts the sub-bass before the clipper without stripping guitar fundamentals
+            // as aggressively as the 720 Hz feedback-network frequency would.
+            input_hp: Biquad::highpass(sr, 340.0, 0.707),
+            // Models the TS-808 feedback network resonance: mid-push centered at 720 Hz
+            mid_peak: Biquad::peak_eq(sr, 720.0, 0.7, 6.0),
             tone_z: 0.0,
             last_tone: -1.0, // force first update
             tone_coeff: 0.0,
@@ -47,6 +57,7 @@ impl TubeScreamer {
 
         let x = self.dc_block.process(x);
         let x = self.input_hp.process(x);
+        let x = self.mid_peak.process(x);
 
         // Drive: 10 kΩ fixed + up to 500 kΩ pot → gain ratio 1×–51×
         let gain = 1.0 + drive * 50.0;

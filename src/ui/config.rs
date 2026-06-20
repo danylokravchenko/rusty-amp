@@ -18,6 +18,22 @@ pub(super) type SectionDef = (
     u32, // relative width weight
 );
 
+// Knob index range boundaries
+pub(super) const TS_START: usize = 0;
+pub(super) const TS_END: usize = 3;
+pub(super) const DS_START: usize = 3;
+pub(super) const DS_END: usize = 6;
+pub(super) const REV_START: usize = 6;
+pub(super) const REV_END: usize = 9;
+pub(super) const DELAY_START: usize = 9;
+pub(super) const DELAY_END: usize = 12;
+pub(super) const NG_START: usize = 12;
+pub(super) const NG_END: usize = 14;
+pub(super) const AMP_START: usize = 14;
+pub(super) const AMP_END: usize = 20;
+pub(super) const EQ_START: usize = 20;
+pub(super) const EQ_END: usize = 23;
+
 pub(super) const KNOBS: &[Knob] = &[
     // 0–2: TS-808
     Knob {
@@ -124,36 +140,36 @@ pub(super) const KNOBS: &[Knob] = &[
 pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
     (
         |_| "⚡ TS-808".into(),
-        0,
-        3,
+        TS_START,
+        TS_END,
         |p| Some(p.ts_enabled.load(Relaxed)),
         3,
     ),
     (
         |_| "⚡ DS-1 DISTORTION".into(),
-        3,
-        6,
+        DS_START,
+        DS_END,
         |p| Some(p.ds_enabled.load(Relaxed)),
         3,
     ),
     (
         |_| "⚡ SPRING REVERB".into(),
-        6,
-        9,
+        REV_START,
+        REV_END,
         |p| Some(p.rev_enabled.load(Relaxed)),
         3,
     ),
     (
         |_| "⏱ DELAY".into(),
-        9,
-        12,
+        DELAY_START,
+        DELAY_END,
         |p| Some(p.delay_enabled.load(Relaxed)),
         3,
     ),
     (
         |_| "🔇 NOISE GATE".into(),
-        12,
-        14,
+        NG_START,
+        NG_END,
         |p| Some(p.ng_enabled.load(Relaxed)),
         2,
     ),
@@ -163,15 +179,15 @@ pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
 pub(super) const AMP_SECTIONS: &[SectionDef] = &[
     (
         |p| format!("⚡ {}", p.amp_model().name()),
-        14,
-        20,
+        AMP_START,
+        AMP_END,
         |_| None,
         2,
     ),
     (
         |_| "🎛 PARAMETRIC EQ".into(),
-        20,
-        23,
+        EQ_START,
+        EQ_END,
         |p| Some(p.eq_enabled.load(Relaxed)),
         1,
     ),
@@ -180,11 +196,11 @@ pub(super) const AMP_SECTIONS: &[SectionDef] = &[
 // Tab order: None (selectors) → TS → DS → Rev → Delay → NG → Amp → EQ
 pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     None,
-    Some(0),
-    Some(3),
-    Some(6),
-    Some(9),
-    Some(12),
-    Some(14),
-    Some(20),
+    Some(TS_START),
+    Some(DS_START),
+    Some(REV_START),
+    Some(DELAY_START),
+    Some(NG_START),
+    Some(AMP_START),
+    Some(EQ_START),
 ];
