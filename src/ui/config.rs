@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use atomic_float::AtomicF32;
-use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::Params;
 
@@ -10,95 +9,32 @@ pub(super) struct Knob {
     pub(super) param: fn(&Params) -> &Arc<AtomicF32>,
 }
 
-pub(super) type SectionDef = (
-    fn(&Params) -> String,
-    usize,
-    usize,
-    fn(&Params) -> Option<bool>,
-    u32, // relative width weight
-);
-
-// Knob index range boundaries
-pub(super) const TS_START: usize = 0;
-pub(super) const TS_END: usize = 3;
-pub(super) const DS_START: usize = 3;
-pub(super) const DS_END: usize = 6;
-pub(super) const REV_START: usize = 6;
-pub(super) const REV_END: usize = 9;
-pub(super) const DELAY_START: usize = 9;
-pub(super) const DELAY_END: usize = 12;
-pub(super) const NG_START: usize = 12;
-pub(super) const NG_END: usize = 14;
-pub(super) const AMP_START: usize = 14;
-pub(super) const AMP_END: usize = 20;
-pub(super) const EQ_START: usize = 20;
-pub(super) const EQ_END: usize = 23;
-pub(super) const MIC_START: usize = 23;
-pub(super) const MIC_END: usize = 24;
+// Knob index range boundaries.
+//
+// Order mirrors the on-screen layout top-to-bottom, left-to-right: the
+// amplifier head (tone stack + mic) sits above the pedalboard rig, so its
+// knobs come first, then the rig pedals in rows.
+pub(super) const AMP_START: usize = 0;
+pub(super) const AMP_END: usize = 6;
+pub(super) const MIC_START: usize = 6;
+pub(super) const MIC_END: usize = 7;
+pub(super) const TS_START: usize = 7;
+pub(super) const TS_END: usize = 10;
+pub(super) const DS_START: usize = 10;
+pub(super) const DS_END: usize = 13;
+pub(super) const REV_START: usize = 13;
+pub(super) const REV_END: usize = 16;
+pub(super) const DELAY_START: usize = 16;
+pub(super) const DELAY_END: usize = 19;
+pub(super) const FUZZ_START: usize = 19;
+pub(super) const FUZZ_END: usize = 22;
+pub(super) const NG_START: usize = 22;
+pub(super) const NG_END: usize = 24;
+pub(super) const EQ_START: usize = 24;
+pub(super) const EQ_END: usize = 27;
 
 pub(super) const KNOBS: &[Knob] = &[
-    // 0–2: TS-808
-    Knob {
-        label: "DRIVE",
-        param: |p| &p.ts_drive,
-    },
-    Knob {
-        label: "TONE",
-        param: |p| &p.ts_tone,
-    },
-    Knob {
-        label: "LEVEL",
-        param: |p| &p.ts_level,
-    },
-    // 3–5: DS-1
-    Knob {
-        label: "DRIVE",
-        param: |p| &p.ds_drive,
-    },
-    Knob {
-        label: "TONE",
-        param: |p| &p.ds_tone,
-    },
-    Knob {
-        label: "LEVEL",
-        param: |p| &p.ds_level,
-    },
-    // 6–8: Reverb
-    Knob {
-        label: "ROOM",
-        param: |p| &p.rev_room,
-    },
-    Knob {
-        label: "DAMP",
-        param: |p| &p.rev_damp,
-    },
-    Knob {
-        label: "MIX",
-        param: |p| &p.rev_mix,
-    },
-    // 9–11: Delay
-    Knob {
-        label: "TIME",
-        param: |p| &p.delay_time,
-    },
-    Knob {
-        label: "FEEDBACK",
-        param: |p| &p.delay_feedback,
-    },
-    Knob {
-        label: "MIX",
-        param: |p| &p.delay_mix,
-    },
-    // 12–13: Noise Gate
-    Knob {
-        label: "THRESH",
-        param: |p| &p.ng_threshold,
-    },
-    Knob {
-        label: "RELEASE",
-        param: |p| &p.ng_release,
-    },
-    // 14–19: Amp
+    // 0–5: Amp tone stack
     Knob {
         label: "GAIN",
         param: |p| &p.amp_gain,
@@ -123,7 +59,86 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MASTER",
         param: |p| &p.amp_master,
     },
-    // 20–22: Parametric EQ
+    // 6: Mic position
+    Knob {
+        label: "MIC POS",
+        param: |p| &p.mic_pos,
+    },
+    // 7–9: TS-808
+    Knob {
+        label: "DRIVE",
+        param: |p| &p.ts_drive,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.ts_tone,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.ts_level,
+    },
+    // 10–12: DS-1
+    Knob {
+        label: "DRIVE",
+        param: |p| &p.ds_drive,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.ds_tone,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.ds_level,
+    },
+    // 13–15: Reverb
+    Knob {
+        label: "ROOM",
+        param: |p| &p.rev_room,
+    },
+    Knob {
+        label: "DAMP",
+        param: |p| &p.rev_damp,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.rev_mix,
+    },
+    // 16–18: Delay
+    Knob {
+        label: "TIME",
+        param: |p| &p.delay_time,
+    },
+    Knob {
+        label: "FEEDBACK",
+        param: |p| &p.delay_feedback,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.delay_mix,
+    },
+    // 19–21: Fuzz
+    Knob {
+        label: "FUZZ",
+        param: |p| &p.fz_fuzz,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.fz_tone,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.fz_level,
+    },
+    // 22–23: Noise Gate
+    Knob {
+        label: "THRESH",
+        param: |p| &p.ng_threshold,
+    },
+    Knob {
+        label: "RELEASE",
+        param: |p| &p.ng_release,
+    },
+    // 24–26: Parametric EQ
     Knob {
         label: "LOW",
         param: |p| &p.eq_low,
@@ -136,86 +151,18 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "HIGH",
         param: |p| &p.eq_high,
     },
-    // 23: Mic position
-    Knob {
-        label: "MIC POS",
-        param: |p| &p.mic_pos,
-    },
 ];
 
-// Row 1: TS-808, DS-1, Reverb, Delay, Noise Gate
-pub(super) const PEDAL_SECTIONS: &[SectionDef] = &[
-    (
-        |_| "⚡ TS-808".into(),
-        TS_START,
-        TS_END,
-        |p| Some(p.ts_enabled.load(Relaxed)),
-        3,
-    ),
-    (
-        |_| "⚡ DS-1 DISTORTION".into(),
-        DS_START,
-        DS_END,
-        |p| Some(p.ds_enabled.load(Relaxed)),
-        3,
-    ),
-    (
-        |_| "⚡ SPRING REVERB".into(),
-        REV_START,
-        REV_END,
-        |p| Some(p.rev_enabled.load(Relaxed)),
-        3,
-    ),
-    (
-        |_| "⏱ DELAY".into(),
-        DELAY_START,
-        DELAY_END,
-        |p| Some(p.delay_enabled.load(Relaxed)),
-        3,
-    ),
-    (
-        |_| "🔇 NOISE GATE".into(),
-        NG_START,
-        NG_END,
-        |p| Some(p.ng_enabled.load(Relaxed)),
-        2,
-    ),
-];
-
-// Row 2: Amp (wider), Parametric EQ, Mic position
-pub(super) const AMP_SECTIONS: &[SectionDef] = &[
-    (
-        |p| format!("⚡ {}", p.amp_model().name()),
-        AMP_START,
-        AMP_END,
-        |_| None,
-        3,
-    ),
-    (
-        |_| "🎛 PARAMETRIC EQ".into(),
-        EQ_START,
-        EQ_END,
-        |p| Some(p.eq_enabled.load(Relaxed)),
-        2,
-    ),
-    (
-        |p| format!("🎙 {}", p.cab_model().short_name()),
-        MIC_START,
-        MIC_END,
-        |_| None,
-        1,
-    ),
-];
-
-// Tab order: None (selectors) → TS → DS → Rev → Delay → NG → Amp → EQ → Mic
+// Tab order follows the layout: selectors → Amp → Mic → rig pedals.
 pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     None,
+    Some(AMP_START),
+    Some(MIC_START),
     Some(TS_START),
     Some(DS_START),
     Some(REV_START),
     Some(DELAY_START),
+    Some(FUZZ_START),
     Some(NG_START),
-    Some(AMP_START),
     Some(EQ_START),
-    Some(MIC_START),
 ];

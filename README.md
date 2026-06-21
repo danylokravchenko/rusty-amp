@@ -14,6 +14,10 @@ Noise Gate  [bypassable]
   Envelope follower → gain ramp (smooth open/close to avoid clicks)
   │
   ▼
+Fuzz  [bypassable · Big Muff style]
+  DC block → 70 Hz HP → [4× OS: two cascaded asymmetric soft-clip stages] → DC block → 700 Hz mid scoop → variable tone LP
+  │
+  ▼
 TS-808 Tube Screamer  [bypassable]
   DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → variable tone LP
   │
@@ -118,7 +122,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 
 ## Knob sections
 
-### Pedals row  _(TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate — each independently bypassable with Space)_
+### Pedals row  _(Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate — each independently bypassable with Space)_
 
 #### Noise Gate
 
@@ -126,6 +130,16 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | ------ | ------- | -------- |
 | Thresh | 0–10 | Gate open threshold. 0 = opens at very low levels (−80 dB), 10 = always open. Start around 2–3 for high-gain tones |
 | Release | 0–10 | How long the gate stays open after the signal drops below threshold. Higher = slower, more natural decay |
+
+#### Fuzz  _(Big Muff style)_
+
+Runs first in the chain so it sees the rawest pickup signal. Two cascaded clipping stages give the long, singing sustain and near-square saturation of a vintage fuzz — much heavier than the TS or DS-1. The voice is mid-scooped at 700 Hz for the classic "wall of sound" timbre.
+
+| Knob | Range | Effect |
+| ------ | ------- | -------- |
+| Fuzz | 0–10 | Sustain/gain into the two cascaded soft-clip stages. High values drive the waveform toward a gated square wave |
+| Tone | 0–10 | Low-pass after the scoop. 0 = dark/woolly (~400 Hz), 10 = bright/buzzy (~6 kHz) |
+| Level | 0–10 | Output volume of the pedal into the next stage |
 
 #### TS-808 Tube Screamer
 
@@ -252,6 +266,14 @@ description = "Optional one-line description shown in the preset browser."
 enabled   = true    # optional, defaults to true
 threshold = 0.20    # 0.0 – 1.0  (0 = barely open, 1 = always open)
 release   = 0.30    # 0.0 – 1.0  (0 = instant close, 1 = very slow)
+
+# Omit [fuzz] entirely to leave it off (the default for the bundled presets),
+# or include it with enabled = false to store values but keep it bypassed.
+[fuzz]
+enabled = false     # optional, defaults to true when the section is present
+fuzz  = 0.70        # 0.0 – 1.0  (sustain/gain)
+tone  = 0.50
+level = 0.60
 
 [tube_screamer]
 enabled = true      # optional, defaults to true
