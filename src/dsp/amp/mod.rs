@@ -3,10 +3,56 @@ pub mod mesa;
 pub mod randall;
 
 use crate::dsp::AmpModel;
+use crate::dsp::biquad::Biquad;
 
 pub use marshall::Marshall;
 pub use mesa::Mesa;
 pub use randall::Randall;
+
+// ── Power-amp ↔ speaker interaction ─────────────────────────────────────────
+
+/// Models the way a real power amp "sees" the loudspeaker's impedance curve
+/// through its negative-feedback loop.
+///
+/// A speaker is not a flat resistive load: its impedance has a tall resonant peak
+/// near the cabinet's tuning (~80–110 Hz) and rises again through the treble from
+/// voice-coil inductance. Because the power amp has a finite output impedance, more
+/// drive develops across the speaker exactly where its impedance is high — so the
+/// low-frequency resonance blooms and the top end lifts. Crucially this is
+/// *dynamic*: as the power supply sags under hard playing the damping factor drops
+/// and the low-end resonance opens up further, giving the amp its touch-dependent
+/// "give" and three-dimensional low end.
+///
+/// We tap a resonant band (a 0 dB band-pass at the resonance) and feed back a
+/// portion that grows with the sag envelope, plus a static high shelf for the
+/// inductive treble rise.
+pub(crate) struct SpeakerLoad {
+    resonance: Biquad,
+    presence: Biquad,
+    res_base: f32,
+    res_dyn: f32,
+}
+
+impl SpeakerLoad {
+    /// `fs` resonance frequency, `q` its sharpness, `res_base` the static
+    /// resonance amount, `res_dyn` how much more the sag envelope adds, and
+    /// `pres_db` the inductive high-shelf lift (at 5 kHz).
+    pub fn new(sr: f32, fs: f32, q: f32, res_base: f32, res_dyn: f32, pres_db: f32) -> Self {
+        Self {
+            resonance: Biquad::bandpass(sr, fs, q),
+            presence: Biquad::high_shelf(sr, 5000.0, pres_db),
+            res_base,
+            res_dyn,
+        }
+    }
+
+    #[inline]
+    pub fn process(&mut self, x: f32, sag: f32) -> f32 {
+        let band = self.resonance.process(x);
+        let amt = self.res_base + self.res_dyn * sag;
+        self.presence.process(x + band * amt)
+    }
+}
 
 // ── Dynamic "bloom" ─────────────────────────────────────────────────────────
 

@@ -86,6 +86,16 @@ impl Biquad {
         )
     }
 
+    /// Constant 0 dB peak-gain band-pass (cookbook BPF). Unity at the centre
+    /// frequency, falling away on both sides — used to tap a resonant band for
+    /// the speaker-load resonance model.
+    pub fn bandpass(sr: f32, freq: f32, q: f32) -> Self {
+        let w0 = 2.0 * PI * freq / sr;
+        let (s, c) = (w0.sin(), w0.cos());
+        let alpha = s / (2.0 * q);
+        Self::from_coeffs(alpha, 0.0, -alpha, 1.0 + alpha, -2.0 * c, 1.0 - alpha)
+    }
+
     pub fn peak_eq(sr: f32, freq: f32, q: f32, gain_db: f32) -> Self {
         let a = 10.0_f32.powf(gain_db / 40.0);
         let w0 = 2.0 * PI * freq / sr;

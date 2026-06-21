@@ -48,6 +48,8 @@ master = 0.62
 [cabinet]
 model = "mesa"
 mic_pos = 0.42   # off-axis — chunky Slipknot low-end sounds heavier with a darker cab
+mic_blend = 0.12 # touch of ribbon thickens the low-mids for a heavier wall
+mic_room  = 0.12 # slight room for size without losing the chug's tightness
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # Subtle EQ to tighten the modern metal sound — a slight mid cut to push the

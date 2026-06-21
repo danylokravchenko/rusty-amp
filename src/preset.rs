@@ -90,10 +90,24 @@ pub struct CabSection {
     /// 0.0 = edge (off-axis, dark) … 1.0 = center (on-axis, bright). Default 0.5.
     #[serde(default = "mic_pos_default")]
     pub mic_pos: f32,
+    /// 0.0 = close SM57 dynamic … 1.0 = R121 ribbon. Default 0.15.
+    #[serde(default = "mic_blend_default")]
+    pub mic_blend: f32,
+    /// 0.0 = dry close mic only … 1.0 = full ambient room mic. Default 0.15.
+    #[serde(default = "mic_room_default")]
+    pub mic_room: f32,
 }
 
 fn mic_pos_default() -> f32 {
     0.5
+}
+
+fn mic_blend_default() -> f32 {
+    0.15
+}
+
+fn mic_room_default() -> f32 {
+    0.15
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -191,6 +205,8 @@ impl Preset {
             cabinet: Some(CabSection {
                 model: Some(cab_model_str.to_string()),
                 mic_pos: params.mic_pos.load(Relaxed),
+                mic_blend: params.mic_blend.load(Relaxed),
+                mic_room: params.mic_room.load(Relaxed),
             }),
             eq: Some(EqSection {
                 enabled: Some(params.eq_enabled.load(Relaxed)),
@@ -288,6 +304,10 @@ impl Preset {
             };
             params.cab_model.store(cab_model as u8, Relaxed);
             params.mic_pos.store(cab.mic_pos.clamp(0.0, 1.0), Relaxed);
+            params
+                .mic_blend
+                .store(cab.mic_blend.clamp(0.0, 1.0), Relaxed);
+            params.mic_room.store(cab.mic_room.clamp(0.0, 1.0), Relaxed);
         }
 
         if let Some(eq) = &self.eq {

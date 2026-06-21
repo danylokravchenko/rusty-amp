@@ -46,6 +46,8 @@ master = 0.65
 [cabinet]
 model = "mesa"
 mic_pos = 0.58   # slightly on-axis — cleaner Dimebag tone needs presence without harshness
+mic_blend = 0.25 # blend in the ribbon — smooths the top for the cleaner solo voice
+mic_room  = 0.35 # generous room — adds the dimension and depth a solo lives in
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No extra EQ on the lead — the amp's own tone stack with mids up is enough.

@@ -9,6 +9,7 @@ pub mod noise_gate;
 pub mod oversample;
 pub mod parametric_eq;
 pub mod reverb;
+pub mod tonestack;
 pub mod tube_screamer;
 
 use atomic_float::AtomicF32;
@@ -128,6 +129,10 @@ pub struct Params {
 
     // Mic position (0 = edge/dark, 1 = center/bright)
     pub mic_pos: Arc<AtomicF32>,
+    // Mic blend (0 = close SM57 dynamic, 1 = R121 ribbon)
+    pub mic_blend: Arc<AtomicF32>,
+    // Room mic amount (0 = dry close mic only, 1 = full ambient room)
+    pub mic_room: Arc<AtomicF32>,
 
     // Noise gate
     pub ng_enabled: Arc<AtomicBool>,
@@ -195,6 +200,8 @@ impl Params {
             amp_model: Arc::new(AtomicU8::new(AmpModel::Marshall as u8)),
             cab_model: Arc::new(AtomicU8::new(CabModel::Mesa as u8)),
             mic_pos: p!(0.5),
+            mic_blend: p!(0.15),
+            mic_room: p!(0.15),
 
             ng_enabled: b!(true),
             ng_threshold: p!(0.20),
@@ -298,8 +305,8 @@ impl DspChain {
     /// Process one mono input sample, returning a stereo (L, R) pair.
     ///
     /// The pre-amp signal path (gate → pedals → amp) is mono; the signal becomes
-    /// stereo at the cabinet (dual-mic convolution) and stays stereo through the
-    /// EQ, ping-pong delay and stereo reverb for studio-grade width and depth.
+    /// stereo at the cabinet (multi-mic blend convolution) and stays stereo through
+    /// the EQ, ping-pong delay and stereo reverb for studio-grade width and depth.
     #[inline]
     pub fn process(&mut self, sample: f32) -> (f32, f32) {
         let p = &self.params;
@@ -361,8 +368,14 @@ impl DspChain {
             p.amp_master.load(Relaxed),
         );
 
-        // Cabinet simulation — mono in, stereo (dual-mic) out
-        let (l, r) = self.cab.process(p.cab_model(), x, p.mic_pos.load(Relaxed));
+        // Cabinet simulation — mono in, stereo (multi-mic blend) out
+        let (l, r) = self.cab.process(
+            p.cab_model(),
+            x,
+            p.mic_pos.load(Relaxed),
+            p.mic_blend.load(Relaxed),
+            p.mic_room.load(Relaxed),
+        );
 
         // Parametric EQ
         let (l, r) = if p.eq_enabled.load(Relaxed) {
@@ -589,6 +602,53 @@ mod tests {
         // near zero so the fuzz doesn't push DC into the amp.
         let dc = (sum / count as f64).abs();
         assert!(dc < 0.02, "fuzz has DC offset: {dc}");
+    }
+
+    /// The passive FMV tone stack must be stable, peak-bounded (it only cuts), and
+    /// its controls must move the right bands: turning a knob up should raise that
+    /// band's output. Guards the hand-transcribed analog→digital coefficients.
+    #[test]
+    fn tonestack_is_stable_and_controls_work() {
+        use super::tonestack::{Components, ToneStack};
+        let sr = 48_000.0;
+
+        // Measure a band's steady-state level for given (bass, mid, treble).
+        let level = |b: f32, m: f32, t: f32, f: f32| {
+            let mut ts = ToneStack::new(sr, Components::MARSHALL);
+            ts.update(b, m, t);
+            let mut out = Vec::with_capacity(sr as usize / 2);
+            for n in 0..(sr as usize / 2) {
+                let x = (2.0 * PI * f * n as f32 / sr).sin();
+                let y = ts.process(x);
+                assert!(y.is_finite(), "tonestack non-finite");
+                // ignore the first quarter (settling)
+                if n >= sr as usize / 8 {
+                    out.push(y);
+                }
+            }
+            goertzel(&out, f, sr)
+        };
+
+        // Peak-normalised: no setting should pass more than unity (a hair of slack).
+        for &(b, m, t) in &[(0.5, 0.5, 0.5), (1.0, 0.0, 1.0), (0.0, 1.0, 0.0)] {
+            for &f in &[100.0, 800.0, 4000.0] {
+                assert!(level(b, m, t, f) <= 1.2, "tonestack boosts above unity");
+            }
+        }
+
+        // Bass up → more lows; treble up → more highs; mid up → more mids.
+        assert!(
+            level(0.9, 0.5, 0.5, 100.0) > level(0.1, 0.5, 0.5, 100.0),
+            "bass control inverted/dead at 100 Hz"
+        );
+        assert!(
+            level(0.5, 0.5, 0.9, 4000.0) > level(0.5, 0.5, 0.1, 4000.0),
+            "treble control inverted/dead at 4 kHz"
+        );
+        assert!(
+            level(0.5, 0.9, 0.5, 800.0) > level(0.5, 0.1, 0.5, 800.0),
+            "mid control inverted/dead at 800 Hz"
+        );
     }
 
     /// Every amp model should be stable (no NaN/blowup) at full gain.

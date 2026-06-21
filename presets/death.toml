@@ -48,6 +48,8 @@ master = 0.60
 [cabinet]
 model   = "mesa"
 mic_pos = 0.55   # slightly on-axis — V30 presence spike needs a touch of brightness for note clarity
+mic_blend = 0.10 # mostly SM57, a hair of ribbon to round the top for note clarity
+mic_room  = 0.10 # tight, near-dry — keeps fast riffing articulate
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # Subtle EQ to enhance technical clarity — a slight mid presence boost

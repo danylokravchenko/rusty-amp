@@ -1,4 +1,4 @@
-use super::{Amplifier, Bloom};
+use super::{Amplifier, Bloom, SpeakerLoad};
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
 
@@ -36,6 +36,8 @@ pub struct Randall {
     // Presence (base rate)
     presence_shelf: Biquad,
     last_presence: f32,
+    // Speaker impedance interaction (static — stiff rails, high damping factor).
+    speaker: SpeakerLoad,
 }
 
 impl Randall {
@@ -65,6 +67,8 @@ impl Randall {
             last_mid: -1.0,
             last_treble: -1.0,
             last_presence: -1.0,
+            // Tight 4×12 resonance ~90 Hz, modest and static (no rectifier sag).
+            speaker: SpeakerLoad::new(sr, 90.0, 1.3, 0.10, 0.0, 1.0),
         };
         r.update_tone_stack(0.5, 0.3, 0.75);
         r.update_presence(0.5);
@@ -140,6 +144,7 @@ impl Amplifier for Randall {
         // HP before tanh: prevents the output stage from distorting sub-bass.
         let x = self.power_hp.process(x);
         let x = (x * 2.0).tanh() * 0.5;
+        let x = self.speaker.process(x, 0.0);
 
         x * master * 0.8
     }

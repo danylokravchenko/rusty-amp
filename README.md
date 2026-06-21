@@ -1,6 +1,6 @@
 # rusty-amp
 
-A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (dual-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** for creamy, alias-free high-gain saturation, and the cabinets use **long (~46 ms) impulse responses** with room reflections and deep cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
+A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (a blended multi-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** for creamy, alias-free high-gain saturation; the tube amps use a real **passive FMV tone stack** with a modelled **power-amp ↔ speaker interaction**; and the cabinets blend three mics (close SM57 + ribbon + room) over **long (~46 ms) impulse responses** with room reflections and deep cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
 
 ![Screenshot](/assets/screenshot.png)
 
@@ -28,16 +28,16 @@ DS-1 Distortion  [bypassable]
   ▼
 Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
   8× oversampled nonlinear stages (8th-order Butterworth anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
-  JCM800:   dual 12AX7 atan soft-clip → passive tone stack → tube rectifier sag
-  Mesa DR:  triple gain stage (atan + silicon clip) → tone stack → silicon rectifier sag
-  Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section
+  JCM800:   dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom
+  Mesa DR:  triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom
+  Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
   │
   ▼  (mono → STEREO)
 Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback — switchable in real time]
-  Dual-mic impulse-response convolution modelling a close-mic'd 4×12 cabinet:
-  long (~46 ms) voiced EQ skeleton + early-reflection comb + late room reflections
-  + deep cone-resonance ring, with decorrelated left/right IRs → natural stereo
-  width and three-dimensional depth · mic-position shelf
+  Blended multi-mic impulse-response convolution of a 4×12 cabinet:
+  close SM57 dynamic + R121 ribbon + room mic, each a long (~46 ms) voiced EQ
+  skeleton + early-reflection comb + late room reflections + deep cone-resonance
+  ring, decorrelated L/R → natural stereo width and depth · mic-position shelf
   │
   ▼  (stereo from here on)
 Parametric EQ  [bypassable]
@@ -80,7 +80,7 @@ cargo run
 2. **Select guitar input channel** — Focusrite 2i2 has 2; guitar is usually channel 2 if plugged into Input 2
 3. **Select output device** — pick your speakers or headphones
 
-The processed signal is **true stereo**: the left channel goes to output 0, the right to output 1 (a mono output device receives the summed mix). On a stereo interface or headphones you hear the full dual-mic cab spread, ping-pong delay, and stereo reverb.
+The processed signal is **true stereo**: the left channel goes to output 0, the right to output 1 (a mono output device receives the summed mix). On a stereo interface or headphones you hear the full multi-mic cab spread, ping-pong delay, and stereo reverb.
 
 The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing. Press **`S`** at any time to save the current state as a new preset. Press **`R`** to start or stop recording the processed output to a WAV file.
 
@@ -181,18 +181,25 @@ Stereo ping-pong: feedback cross-feeds the two channels so repeats bounce left �
 | Feedback | 0–10 | Repeat level. Capped at 85% internally to prevent runaway |
 | Mix | 0–10 | Dry/wet blend |
 
-### Amp / FX row  _(Amp | Parametric EQ | Cabinet mic position)_
+### Amp / FX row  _(Amp | Parametric EQ | Cabinet mics)_
 
 #### Amp  _(model selected with `↑`/`↓` or `A` on the selector row)_
 
 | Knob | Range | Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead |
 | ------ | ------- | ---------------- | -------------------- | --------------- |
 | Gain | 0–10 | Preamp gain 1×–40× into dual 12AX7 | Preamp gain 1×–36× into three stages | Preamp gain 1×–46× into FET+BJT stages |
-| Bass | 0–10 | Low shelf at 80 Hz (±15 dB) | Low shelf at 100 Hz (±15 dB) | Low shelf at 80 Hz (±15 dB) |
-| Mid | 0–10 | Peak EQ at 400 Hz (±12 dB) | Peak EQ at 750 Hz (±12 dB) | Peak EQ at 500 Hz (±12 dB) |
-| Treble | 0–10 | High shelf at 2.5 kHz (±15 dB) | High shelf at 3.3 kHz (±15 dB) | High shelf at 4.5 kHz (±15 dB) |
+| Bass | 0–10 | Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall component values) | Passive FMV tone stack (Fender-type values: fuller lows, gentler scoop) | Active tone stack — low shelf at 80 Hz |
+| Mid | 0–10 | …the mid pot sets the depth of the stack's inherent scoop | …gentler scoop than the Marshall | Peak EQ at 500 Hz |
+| Treble | 0–10 | …treble interacts with mid/bass, lossy & peak-normalised | …same interacting network | High shelf at 4.5 kHz |
 | Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
 | Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
+
+The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC
+network where the three controls interact and the mids inherently scoop, exactly
+like a real amp — followed by a **power-amp ↔ speaker interaction** model: the
+speaker's impedance resonance blooms the low end dynamically as the supply sags
+under hard playing. The Randall keeps an active (independent-band) stack and a
+small static speaker resonance, true to its stiff solid-state design.
 
 #### Parametric EQ  _(bypassable with Space)_
 
@@ -204,21 +211,25 @@ All three bands map 0–10 to −15 dB → 0 dB → +15 dB. Centre (5.0) is unit
 | Mid | 800 Hz | Peak (Q 1.5) |
 | High | 5 kHz | High shelf |
 
-#### Cabinet mic position  _(labeled with the active cabinet model)_
+#### Cabinet mics  _(labeled with the active cabinet model)_
 
-Simulates moving the SM57 between the speaker cone edge and centre.
+Three controls model a multi-mic'd 4×12 — the close mic's position, a blend from a
+dynamic to a ribbon, and a room mic for depth. The blend is a weighted sum of the
+three mics' impulse responses, so it costs no extra per-sample CPU.
 
 | Knob | Range | Effect |
 | ------ | ------- | -------- |
-| Mic Pos | 0–10 | 0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz) |
+| Mic | 0–10 | Close-mic position: 0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz) |
+| Blend | 0–10 | Close-mic capsule: 0 = SM57 dynamic (bright, present) · 10 = R121 ribbon (darker, fuller low-mids, silky top) |
+| Room | 0–10 | Amount of a distant room mic mixed in — adds air and three-dimensional depth (0 = dry close mic only) |
 
 ## Amp models
 
-| Model | Character | Tone stack centre | Rectifier / power | Gain stages |
+| Model | Character | Tone stack | Rectifier / power | Gain stages |
 | ------- | ----------- | ----------------- | ----------------- | ----------- |
-| Marshall JCM800 | Punchy, dynamic, touch-sensitive | Bass 80 Hz / Mid 400 Hz / Treble 2.5 kHz | Tube sag (5 ms attack, 200 ms release) | 2 × 12AX7 atan soft-clip |
-| Mesa Dual Rectifier | Compressed, aggressive, modern | Bass 100 Hz / Mid 750 Hz / Treble 3.3 kHz | Silicon sag (0.5 ms attack, 80 ms release) | 3-stage: atan → atan → exponential |
-| Randall Warhead | Tight, crushing, solid-state | Bass 80 Hz / Mid 500 Hz / Treble 4.5 kHz + fixed +3 dB presence | No sag — stiff solid-state rails | FET (x/√(1+x²)) → BJT (tanh) → rail-clip |
+| Marshall JCM800 | Punchy, dynamic, touch-sensitive | Passive FMV (Marshall values) | Tube sag (5 ms attack, 200 ms release) + dynamic speaker-load bloom | 2 × 12AX7 atan soft-clip |
+| Mesa Dual Rectifier | Compressed, aggressive, modern | Passive FMV (Fender values) | Silicon sag (0.5 ms attack, 80 ms release) + dynamic speaker-load bloom | 3-stage: atan → atan → exponential |
+| Randall Warhead | Tight, crushing, solid-state | Active, independent bands + fixed +3 dB presence | No sag — stiff solid-state rails + static speaker resonance | FET (x/√(1+x²)) → BJT (tanh) → rail-clip |
 
 ## Cabinet models
 
@@ -227,11 +238,13 @@ Simulates moving the SM57 between the speaker cone edge and centre.
 | Mesa 4×12 (Vintage 30) | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +7 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
 | Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IR is synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. The IR runs ~46 ms (~2200 taps at 48 kHz), long enough for the low resonance to bloom and ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IRs are synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~46 ms (~2200 taps at 48 kHz), long enough for the low resonance to bloom and ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
-Toggle between them with `C` at any time. The cabinet state is preserved when switching amp models.
+Each cabinet is captured by **three mics** — a close SM57 dynamic, a close R121 ribbon, and a room mic — each with its own voicing and reflection texture (the room mic carries extra pre-delay and denser late reflections for air). The **Blend** and **Room** knobs mix these captures. Because convolution is linear, the blend is just a weighted **sum of the three IRs**, recombined into the live convolver only when a knob moves — so any mic mix costs exactly two convolutions per sample, no more.
 
-The **Mic Pos** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis microphone placement.
+Toggle between cabinet models with `C` at any time. The cabinet state is preserved when switching amp models.
+
+The **Mic** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis close-mic placement.
 
 ## Presets
 
@@ -302,8 +315,10 @@ treble = 0.65
 master = 0.55
 
 [cabinet]
-model   = "mesa"      # "mesa" (default) or "marshall"
-mic_pos = 0.5         # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (default 0.5)
+model     = "mesa"    # "mesa" (default) or "marshall"
+mic_pos   = 0.5       # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (default 0.5)
+mic_blend = 0.15      # 0.0 = SM57 dynamic, 1.0 = R121 ribbon (default 0.15)
+mic_room  = 0.15      # 0.0 = dry close mic, 1.0 = full room mic (default 0.15)
 
 [eq]
 enabled = true        # optional, defaults to true
@@ -330,7 +345,7 @@ Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset
 
 Press **`R`** to start recording. The header switches from `○ OFF AIR` to a blinking `● ON AIR` indicator next to `POWER ON`. Press **`R`** again to stop — the file is written immediately and the saved path is shown briefly in the footer.
 
-Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full dual-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
+Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full multi-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
 
 ## License
 

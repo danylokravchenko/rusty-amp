@@ -36,6 +36,8 @@ master = 0.60
 [cabinet]
 model = "marshall"
 mic_pos = 0.52   # near center — classic Marshall warmth with just a hint of brightness
+mic_blend = 0.00 # pure SM57 dynamic — tight rhythm wants the close mic's attack
+mic_room  = 0.05 # essentially dry — room would blur the palm-mute chunk
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No extra EQ — the JCM800 + TS boost combination is the entire tone.

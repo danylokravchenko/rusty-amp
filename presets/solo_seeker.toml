@@ -51,6 +51,8 @@ master   = 0.50
 [cabinet]
 model = "mesa"
 mic_pos = 0.68   # on-axis — solo tone needs brightness and pick-attack clarity
+mic_blend = 0.30 # ribbon blended in for a singing, silky lead top end
+mic_room  = 0.35 # generous room — the singing sustain blooms with depth
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No post EQ — the amp's own EQ at these settings is already well-shaped for

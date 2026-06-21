@@ -56,10 +56,7 @@ impl<const N: usize> Oversampler<N> {
                 Biquad::lowpass(srn, fc, BW8_Q[3]),
             ]
         };
-        Self {
-            up: mk(),
-            dn: mk(),
-        }
+        Self { up: mk(), dn: mk() }
     }
 
     /// Zero-stuff by `N` and interpolate. The ×N gain compensates for the energy
