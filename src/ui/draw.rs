@@ -318,7 +318,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
             .fg(label_color)
             .add_modifier(Modifier::BOLD),
     )];
-    for m in [CabModel::Mesa, CabModel::Marshall] {
+    for m in [CabModel::Mesa, CabModel::Marshall, CabModel::Orange] {
         let selected = m == cab_model;
         let style = if selected {
             Style::default()

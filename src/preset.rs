@@ -164,6 +164,7 @@ impl Preset {
         let cab_model_str = match cab_model {
             CabModel::Mesa => "mesa",
             CabModel::Marshall => "marshall",
+            CabModel::Orange => "orange",
         };
         Self {
             name,
@@ -300,6 +301,7 @@ impl Preset {
         if let Some(cab) = &self.cabinet {
             let cab_model = match cab.model.as_deref() {
                 Some("marshall") => CabModel::Marshall,
+                Some("orange") => CabModel::Orange,
                 _ => CabModel::Mesa,
             };
             params.cab_model.store(cab_model as u8, Relaxed);

@@ -1,12 +1,14 @@
 pub mod ir;
 pub mod marshall;
 pub mod mesa;
+pub mod orange;
 
 use crate::dsp::biquad::Biquad;
 use crate::dsp::conv::FirConvolver;
 
 pub use marshall::MarshallCab;
 pub use mesa::MesaCab;
+pub use orange::OrangeCab;
 
 // ── Trait ─────────────────────────────────────────────────────────────────────
 
@@ -124,6 +126,7 @@ impl BlendedCab {
 pub struct CabBank {
     mesa: MesaCab,
     marshall: MarshallCab,
+    orange: OrangeCab,
 }
 
 impl CabBank {
@@ -131,6 +134,7 @@ impl CabBank {
         Self {
             mesa: MesaCab::new(sr),
             marshall: MarshallCab::new(sr),
+            orange: OrangeCab::new(sr),
         }
     }
 
@@ -146,6 +150,7 @@ impl CabBank {
         match model {
             super::CabModel::Mesa => self.mesa.process(sample, mic_pos, blend, room),
             super::CabModel::Marshall => self.marshall.process(sample, mic_pos, blend, room),
+            super::CabModel::Orange => self.orange.process(sample, mic_pos, blend, room),
         }
     }
 }

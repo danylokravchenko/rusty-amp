@@ -85,12 +85,14 @@ impl AmpModel {
 pub enum CabModel {
     Mesa = 0,
     Marshall = 1,
+    Orange = 2,
 }
 
 impl CabModel {
     pub fn from_u8(v: u8) -> Self {
         match v {
             1 => Self::Marshall,
+            2 => Self::Orange,
             _ => Self::Mesa,
         }
     }
@@ -100,6 +102,7 @@ impl CabModel {
         match self {
             Self::Mesa => "Mesa 4×12 (V30)",
             Self::Marshall => "Marshall 4×12 (GB)",
+            Self::Orange => "Orange PPC412 (V30)",
         }
     }
 
@@ -107,13 +110,15 @@ impl CabModel {
         match self {
             Self::Mesa => "MESA V30",
             Self::Marshall => "MARSH GB",
+            Self::Orange => "ORANGE",
         }
     }
 
     pub fn toggle(self) -> Self {
         match self {
             Self::Mesa => Self::Marshall,
-            Self::Marshall => Self::Mesa,
+            Self::Marshall => Self::Orange,
+            Self::Orange => Self::Mesa,
         }
     }
 }

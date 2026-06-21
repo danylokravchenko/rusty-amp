@@ -33,7 +33,7 @@ Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in 
   Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
   │
   ▼  (mono → STEREO)
-Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback — switchable in real time]
+Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback | Orange PPC412 Vintage 30 — switchable in real time]
   Blended multi-mic impulse-response convolution of a 4×12 cabinet:
   close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced EQ
   skeleton + early-reflection comb + late room reflections + deep cone-resonance
@@ -63,7 +63,7 @@ Per-channel output soft limiter → stereo (L, R)
 - **macOS** (uses CoreAudio via cpal)
 - **Rust** 1.95+ (`rustup` recommended)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
-- macOS **microphone permission** granted to Terminal.app  
+- macOS **microphone permission** granted to Terminal.app
   → System Settings › Privacy & Security › Microphone
 
 ## Run
@@ -93,7 +93,7 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `↑` / `+` / `=` | Increase focused knob by 5 % — or cycle amp model forward when on the selector row |
 | `↓` / `-` | Decrease focused knob by 5 % — or cycle amp model backward when on the selector row |
 | `A` | Cycle amp model forward (works from any section) |
-| `C` | Toggle cabinet model between Mesa V30 and Marshall Greenback |
+| `C` | Cycle cabinet model (Mesa V30 → Marshall Greenback → Orange PPC412) |
 | `Space` | Toggle the focused pedal / effect on / off |
 | `P` | Open the preset browser overlay |
 | `S` | Save the current state as a new user preset |
@@ -237,12 +237,13 @@ three mics' impulse responses, so it costs no extra per-sample CPU.
 | ------- | ----------- | --------------- |
 | Mesa 4×12 (Vintage 30) | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +7 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
 | Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
+| Orange PPC412 (Vintage 30) | Thick, chunky, mid-forward (closed-back birch) | +5 dB low-mid "wall" at 600 Hz, +3 dB grind at 1.2 kHz, +5 dB presence at 3.2 kHz |
 
 Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IRs are synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
 Each cabinet is captured by **three mics** — a close SM57 dynamic, a close R121 ribbon, and a room mic — each with its own voicing and reflection texture (the room mic carries extra pre-delay and denser late reflections for air). The **Blend** and **Room** knobs mix these captures. Because convolution is linear, the blend is just a weighted **sum of the three IRs**, recombined into the live convolver only when a knob moves — so any mic mix costs exactly two convolutions per sample, no more.
 
-Toggle between cabinet models with `C` at any time. The cabinet state is preserved when switching amp models.
+Cycle between cabinet models with `C` at any time. The cabinet state is preserved when switching amp models.
 
 The **Mic** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis close-mic placement.
 
@@ -315,7 +316,7 @@ treble = 0.65
 master = 0.55
 
 [cabinet]
-model     = "mesa"    # "mesa" (default) or "marshall"
+model     = "mesa"    # "mesa" (default), "marshall", or "orange"
 mic_pos   = 0.5       # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (default 0.5)
 mic_blend = 0.15      # 0.0 = SM57 dynamic, 1.0 = R121 ribbon (default 0.15)
 mic_room  = 0.15      # 0.0 = dry close mic, 1.0 = full room mic (default 0.15)
