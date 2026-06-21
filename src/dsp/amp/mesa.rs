@@ -1,6 +1,7 @@
-use super::{Amplifier, Bloom};
+use super::{Amplifier, Bloom, SpeakerLoad};
 use crate::dsp::biquad::Biquad;
-use crate::dsp::oversample::Oversampler4;
+use crate::dsp::oversample::Oversampler8;
+use crate::dsp::tonestack::{Components, ToneStack};
 
 /// Mesa/Boogie Dual Rectifier — Modern channel simulation.
 ///
@@ -17,17 +18,16 @@ pub struct Mesa {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
-    os: Oversampler4,
-    // Pre-clip HP at 4× rate — cuts sub-bass before the first gain stage
+    os: Oversampler8,
+    // Pre-clip HP at 8× rate — cuts sub-bass before the first gain stage
     pre_clip_hp: Biquad,
-    // Two inter-stage coupling HPs at 4× rate
+    // Two inter-stage coupling HPs at 8× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
     bloom: Bloom,
-    // Tone stack (base rate)
-    bass_shelf: Biquad,
-    mid_peak: Biquad,
-    treble_shelf: Biquad,
+    // Passive FMV tone stack (base rate) — Fender-type values for the Recto's
+    // thicker low end and gentler scoop.
+    tone: ToneStack,
     last_bass: f32,
     last_mid: f32,
     last_treble: f32,
@@ -36,33 +36,36 @@ pub struct Mesa {
     last_presence: f32,
     // Silicon-rectifier sag envelope
     envelope: f32,
+    // Power-amp ↔ speaker impedance interaction.
+    speaker: SpeakerLoad,
 }
 
 impl Mesa {
     pub fn new(sr: f32) -> Self {
-        let sr4 = sr * 4.0;
+        let sr8 = sr * 8.0;
         let mut m = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
-            os: Oversampler4::new(sr),
+            os: Oversampler8::new(sr),
             // Recto input coupling HP at ~40 Hz — sub-rumble only, still preserves
             // the 82 Hz low-E fundamental going into the gain stages.
-            pre_clip_hp: Biquad::highpass(sr4, 40.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr8, 40.0, 0.707),
             // Between stage 1 and 2: ~680 Hz (Recto coupling cap characteristic)
-            stage_hp_1: Biquad::highpass(sr4, 680.0, 0.707),
+            stage_hp_1: Biquad::highpass(sr8, 680.0, 0.707),
             // Between stage 2 and 3: ~1 kHz (silicon stage compresses harder so HP is tighter)
-            stage_hp_2: Biquad::highpass(sr4, 1000.0, 0.707),
+            stage_hp_2: Biquad::highpass(sr8, 1000.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
-            bass_shelf: Biquad::low_shelf(sr, 100.0, 0.0),
-            mid_peak: Biquad::peak_eq(sr, 750.0, 0.5, 0.0),
-            treble_shelf: Biquad::high_shelf(sr, 3300.0, 0.0),
+            tone: ToneStack::new(sr, Components::FENDER),
             last_bass: -1.0,
             last_mid: -1.0,
             last_treble: -1.0,
             presence_shelf: Biquad::high_shelf(sr, 4000.0, 0.0),
             last_presence: -1.0,
             envelope: 0.0,
+            // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
+            // rectifier, so a slightly tighter dynamic bloom than the JCM800.
+            speaker: SpeakerLoad::new(sr, 100.0, 1.0, 0.06, 0.45, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);
@@ -70,9 +73,7 @@ impl Mesa {
     }
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
-        self.bass_shelf = Biquad::low_shelf(self.sr, 100.0, (bass - 0.5) * 30.0);
-        self.mid_peak = Biquad::peak_eq(self.sr, 750.0, 0.5, (mid - 0.5) * 24.0);
-        self.treble_shelf = Biquad::high_shelf(self.sr, 3300.0, (treble - 0.5) * 30.0);
+        self.tone.update(bass, mid, treble);
         self.last_bass = bass;
         self.last_mid = mid;
         self.last_treble = treble;
@@ -130,7 +131,7 @@ impl Amplifier for Mesa {
 
         // ── 4× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
-        let mut down = [0.0f32; 4];
+        let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
@@ -142,11 +143,10 @@ impl Amplifier for Mesa {
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
 
-        let x = self.bass_shelf.process(x);
-        let x = self.mid_peak.process(x);
-        let x = self.treble_shelf.process(x);
+        let x = self.tone.process(x);
 
         let x = self.power_amp(x);
+        let x = self.speaker.process(x, self.envelope);
         let x = self.presence_shelf.process(x);
 
         x * master * 0.8

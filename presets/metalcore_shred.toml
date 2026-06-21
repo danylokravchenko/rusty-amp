@@ -54,6 +54,8 @@ master   = 0.52
 [cabinet]
 model = "mesa"
 mic_pos = 0.62   # on-axis — modern tight Mesa tone needs clarity for fast picking
+mic_blend = 0.05 # close SM57 with a touch of ribbon for a modern, polished top
+mic_room  = 0.12 # a hint of room for a produced sense of space, still tight
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # No post-EQ — the Skreamer + Mesa combination is already well-shaped.

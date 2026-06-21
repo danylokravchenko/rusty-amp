@@ -52,6 +52,8 @@ master = 0.68
 [cabinet]
 model   = "marshall"
 mic_pos = 0.65   # on-axis — Kerry King's tone is aggressive and cutting, needs presence
+mic_blend = 0.00 # pure SM57 dynamic — maximum aggression and cut
+mic_room  = 0.05 # bone dry — nothing between the riff and your face
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # One final surgical cut in the mid-range — layering multiple JCM800s in

@@ -48,6 +48,8 @@ master = 0.65
 [cabinet]
 model = "mesa"
 mic_pos = 0.72   # well on-axis — Dimebag's Randall + V30 tone is famously bright and cutting
+mic_blend = 0.00 # pure SM57 dynamic — Dimebag's tone is all close-mic bite
+mic_room  = 0.06 # nearly dry — tight, in-your-face rhythm
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
 # Recreates the Furman PQ-3 graphic EQ Dimebag used on "Vulgar Display" —

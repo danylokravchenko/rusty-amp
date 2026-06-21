@@ -11,7 +11,7 @@ use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
 use super::config::{
     AMP_END, AMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END, EQ_START, FUZZ_END,
-    FUZZ_START, KNOBS, MIC_START, NG_END, NG_START, REV_END, REV_START, TS_END, TS_START,
+    FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START, REV_END, REV_START, TS_END, TS_START,
 };
 use super::styles::*;
 
@@ -347,7 +347,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
 // ── Amplifier head + cabinet/mic ──────────────────────────────────────────────
 fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) {
     let amp_active = focus.is_some_and(|i| (AMP_START..AMP_END).contains(&i));
-    let mic_active = focus == Some(MIC_START);
+    let mic_active = focus.is_some_and(|i| (MIC_START..MIC_END).contains(&i));
     let border_color = if amp_active || mic_active {
         ORANGE
     } else {
@@ -393,7 +393,7 @@ fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
 
     let panel = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Min(0), Constraint::Length(18)])
+        .constraints([Constraint::Min(0), Constraint::Length(30)])
         .split(parts[0]);
 
     // Amp tone stack knobs.
@@ -419,17 +419,28 @@ fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
         );
     }
 
-    // Mic position (in front of the cabinet).
-    let mic_val = (KNOBS[MIC_START].param)(params).load(Relaxed);
-    render_compact_knob(
-        f,
-        panel[1],
-        KNOBS[MIC_START].label,
-        mic_val,
-        mic_active,
-        true,
-        CHROME,
-    );
+    // Cabinet mics (position, dynamic↔ribbon blend, room) in front of the cabinet.
+    let mic_count = MIC_END - MIC_START;
+    let mic_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            (0..mic_count)
+                .map(|_| Constraint::Ratio(1, mic_count as u32))
+                .collect::<Vec<_>>(),
+        )
+        .split(panel[1]);
+    for (i, ki) in (MIC_START..MIC_END).enumerate() {
+        let val = (KNOBS[ki].param)(params).load(Relaxed);
+        render_compact_knob(
+            f,
+            mic_cols[i],
+            KNOBS[ki].label,
+            val,
+            focus == Some(ki),
+            true,
+            CHROME,
+        );
+    }
 
     render_grille(f, parts[1], shade(WARM, 0.45));
 }

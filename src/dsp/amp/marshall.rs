@@ -1,6 +1,7 @@
-use super::{Amplifier, Bloom};
+use super::{Amplifier, Bloom, SpeakerLoad};
 use crate::dsp::biquad::Biquad;
-use crate::dsp::oversample::Oversampler4;
+use crate::dsp::oversample::Oversampler8;
+use crate::dsp::tonestack::{Components, ToneStack};
 
 /// Marshall JCM800 amplifier simulation.
 ///
@@ -19,8 +20,8 @@ pub struct Marshall {
     // Pre-gain linear filters (base rate)
     dc_block: Biquad,
     input_hp: Biquad,
-    // 4× oversampling for the nonlinear section
-    os: Oversampler4,
+    // 8× oversampling for the nonlinear section
+    os: Oversampler8,
     // Bass cut before the first gain stage at 4× rate — prevents sub-bass from
     // entering the clipper and generating low-frequency IM products ("fart").
     pre_clip_hp: Biquad,
@@ -28,10 +29,9 @@ pub struct Marshall {
     stage_hp: Biquad,
     // Dynamic preamp bloom
     bloom: Bloom,
-    // Tone stack (base rate)
-    bass_shelf: Biquad,
-    mid_peak: Biquad,
-    treble_shelf: Biquad,
+    // Passive FMV tone stack (base rate) — bass/mid/treble interact like the real
+    // JCM800 network, with the characteristic mid scoop.
+    tone: ToneStack,
     last_bass: f32,
     last_mid: f32,
     last_treble: f32,
@@ -40,31 +40,34 @@ pub struct Marshall {
     last_presence: f32,
     // Power amp envelope follower (sag simulation)
     envelope: f32,
+    // Power-amp ↔ speaker impedance interaction (dynamic low-end bloom).
+    speaker: SpeakerLoad,
 }
 
 impl Marshall {
     pub fn new(sr: f32) -> Self {
-        let sr4 = sr * 4.0;
+        let sr8 = sr * 8.0;
         let mut m = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
-            os: Oversampler4::new(sr),
+            os: Oversampler8::new(sr),
             // JCM800 input coupling cap → sub-rumble cut at ~35 Hz, kept below the
             // 82 Hz low-E fundamental so the distorted bass string stays intact.
-            pre_clip_hp: Biquad::highpass(sr4, 35.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr8, 35.0, 0.707),
             // JCM800 22 nF inter-stage coupling cap → HP at ~720 Hz
-            stage_hp: Biquad::highpass(sr4, 720.0, 0.707),
+            stage_hp: Biquad::highpass(sr8, 720.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
-            bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
-            mid_peak: Biquad::peak_eq(sr, 400.0, 0.7, 0.0),
-            treble_shelf: Biquad::high_shelf(sr, 2500.0, 0.0),
+            tone: ToneStack::new(sr, Components::MARSHALL),
             last_bass: -1.0,
             last_mid: -1.0,
             last_treble: -1.0,
             presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
             last_presence: -1.0,
             envelope: 0.0,
+            // 4×12 resonance ~95 Hz; tube amp has moderate damping, so a healthy
+            // dynamic bloom under sag and a gentle inductive top lift.
+            speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.55, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);
@@ -72,9 +75,7 @@ impl Marshall {
     }
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
-        self.bass_shelf = Biquad::low_shelf(self.sr, 80.0, (bass - 0.5) * 30.0);
-        self.mid_peak = Biquad::peak_eq(self.sr, 400.0, 0.7, (mid - 0.5) * 24.0);
-        self.treble_shelf = Biquad::high_shelf(self.sr, 2500.0, (treble - 0.5) * 30.0);
+        self.tone.update(bass, mid, treble);
         self.last_bass = bass;
         self.last_mid = mid;
         self.last_treble = treble;
@@ -132,7 +133,7 @@ impl Amplifier for Marshall {
 
         // ── 4× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
-        let mut down = [0.0f32; 4];
+        let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
@@ -142,13 +143,14 @@ impl Amplifier for Marshall {
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
 
-        // Passive tone stack (base rate — no aliasing risk)
-        let x = self.bass_shelf.process(x);
-        let x = self.mid_peak.process(x);
-        let x = self.treble_shelf.process(x);
+        // Passive FMV tone stack (base rate — no aliasing risk)
+        let x = self.tone.process(x);
 
         // Power amp: transformer sag + light saturation
         let x = self.power_amp(x);
+
+        // Speaker impedance interaction — dynamic low-end bloom driven by sag.
+        let x = self.speaker.process(x, self.envelope);
 
         // Presence: output transformer NFB shelf
         let x = self.presence_shelf.process(x);
