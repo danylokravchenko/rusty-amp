@@ -1,6 +1,6 @@
 use super::{Amplifier, Bloom};
 use crate::dsp::biquad::Biquad;
-use crate::dsp::oversample::Oversampler4;
+use crate::dsp::oversample::Oversampler8;
 
 /// Marshall JCM800 amplifier simulation.
 ///
@@ -19,8 +19,8 @@ pub struct Marshall {
     // Pre-gain linear filters (base rate)
     dc_block: Biquad,
     input_hp: Biquad,
-    // 4× oversampling for the nonlinear section
-    os: Oversampler4,
+    // 8× oversampling for the nonlinear section
+    os: Oversampler8,
     // Bass cut before the first gain stage at 4× rate — prevents sub-bass from
     // entering the clipper and generating low-frequency IM products ("fart").
     pre_clip_hp: Biquad,
@@ -44,17 +44,17 @@ pub struct Marshall {
 
 impl Marshall {
     pub fn new(sr: f32) -> Self {
-        let sr4 = sr * 4.0;
+        let sr8 = sr * 8.0;
         let mut m = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
-            os: Oversampler4::new(sr),
+            os: Oversampler8::new(sr),
             // JCM800 input coupling cap → sub-rumble cut at ~35 Hz, kept below the
             // 82 Hz low-E fundamental so the distorted bass string stays intact.
-            pre_clip_hp: Biquad::highpass(sr4, 35.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr8, 35.0, 0.707),
             // JCM800 22 nF inter-stage coupling cap → HP at ~720 Hz
-            stage_hp: Biquad::highpass(sr4, 720.0, 0.707),
+            stage_hp: Biquad::highpass(sr8, 720.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 400.0, 0.7, 0.0),
@@ -132,7 +132,7 @@ impl Amplifier for Marshall {
 
         // ── 4× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
-        let mut down = [0.0f32; 4];
+        let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();

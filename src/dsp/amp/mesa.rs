@@ -1,6 +1,6 @@
 use super::{Amplifier, Bloom};
 use crate::dsp::biquad::Biquad;
-use crate::dsp::oversample::Oversampler4;
+use crate::dsp::oversample::Oversampler8;
 
 /// Mesa/Boogie Dual Rectifier — Modern channel simulation.
 ///
@@ -17,10 +17,10 @@ pub struct Mesa {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
-    os: Oversampler4,
-    // Pre-clip HP at 4× rate — cuts sub-bass before the first gain stage
+    os: Oversampler8,
+    // Pre-clip HP at 8× rate — cuts sub-bass before the first gain stage
     pre_clip_hp: Biquad,
-    // Two inter-stage coupling HPs at 4× rate
+    // Two inter-stage coupling HPs at 8× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
     bloom: Bloom,
@@ -40,19 +40,19 @@ pub struct Mesa {
 
 impl Mesa {
     pub fn new(sr: f32) -> Self {
-        let sr4 = sr * 4.0;
+        let sr8 = sr * 8.0;
         let mut m = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
-            os: Oversampler4::new(sr),
+            os: Oversampler8::new(sr),
             // Recto input coupling HP at ~40 Hz — sub-rumble only, still preserves
             // the 82 Hz low-E fundamental going into the gain stages.
-            pre_clip_hp: Biquad::highpass(sr4, 40.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr8, 40.0, 0.707),
             // Between stage 1 and 2: ~680 Hz (Recto coupling cap characteristic)
-            stage_hp_1: Biquad::highpass(sr4, 680.0, 0.707),
+            stage_hp_1: Biquad::highpass(sr8, 680.0, 0.707),
             // Between stage 2 and 3: ~1 kHz (silicon stage compresses harder so HP is tighter)
-            stage_hp_2: Biquad::highpass(sr4, 1000.0, 0.707),
+            stage_hp_2: Biquad::highpass(sr8, 1000.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
             bass_shelf: Biquad::low_shelf(sr, 100.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 750.0, 0.5, 0.0),
@@ -130,7 +130,7 @@ impl Amplifier for Mesa {
 
         // ── 4× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
-        let mut down = [0.0f32; 4];
+        let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();

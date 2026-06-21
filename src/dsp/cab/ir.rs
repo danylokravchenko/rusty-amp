@@ -96,7 +96,14 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
     ir
 }
 
-/// IR length in taps for a given sample rate (~11.6 ms, plenty for a cab body).
+/// IR length in taps for a given sample rate (~46 ms at any rate).
+///
+/// A long IR is what lets the cab sound deep and three-dimensional rather than
+/// boxy: it gives the low-frequency cone resonance room to ring out (a 150 ms-t60
+/// mode is still meaningfully alive at 40 ms) and leaves space for the late
+/// cabinet/room reflections that create a sense of air around the note. At 48 kHz
+/// this is ~2230 taps per channel — direct-form convolution at that length is a
+/// few hundred MFLOP/s, well within a real-time budget on a modern CPU.
 pub fn ir_len(sr: f32) -> usize {
-    ((sr / 44100.0) * 512.0) as usize
+    ((sr / 44100.0) * 2048.0) as usize
 }

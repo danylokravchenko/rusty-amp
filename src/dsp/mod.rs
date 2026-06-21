@@ -403,8 +403,22 @@ impl DspChain {
             (l, r)
         };
 
+        // Master-bus stereo widening — push the cab/reverb decorrelation out for a
+        // wider, deeper image without losing mono punch (the mid is untouched).
+        let (l, r) = widen(l, r, 1.3);
+
         (soft_limit(l), soft_limit(r))
     }
+}
+
+/// Mid/side stereo widener. `width` 1.0 = unchanged, > 1.0 spreads the sides.
+/// The mono (mid) component is preserved exactly, so the center stays solid and
+/// the result folds down to mono cleanly.
+#[inline]
+fn widen(l: f32, r: f32, width: f32) -> (f32, f32) {
+    let mid = (l + r) * 0.5;
+    let side = (l - r) * 0.5 * width;
+    (mid + side, mid - side)
 }
 
 /// Transparent soft limiter: unity for |x| < 0.95, gentle knee above.

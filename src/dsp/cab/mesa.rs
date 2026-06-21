@@ -30,15 +30,39 @@ pub struct MesaCab {
 
 // Left/right speaker textures: slightly different reflection times and modes so
 // the two channels decorrelate (stereo width) without smearing a mono sum.
+//
+// Early taps (< 4 ms) are the cone-to-grille / panel comb that colours the body;
+// the later taps (6–28 ms) are cabinet-edge and near-wall reflections that put
+// the speaker in a space and give the note depth and air. The low modal pair
+// (a deep ~75 Hz cabinet "thump" plus the ~95 Hz cone resonance) blooms and
+// rings out across the long IR for weight; the ~3.4 kHz mode is the V30 breakup.
 const TEX_L: Texture = Texture {
     predelay: 0,
-    reflections: &[(0.27, -0.32), (0.85, 0.20), (1.70, -0.12), (3.10, 0.07)],
-    modes: &[(95.0, 140.0, 0.18), (3400.0, 4.0, 0.12)],
+    reflections: &[
+        (0.27, -0.32),
+        (0.85, 0.20),
+        (1.70, -0.12),
+        (3.10, 0.07),
+        (6.30, -0.055),
+        (10.80, 0.040),
+        (17.50, -0.026),
+        (26.00, 0.015),
+    ],
+    modes: &[(74.0, 210.0, 0.11), (95.0, 150.0, 0.18), (3400.0, 4.0, 0.12)],
 };
 const TEX_R: Texture = Texture {
     predelay: 2,
-    reflections: &[(0.31, -0.28), (0.95, 0.22), (1.90, -0.10), (3.40, 0.06)],
-    modes: &[(102.0, 150.0, 0.17), (3550.0, 4.0, 0.11)],
+    reflections: &[
+        (0.31, -0.28),
+        (0.95, 0.22),
+        (1.90, -0.10),
+        (3.40, 0.06),
+        (6.90, -0.050),
+        (11.60, 0.037),
+        (18.80, -0.024),
+        (28.00, 0.014),
+    ],
+    modes: &[(79.0, 220.0, 0.10), (102.0, 160.0, 0.17), (3550.0, 4.0, 0.11)],
 };
 
 impl MesaCab {

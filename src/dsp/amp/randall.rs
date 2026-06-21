@@ -1,6 +1,6 @@
 use super::{Amplifier, Bloom};
 use crate::dsp::biquad::Biquad;
-use crate::dsp::oversample::Oversampler4;
+use crate::dsp::oversample::Oversampler8;
 
 /// Randall Warhead solid-state amp simulation.
 ///
@@ -17,10 +17,10 @@ pub struct Randall {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
-    os: Oversampler4,
-    // Pre-clip HP at 4× rate — the Warhead's tight solid-state input coupling
+    os: Oversampler8,
+    // Pre-clip HP at 8× rate — the Warhead's tight solid-state input coupling
     pre_clip_hp: Biquad,
-    // Inter-stage HPs at 4× rate
+    // Inter-stage HPs at 8× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
     // Power section bass cut (base rate) — prevents the output tanh distorting bass
@@ -40,19 +40,19 @@ pub struct Randall {
 
 impl Randall {
     pub fn new(sr: f32) -> Self {
-        let sr4 = sr * 4.0;
+        let sr8 = sr * 8.0;
         let mut r = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             // 75 Hz: tighter than tube amps (60 Hz) but doesn't cut the 82 Hz low-E
             input_hp: Biquad::highpass(sr, 75.0, 0.707),
-            os: Oversampler4::new(sr),
+            os: Oversampler8::new(sr),
             // Warhead pre-clip HP: 55 Hz — tighter than Marshall/Mesa but below 82 Hz
-            pre_clip_hp: Biquad::highpass(sr4, 55.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr8, 55.0, 0.707),
             // After FET stage: 500 Hz (Warhead input coupling)
-            stage_hp_1: Biquad::highpass(sr4, 500.0, 0.707),
+            stage_hp_1: Biquad::highpass(sr8, 500.0, 0.707),
             // After BJT stage: 800 Hz (driver stage coupling)
-            stage_hp_2: Biquad::highpass(sr4, 800.0, 0.707),
+            stage_hp_2: Biquad::highpass(sr8, 800.0, 0.707),
             // Output stage HP at 80 Hz: lets the fundamental through while blocking
             // sub-rumble from the tanh stage
             power_hp: Biquad::highpass(sr, 80.0, 0.707),
@@ -119,7 +119,7 @@ impl Amplifier for Randall {
 
         // ── 4× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
-        let mut down = [0.0f32; 4];
+        let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before FET stage
             let s = fet_clip_asym((u + bias) * pregain) / pregain.sqrt();

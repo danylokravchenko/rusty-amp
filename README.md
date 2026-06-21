@@ -1,6 +1,6 @@
 # rusty-amp
 
-A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (dual-mic impulse-response convolution) and stays stereo through a ping-pong delay and stereo reverb for a wide, studio-grade image. Presets can be loaded at any time without leaving the app.
+A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (dual-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** for creamy, alias-free high-gain saturation, and the cabinets use **long (~46 ms) impulse responses** with room reflections and deep cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
 
 ![Screenshot](/assets/screenshot.png)
 
@@ -27,7 +27,7 @@ DS-1 Distortion  [bypassable]
   │
   ▼
 Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
-  4× oversampled nonlinear stages + dynamic grid-bias "bloom" for touch sensitivity
+  8× oversampled nonlinear stages (8th-order Butterworth anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
   JCM800:   dual 12AX7 atan soft-clip → passive tone stack → tube rectifier sag
   Mesa DR:  triple gain stage (atan + silicon clip) → tone stack → silicon rectifier sag
   Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section
@@ -35,8 +35,9 @@ Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in 
   ▼  (mono → STEREO)
 Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback — switchable in real time]
   Dual-mic impulse-response convolution modelling a close-mic'd 4×12 cabinet:
-  voiced EQ skeleton + early-reflection comb + speaker modal ring,
-  with decorrelated left/right IRs → natural stereo width · mic-position shelf
+  long (~46 ms) voiced EQ skeleton + early-reflection comb + late room reflections
+  + deep cone-resonance ring, with decorrelated left/right IRs → natural stereo
+  width and three-dimensional depth · mic-position shelf
   │
   ▼  (stereo from here on)
 Parametric EQ  [bypassable]
@@ -49,6 +50,9 @@ Delay  [bypassable]
   ▼
 Stereo Reverb  [bypassable]
   Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix
+  │
+  ▼
+Master-bus mid/side stereo widener (mono center preserved)
   │
   ▼
 Per-channel output soft limiter → stereo (L, R)
@@ -223,7 +227,7 @@ Simulates moving the SM57 between the speaker cone edge and centre.
 | Mesa 4×12 (Vintage 30) | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +7 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
 | Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IR is synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering) and speaker modal resonances add the time-domain depth of a real miked cab. Two slightly different left/right IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IR is synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. The IR runs ~46 ms (~2200 taps at 48 kHz), long enough for the low resonance to bloom and ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
 Toggle between them with `C` at any time. The cabinet state is preserved when switching amp models.
 

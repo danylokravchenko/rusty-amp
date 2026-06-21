@@ -29,16 +29,36 @@ pub struct MarshallCab {
 }
 
 // Gentler, slightly later reflections than the V30 (smoother Greenback cone),
-// breakup mode lower at ~2.5 kHz.
+// breakup mode lower at ~2.5 kHz. The Greenback has more low-end air than a V30,
+// so the late room taps run a touch longer/hotter and the deep ~66 Hz body mode
+// is given a long decay for that warm, three-dimensional Marshall bloom.
 const TEX_L: Texture = Texture {
     predelay: 0,
-    reflections: &[(0.30, -0.26), (0.95, 0.17), (1.90, -0.09), (3.40, 0.05)],
-    modes: &[(90.0, 160.0, 0.16), (2500.0, 5.0, 0.10)],
+    reflections: &[
+        (0.30, -0.26),
+        (0.95, 0.17),
+        (1.90, -0.09),
+        (3.40, 0.05),
+        (7.10, -0.050),
+        (12.40, 0.038),
+        (20.00, -0.024),
+        (30.00, 0.015),
+    ],
+    modes: &[(66.0, 240.0, 0.12), (90.0, 165.0, 0.16), (2500.0, 5.0, 0.10)],
 };
 const TEX_R: Texture = Texture {
     predelay: 2,
-    reflections: &[(0.34, -0.23), (1.05, 0.18), (2.10, -0.08), (3.70, 0.05)],
-    modes: &[(96.0, 170.0, 0.15), (2600.0, 5.0, 0.09)],
+    reflections: &[
+        (0.34, -0.23),
+        (1.05, 0.18),
+        (2.10, -0.08),
+        (3.70, 0.05),
+        (7.80, -0.046),
+        (13.30, 0.035),
+        (21.50, -0.022),
+        (32.00, 0.014),
+    ],
+    modes: &[(70.0, 250.0, 0.11), (96.0, 175.0, 0.15), (2600.0, 5.0, 0.09)],
 };
 
 impl MarshallCab {
