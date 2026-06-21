@@ -392,6 +392,10 @@ Press **`R`** to start recording. The header switches from `○ OFF AIR` to a bl
 
 Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full multi-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
 
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style rules, DSP conventions, and how to add new effects, amp models, cabinets, or presets.
+
 ## License
 
 Apache 2.0
