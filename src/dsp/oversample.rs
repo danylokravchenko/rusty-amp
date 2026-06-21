@@ -90,8 +90,8 @@ impl<const N: usize> Oversampler<N> {
     }
 }
 
-/// 4× oversampler (kept for lighter stages / reference).
-#[allow(dead_code)]
+/// 4× oversampler — used by milder soft-clip stages (fuzz, TS-808) where the
+/// nonlinearity is gentle enough that 4× already keeps alias fold-back well down.
 pub type Oversampler4 = Oversampler<4>;
 
 /// 8× oversampler — used by the high-gain amp models for creamy, alias-free drive.
