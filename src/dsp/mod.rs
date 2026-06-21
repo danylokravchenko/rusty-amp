@@ -129,6 +129,63 @@ impl CabModel {
 
 // ── Shared parameters (written by UI thread, read by audio thread) ────────────
 
+const DEFAULT_AMP_MODEL: u8 = AmpModel::Marshall as u8;
+const DEFAULT_CAB_MODEL: u8 = CabModel::Mesa as u8;
+const DEFAULT_MIC_POS: f32 = 0.5;
+const DEFAULT_MIC_BLEND: f32 = 0.15;
+const DEFAULT_MIC_ROOM: f32 = 0.15;
+
+const DEFAULT_NG_ENABLED: bool = true;
+const DEFAULT_NG_THRESHOLD: f32 = 0.20;
+const DEFAULT_NG_RELEASE: f32 = 0.30;
+
+const DEFAULT_CMP_ENABLED: bool = false;
+const DEFAULT_CMP_SUSTAIN: f32 = 0.40;
+const DEFAULT_CMP_ATTACK: f32 = 0.30;
+const DEFAULT_CMP_LEVEL: f32 = 0.50;
+
+const DEFAULT_PEQ_ENABLED: bool = false;
+const DEFAULT_PEQ_LOW: f32 = 0.50;
+const DEFAULT_PEQ_MID: f32 = 0.50;
+const DEFAULT_PEQ_HIGH: f32 = 0.50;
+
+const DEFAULT_FZ_ENABLED: bool = false;
+const DEFAULT_FZ_FUZZ: f32 = 0.70;
+const DEFAULT_FZ_TONE: f32 = 0.50;
+const DEFAULT_FZ_LEVEL: f32 = 0.60;
+
+const DEFAULT_TS_ENABLED: bool = true;
+const DEFAULT_TS_DRIVE: f32 = 0.45;
+const DEFAULT_TS_TONE: f32 = 0.60;
+const DEFAULT_TS_LEVEL: f32 = 0.70;
+
+const DEFAULT_DS_ENABLED: bool = false;
+const DEFAULT_DS_DRIVE: f32 = 0.40;
+const DEFAULT_DS_TONE: f32 = 0.50;
+const DEFAULT_DS_LEVEL: f32 = 0.65;
+
+const DEFAULT_REV_ENABLED: bool = true;
+const DEFAULT_REV_ROOM: f32 = 0.55;
+const DEFAULT_REV_DAMP: f32 = 0.40;
+const DEFAULT_REV_MIX: f32 = 0.25;
+
+const DEFAULT_EQ_ENABLED: bool = false;
+const DEFAULT_EQ_LOW: f32 = 0.50;
+const DEFAULT_EQ_MID: f32 = 0.50;
+const DEFAULT_EQ_HIGH: f32 = 0.50;
+
+const DEFAULT_DELAY_ENABLED: bool = false;
+const DEFAULT_DELAY_TIME: f32 = 0.30;
+const DEFAULT_DELAY_FEEDBACK: f32 = 0.40;
+const DEFAULT_DELAY_MIX: f32 = 0.30;
+
+const DEFAULT_AMP_GAIN: f32 = 0.65;
+const DEFAULT_AMP_BASS: f32 = 0.50;
+const DEFAULT_AMP_MID: f32 = 0.45;
+const DEFAULT_AMP_TREBLE: f32 = 0.65;
+const DEFAULT_AMP_PRESENCE: f32 = 0.50;
+const DEFAULT_AMP_MASTER: f32 = 0.55;
+
 pub struct Params {
     // Amp model selector
     pub amp_model: Arc<AtomicU8>,
@@ -218,63 +275,122 @@ impl Params {
             };
         }
         Self {
-            amp_model: Arc::new(AtomicU8::new(AmpModel::Marshall as u8)),
-            cab_model: Arc::new(AtomicU8::new(CabModel::Mesa as u8)),
-            mic_pos: p!(0.5),
-            mic_blend: p!(0.15),
-            mic_room: p!(0.15),
+            amp_model: Arc::new(AtomicU8::new(DEFAULT_AMP_MODEL)),
+            cab_model: Arc::new(AtomicU8::new(DEFAULT_CAB_MODEL)),
+            mic_pos: p!(DEFAULT_MIC_POS),
+            mic_blend: p!(DEFAULT_MIC_BLEND),
+            mic_room: p!(DEFAULT_MIC_ROOM),
 
-            ng_enabled: b!(true),
-            ng_threshold: p!(0.20),
-            ng_release: p!(0.30),
+            ng_enabled: b!(DEFAULT_NG_ENABLED),
+            ng_threshold: p!(DEFAULT_NG_THRESHOLD),
+            ng_release: p!(DEFAULT_NG_RELEASE),
 
-            cmp_enabled: b!(false),
-            cmp_sustain: p!(0.40),
-            cmp_attack: p!(0.30),
-            cmp_level: p!(0.50),
+            cmp_enabled: b!(DEFAULT_CMP_ENABLED),
+            cmp_sustain: p!(DEFAULT_CMP_SUSTAIN),
+            cmp_attack: p!(DEFAULT_CMP_ATTACK),
+            cmp_level: p!(DEFAULT_CMP_LEVEL),
 
-            peq_enabled: b!(false),
-            peq_low: p!(0.50),
-            peq_mid: p!(0.50),
-            peq_high: p!(0.50),
+            peq_enabled: b!(DEFAULT_PEQ_ENABLED),
+            peq_low: p!(DEFAULT_PEQ_LOW),
+            peq_mid: p!(DEFAULT_PEQ_MID),
+            peq_high: p!(DEFAULT_PEQ_HIGH),
 
-            fz_enabled: b!(false),
-            fz_fuzz: p!(0.70),
-            fz_tone: p!(0.50),
-            fz_level: p!(0.60),
+            fz_enabled: b!(DEFAULT_FZ_ENABLED),
+            fz_fuzz: p!(DEFAULT_FZ_FUZZ),
+            fz_tone: p!(DEFAULT_FZ_TONE),
+            fz_level: p!(DEFAULT_FZ_LEVEL),
 
-            ts_enabled: b!(true),
-            ts_drive: p!(0.45),
-            ts_tone: p!(0.60),
-            ts_level: p!(0.70),
+            ts_enabled: b!(DEFAULT_TS_ENABLED),
+            ts_drive: p!(DEFAULT_TS_DRIVE),
+            ts_tone: p!(DEFAULT_TS_TONE),
+            ts_level: p!(DEFAULT_TS_LEVEL),
 
-            ds_enabled: b!(false),
-            ds_drive: p!(0.40),
-            ds_tone: p!(0.50),
-            ds_level: p!(0.65),
+            ds_enabled: b!(DEFAULT_DS_ENABLED),
+            ds_drive: p!(DEFAULT_DS_DRIVE),
+            ds_tone: p!(DEFAULT_DS_TONE),
+            ds_level: p!(DEFAULT_DS_LEVEL),
 
-            rev_enabled: b!(true),
-            rev_room: p!(0.55),
-            rev_damp: p!(0.40),
-            rev_mix: p!(0.25),
+            rev_enabled: b!(DEFAULT_REV_ENABLED),
+            rev_room: p!(DEFAULT_REV_ROOM),
+            rev_damp: p!(DEFAULT_REV_DAMP),
+            rev_mix: p!(DEFAULT_REV_MIX),
 
-            eq_enabled: b!(false),
-            eq_low: p!(0.50),
-            eq_mid: p!(0.50),
-            eq_high: p!(0.50),
+            eq_enabled: b!(DEFAULT_EQ_ENABLED),
+            eq_low: p!(DEFAULT_EQ_LOW),
+            eq_mid: p!(DEFAULT_EQ_MID),
+            eq_high: p!(DEFAULT_EQ_HIGH),
 
-            delay_enabled: b!(false),
-            delay_time: p!(0.30),
-            delay_feedback: p!(0.40),
-            delay_mix: p!(0.30),
+            delay_enabled: b!(DEFAULT_DELAY_ENABLED),
+            delay_time: p!(DEFAULT_DELAY_TIME),
+            delay_feedback: p!(DEFAULT_DELAY_FEEDBACK),
+            delay_mix: p!(DEFAULT_DELAY_MIX),
 
-            amp_gain: p!(0.65),
-            amp_bass: p!(0.50),
-            amp_mid: p!(0.45),
-            amp_treble: p!(0.65),
-            amp_presence: p!(0.50),
-            amp_master: p!(0.55),
+            amp_gain: p!(DEFAULT_AMP_GAIN),
+            amp_bass: p!(DEFAULT_AMP_BASS),
+            amp_mid: p!(DEFAULT_AMP_MID),
+            amp_treble: p!(DEFAULT_AMP_TREBLE),
+            amp_presence: p!(DEFAULT_AMP_PRESENCE),
+            amp_master: p!(DEFAULT_AMP_MASTER),
         }
+    }
+
+    pub fn reset_to_defaults(&self) {
+        self.amp_model.store(DEFAULT_AMP_MODEL, Relaxed);
+        self.cab_model.store(DEFAULT_CAB_MODEL, Relaxed);
+        self.mic_pos.store(DEFAULT_MIC_POS, Relaxed);
+        self.mic_blend.store(DEFAULT_MIC_BLEND, Relaxed);
+        self.mic_room.store(DEFAULT_MIC_ROOM, Relaxed);
+
+        self.ng_enabled.store(DEFAULT_NG_ENABLED, Relaxed);
+        self.ng_threshold.store(DEFAULT_NG_THRESHOLD, Relaxed);
+        self.ng_release.store(DEFAULT_NG_RELEASE, Relaxed);
+
+        self.cmp_enabled.store(DEFAULT_CMP_ENABLED, Relaxed);
+        self.cmp_sustain.store(DEFAULT_CMP_SUSTAIN, Relaxed);
+        self.cmp_attack.store(DEFAULT_CMP_ATTACK, Relaxed);
+        self.cmp_level.store(DEFAULT_CMP_LEVEL, Relaxed);
+
+        self.peq_enabled.store(DEFAULT_PEQ_ENABLED, Relaxed);
+        self.peq_low.store(DEFAULT_PEQ_LOW, Relaxed);
+        self.peq_mid.store(DEFAULT_PEQ_MID, Relaxed);
+        self.peq_high.store(DEFAULT_PEQ_HIGH, Relaxed);
+
+        self.fz_enabled.store(DEFAULT_FZ_ENABLED, Relaxed);
+        self.fz_fuzz.store(DEFAULT_FZ_FUZZ, Relaxed);
+        self.fz_tone.store(DEFAULT_FZ_TONE, Relaxed);
+        self.fz_level.store(DEFAULT_FZ_LEVEL, Relaxed);
+
+        self.ts_enabled.store(DEFAULT_TS_ENABLED, Relaxed);
+        self.ts_drive.store(DEFAULT_TS_DRIVE, Relaxed);
+        self.ts_tone.store(DEFAULT_TS_TONE, Relaxed);
+        self.ts_level.store(DEFAULT_TS_LEVEL, Relaxed);
+
+        self.ds_enabled.store(DEFAULT_DS_ENABLED, Relaxed);
+        self.ds_drive.store(DEFAULT_DS_DRIVE, Relaxed);
+        self.ds_tone.store(DEFAULT_DS_TONE, Relaxed);
+        self.ds_level.store(DEFAULT_DS_LEVEL, Relaxed);
+
+        self.rev_enabled.store(DEFAULT_REV_ENABLED, Relaxed);
+        self.rev_room.store(DEFAULT_REV_ROOM, Relaxed);
+        self.rev_damp.store(DEFAULT_REV_DAMP, Relaxed);
+        self.rev_mix.store(DEFAULT_REV_MIX, Relaxed);
+
+        self.eq_enabled.store(DEFAULT_EQ_ENABLED, Relaxed);
+        self.eq_low.store(DEFAULT_EQ_LOW, Relaxed);
+        self.eq_mid.store(DEFAULT_EQ_MID, Relaxed);
+        self.eq_high.store(DEFAULT_EQ_HIGH, Relaxed);
+
+        self.delay_enabled.store(DEFAULT_DELAY_ENABLED, Relaxed);
+        self.delay_time.store(DEFAULT_DELAY_TIME, Relaxed);
+        self.delay_feedback.store(DEFAULT_DELAY_FEEDBACK, Relaxed);
+        self.delay_mix.store(DEFAULT_DELAY_MIX, Relaxed);
+
+        self.amp_gain.store(DEFAULT_AMP_GAIN, Relaxed);
+        self.amp_bass.store(DEFAULT_AMP_BASS, Relaxed);
+        self.amp_mid.store(DEFAULT_AMP_MID, Relaxed);
+        self.amp_treble.store(DEFAULT_AMP_TREBLE, Relaxed);
+        self.amp_presence.store(DEFAULT_AMP_PRESENCE, Relaxed);
+        self.amp_master.store(DEFAULT_AMP_MASTER, Relaxed);
     }
 
     pub fn amp_model(&self) -> AmpModel {
