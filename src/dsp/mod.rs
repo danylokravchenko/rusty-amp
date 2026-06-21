@@ -1,9 +1,11 @@
 pub mod amp;
 pub mod biquad;
 pub mod cab;
+pub mod conv;
 pub mod delay;
 pub mod distortion;
 pub mod noise_gate;
+pub mod oversample;
 pub mod parametric_eq;
 pub mod reverb;
 pub mod tube_screamer;
@@ -278,8 +280,13 @@ impl DspChain {
         }
     }
 
+    /// Process one mono input sample, returning a stereo (L, R) pair.
+    ///
+    /// The pre-amp signal path (gate → pedals → amp) is mono; the signal becomes
+    /// stereo at the cabinet (dual-mic convolution) and stays stereo through the
+    /// EQ, ping-pong delay and stereo reverb for studio-grade width and depth.
     #[inline]
-    pub fn process(&mut self, sample: f32) -> f32 {
+    pub fn process(&mut self, sample: f32) -> (f32, f32) {
         let p = &self.params;
 
         // Noise gate
@@ -328,46 +335,49 @@ impl DspChain {
             p.amp_master.load(Relaxed),
         );
 
-        // Cabinet simulation
-        let x = self.cab.process(p.cab_model(), x, p.mic_pos.load(Relaxed));
+        // Cabinet simulation — mono in, stereo (dual-mic) out
+        let (l, r) = self.cab.process(p.cab_model(), x, p.mic_pos.load(Relaxed));
 
         // Parametric EQ
-        let x = if p.eq_enabled.load(Relaxed) {
+        let (l, r) = if p.eq_enabled.load(Relaxed) {
             self.eq.process(
-                x,
+                l,
+                r,
                 p.eq_low.load(Relaxed),
                 p.eq_mid.load(Relaxed),
                 p.eq_high.load(Relaxed),
             )
         } else {
-            x
+            (l, r)
         };
 
-        // Delay
-        let x = if p.delay_enabled.load(Relaxed) {
+        // Delay (ping-pong stereo)
+        let (l, r) = if p.delay_enabled.load(Relaxed) {
             self.delay.process(
-                x,
+                l,
+                r,
                 p.delay_time.load(Relaxed),
                 p.delay_feedback.load(Relaxed),
                 p.delay_mix.load(Relaxed),
             )
         } else {
-            x
+            (l, r)
         };
 
-        // Reverb
-        let x = if p.rev_enabled.load(Relaxed) {
+        // Reverb (stereo)
+        let (l, r) = if p.rev_enabled.load(Relaxed) {
             self.reverb.process(
-                x,
+                l,
+                r,
                 p.rev_room.load(Relaxed),
                 p.rev_damp.load(Relaxed),
                 p.rev_mix.load(Relaxed),
             )
         } else {
-            x
+            (l, r)
         };
 
-        soft_limit(x)
+        (soft_limit(l), soft_limit(r))
     }
 }
 
@@ -381,5 +391,60 @@ fn soft_limit(x: f32) -> f32 {
     } else {
         let excess = a - 0.95;
         x.signum() * (0.95 + excess / (1.0 + excess * 5.0))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f32::consts::PI;
+
+    /// Drive a loud sine through the full chain and confirm the output stays
+    /// finite, within the limiter's bounds, and is genuinely stereo (the cab's
+    /// dual-mic convolution should decorrelate L and R).
+    #[test]
+    fn full_chain_is_finite_bounded_and_stereo() {
+        let sr = 48_000.0;
+        let params = Arc::new(Params::new());
+        let mut chain = DspChain::new(sr, params);
+
+        let mut max_abs = 0.0f32;
+        let mut channel_diff = 0.0f32;
+        let f = 110.0; // low A — exercises the bass/clip interaction
+        for n in 0..(sr as usize) {
+            let x = (2.0 * PI * f * n as f32 / sr).sin() * 0.8;
+            let (l, r) = chain.process(x);
+            assert!(l.is_finite() && r.is_finite(), "non-finite output at {n}");
+            max_abs = max_abs.max(l.abs()).max(r.abs());
+            channel_diff += (l - r).abs();
+        }
+
+        // Soft limiter ceiling is ~1.0; allow a hair of headroom.
+        assert!(
+            max_abs <= 1.05,
+            "output exceeded limiter ceiling: {max_abs}"
+        );
+        // L and R must differ once the reverb/cab decorrelation has filled in.
+        assert!(
+            channel_diff > 1.0,
+            "output is effectively mono: {channel_diff}"
+        );
+    }
+
+    /// Every amp model should be stable (no NaN/blowup) at full gain.
+    #[test]
+    fn all_amps_stable_at_max_gain() {
+        let sr = 48_000.0;
+        for model in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
+            let mut bank = amp::AmpBank::new(sr);
+            let mut max_abs = 0.0f32;
+            for n in 0..(sr as usize / 2) {
+                let x = (2.0 * PI * 82.0 * n as f32 / sr).sin();
+                let y = bank.process(model, x, 1.0, 0.5, 0.5, 0.7, 0.5, 0.7);
+                assert!(y.is_finite(), "{} produced non-finite output", model.name());
+                max_abs = max_abs.max(y.abs());
+            }
+            assert!(max_abs < 4.0, "{} runaway: {max_abs}", model.name());
+        }
     }
 }

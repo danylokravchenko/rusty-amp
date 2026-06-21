@@ -163,19 +163,33 @@ fn build_engine(
                 let a = sample.abs();
                 in_env += if a > in_env { attack } else { release } * (a - in_env);
 
-                let processed = chain.process(sample);
+                let (l, r) = chain.process(sample);
+                let mono = 0.5 * (l + r);
 
-                let a = processed.abs();
+                let a = mono.abs();
                 out_env += if a > out_env { attack } else { release } * (a - out_env);
 
                 if recording.active.load(Relaxed)
                     && let Ok(mut buf) = recording.buffer.try_lock()
                 {
-                    buf.push(processed);
+                    // Interleaved stereo (L, R).
+                    buf.push(l);
+                    buf.push(r);
                 }
 
-                for _ in 0..out_channels {
-                    let _ = producer.push(processed);
+                // Fan the stereo pair out to the device channels: L→0, R→1,
+                // any extra channels get the mono sum; a mono device gets the sum.
+                for ch in 0..out_channels {
+                    let s = if out_channels == 1 {
+                        mono
+                    } else {
+                        match ch {
+                            0 => l,
+                            1 => r,
+                            _ => mono,
+                        }
+                    };
+                    let _ = producer.push(s);
                 }
             }
             levels.input.store(in_env, Relaxed);

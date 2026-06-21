@@ -1,30 +1,29 @@
-use super::Amplifier;
+use super::{Amplifier, Bloom};
 use crate::dsp::biquad::Biquad;
+use crate::dsp::oversample::Oversampler4;
 
 /// Mesa/Boogie Dual Rectifier — Modern channel simulation.
 ///
 /// Signal path:
-///   DC block → input HP → [2× OS: stage-1 + HP + stage-2 + HP + stage-3 silicon] → tone stack → power amp → presence
+///   DC block → input HP → [4× OS: stage-1 + HP + stage-2 + HP + stage-3 silicon] → tone stack → power amp → presence
 ///
-/// Improvements over the naive model:
-///   • 2× oversampling through all three nonlinear stages eliminates aliasing
+/// Character:
+///   • 4× oversampling through all three nonlinear stages keeps aliasing inaudible
 ///   • Asymmetric waveshapers on tube stages add even-harmonic warmth
+///   • Dynamic grid-bias bloom adds touch sensitivity under hard playing
 ///   • Two inter-stage HPs (680 Hz and 1 kHz) prevent bass accumulation across stages
 ///   • Presence shelf at 4 kHz — Recto's presence is brighter/tighter than the JCM800
 pub struct Mesa {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
-    // 2× oversampling half-band LP (built for sr*2)
-    os_up_a: Biquad,
-    os_up_b: Biquad,
-    os_dn_a: Biquad,
-    os_dn_b: Biquad,
-    // Pre-clip HP at 2× rate — cuts sub-bass before the first gain stage
+    os: Oversampler4,
+    // Pre-clip HP at 4× rate — cuts sub-bass before the first gain stage
     pre_clip_hp: Biquad,
-    // Two inter-stage coupling HPs at 2× rate
+    // Two inter-stage coupling HPs at 4× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
+    bloom: Bloom,
     // Tone stack (base rate)
     bass_shelf: Biquad,
     mid_peak: Biquad,
@@ -41,24 +40,20 @@ pub struct Mesa {
 
 impl Mesa {
     pub fn new(sr: f32) -> Self {
-        let sr2 = sr * 2.0;
-        let half_nyq = sr / 2.0;
+        let sr4 = sr * 4.0;
         let mut m = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
-            os_up_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
-            os_up_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
-            os_dn_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
-            os_dn_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
-            // Recto input coupling HP at ~40 Hz — sub-rumble only.
-            // Recto is slightly tighter than the JCM800 but must still preserve
+            os: Oversampler4::new(sr),
+            // Recto input coupling HP at ~40 Hz — sub-rumble only, still preserves
             // the 82 Hz low-E fundamental going into the gain stages.
-            pre_clip_hp: Biquad::highpass(sr2, 40.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr4, 40.0, 0.707),
             // Between stage 1 and 2: ~680 Hz (Recto coupling cap characteristic)
-            stage_hp_1: Biquad::highpass(sr2, 680.0, 0.707),
+            stage_hp_1: Biquad::highpass(sr4, 680.0, 0.707),
             // Between stage 2 and 3: ~1 kHz (silicon stage compresses harder so HP is tighter)
-            stage_hp_2: Biquad::highpass(sr2, 1000.0, 0.707),
+            stage_hp_2: Biquad::highpass(sr4, 1000.0, 0.707),
+            bloom: Bloom::new(sr, 8.0, 120.0),
             bass_shelf: Biquad::low_shelf(sr, 100.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 750.0, 0.5, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 3300.0, 0.0),
@@ -131,30 +126,23 @@ impl Amplifier for Mesa {
         let x = self.input_hp.process(x);
 
         let pregain = 1.0 + gain * 35.0;
+        let bias = self.bloom.follow(x) * 0.12;
 
-        // ── 2× oversampled nonlinear section ──────────────────────────────────
-        // Even sample (zero-insert upsampling, ×2 for energy conservation)
-        let up = self.os_up_b.process(self.os_up_a.process(x * 2.0));
-        let up = self.pre_clip_hp.process(up); // cut sub-bass before clipping
-        let s = tube_clip_asym(up * pregain) / pregain.sqrt();
-        let s = self.stage_hp_1.process(s);
-        let s = tube_clip_asym(s * 5.0) / 5.0_f32.sqrt();
-        let s = self.stage_hp_2.process(s);
-        let s = silicon_clip_asym(s * 3.0) / 3.0_f32.sqrt();
-        let x_os = self.os_dn_b.process(self.os_dn_a.process(s));
-
-        // Odd sample — advance filter states, discard output
-        let up_z = self.os_up_b.process(self.os_up_a.process(0.0));
-        let up_z = self.pre_clip_hp.process(up_z);
-        let s_z = tube_clip_asym(up_z * pregain) / pregain.sqrt();
-        let s_z = self.stage_hp_1.process(s_z);
-        let s_z = tube_clip_asym(s_z * 5.0) / 5.0_f32.sqrt();
-        let s_z = self.stage_hp_2.process(s_z);
-        let s_z = silicon_clip_asym(s_z * 3.0) / 3.0_f32.sqrt();
-        self.os_dn_b.process(self.os_dn_a.process(s_z));
+        // ── 4× oversampled nonlinear section ──────────────────────────────────
+        let up = self.os.upsample(x);
+        let mut down = [0.0f32; 4];
+        for (o, &u) in down.iter_mut().zip(up.iter()) {
+            let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
+            let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            let s = self.stage_hp_1.process(s);
+            let s = tube_clip_asym(s * 5.0) / 5.0_f32.sqrt();
+            let s = self.stage_hp_2.process(s);
+            *o = silicon_clip_asym(s * 3.0) / 3.0_f32.sqrt();
+        }
+        let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
 
-        let x = self.bass_shelf.process(x_os);
+        let x = self.bass_shelf.process(x);
         let x = self.mid_peak.process(x);
         let x = self.treble_shelf.process(x);
 

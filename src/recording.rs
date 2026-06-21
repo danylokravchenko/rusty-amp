@@ -45,8 +45,9 @@ fn save_wav(samples: &[f32], sample_rate: u32) -> Result<PathBuf> {
         .unwrap_or(0);
     let path = base.join(format!("rusty-amp-{secs}.wav"));
 
+    // Recording buffer holds interleaved stereo (L, R) frames.
     let spec = hound::WavSpec {
-        channels: 1,
+        channels: 2,
         sample_rate,
         bits_per_sample: 32,
         sample_format: hound::SampleFormat::Float,

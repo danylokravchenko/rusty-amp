@@ -1,35 +1,31 @@
-use super::Amplifier;
+use super::{Amplifier, Bloom};
 use crate::dsp::biquad::Biquad;
+use crate::dsp::oversample::Oversampler4;
 
 /// Randall Warhead solid-state amp simulation.
 ///
 /// Signal path:
-///   DC block → input HP → [2× OS: FET + HP + BJT + HP + rail clip] → active tone stack → presence → stiff power section
+///   DC block → input HP → [4× OS: FET + HP + BJT + HP + rail clip] → active tone stack → presence → stiff power section
 ///
-/// Improvements over the naive model:
-///   • 2× oversampling through all three gain stages eliminates aliasing
+/// Character:
+///   • 4× oversampling through all three gain stages keeps aliasing inaudible
 ///   • Asymmetric FET waveshaper adds subtle even harmonics
+///   • A touch of dynamic bloom keeps the otherwise stiff solid-state feel responsive
 ///   • Two inter-stage HPs (500 Hz and 800 Hz) tighten the solid-state response
-///   • Presence knob replaces the old fixed +3 dB shelf (user-adjustable)
+///   • Presence knob (user-adjustable shelf at 5 kHz)
 pub struct Randall {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
-    // 2× oversampling half-band LP (built for sr*2)
-    os_up_a: Biquad,
-    os_up_b: Biquad,
-    os_dn_a: Biquad,
-    os_dn_b: Biquad,
-    // Pre-clip HP at 2× rate — the Warhead's tight solid-state input coupling
-    // cuts harder than tube amps (100 Hz vs 60-80 Hz), which is why it feels
-    // "tighter" — less sub-bass energy enters the gain stages
+    os: Oversampler4,
+    // Pre-clip HP at 4× rate — the Warhead's tight solid-state input coupling
     pre_clip_hp: Biquad,
-    // Inter-stage HPs at 2× rate
+    // Inter-stage HPs at 4× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
-    // Power section bass cut — prevents the output tanh from distorting bass frequencies;
-    // real solid-state amps have tight output stage coupling (no output transformer warmth)
+    // Power section bass cut (base rate) — prevents the output tanh distorting bass
     power_hp: Biquad,
+    bloom: Bloom,
     // Active tone stack (base rate)
     bass_shelf: Biquad,
     mid_peak: Biquad,
@@ -37,38 +33,33 @@ pub struct Randall {
     last_bass: f32,
     last_mid: f32,
     last_treble: f32,
-    // Presence — replaces the old fixed shelf (base rate)
+    // Presence (base rate)
     presence_shelf: Biquad,
     last_presence: f32,
 }
 
 impl Randall {
     pub fn new(sr: f32) -> Self {
-        let sr2 = sr * 2.0;
-        let half_nyq = sr / 2.0;
+        let sr4 = sr * 4.0;
         let mut r = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             // 75 Hz: tighter than tube amps (60 Hz) but doesn't cut the 82 Hz low-E
             input_hp: Biquad::highpass(sr, 75.0, 0.707),
-            os_up_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
-            os_up_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
-            os_dn_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
-            os_dn_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
-            // Warhead pre-clip HP: 55 Hz — tighter than Marshall/Mesa (solid-state characteristic)
-            // but still below the 82 Hz low-E so the fundamental enters the FET stage intact
-            pre_clip_hp: Biquad::highpass(sr2, 55.0, 0.707),
+            os: Oversampler4::new(sr),
+            // Warhead pre-clip HP: 55 Hz — tighter than Marshall/Mesa but below 82 Hz
+            pre_clip_hp: Biquad::highpass(sr4, 55.0, 0.707),
             // After FET stage: 500 Hz (Warhead input coupling)
-            stage_hp_1: Biquad::highpass(sr2, 500.0, 0.707),
+            stage_hp_1: Biquad::highpass(sr4, 500.0, 0.707),
             // After BJT stage: 800 Hz (driver stage coupling)
-            stage_hp_2: Biquad::highpass(sr2, 800.0, 0.707),
-            // Output stage HP at 80 Hz: lets the fundamental (82 Hz) through with
-            // only ~-3 dB attenuation while blocking sub-rumble from the tanh stage
+            stage_hp_2: Biquad::highpass(sr4, 800.0, 0.707),
+            // Output stage HP at 80 Hz: lets the fundamental through while blocking
+            // sub-rumble from the tanh stage
             power_hp: Biquad::highpass(sr, 80.0, 0.707),
+            bloom: Bloom::new(sr, 8.0, 100.0),
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 500.0, 0.4, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 4500.0, 0.0),
-            // Fixed presence knob (was hard-coded +3 dB; now user-controlled)
             presence_shelf: Biquad::high_shelf(sr, 5000.0, 3.0),
             last_bass: -1.0,
             last_mid: -1.0,
@@ -124,36 +115,29 @@ impl Amplifier for Randall {
         let x = self.input_hp.process(x);
 
         let pregain = 1.0 + gain * 45.0;
+        let bias = self.bloom.follow(x) * 0.08;
 
-        // ── 2× oversampled nonlinear section ──────────────────────────────────
-        // Even sample
-        let up = self.os_up_b.process(self.os_up_a.process(x * 2.0));
-        let up = self.pre_clip_hp.process(up); // cut sub-bass before FET stage
-        let s = fet_clip_asym(up * pregain) / pregain.sqrt();
-        let s = self.stage_hp_1.process(s);
-        let s = bjt_clip(s * 6.0) / 6.0_f32.sqrt();
-        let s = self.stage_hp_2.process(s);
-        let s = rail_clip(s * 3.0) / 3.0_f32.sqrt();
-        let x_os = self.os_dn_b.process(self.os_dn_a.process(s));
-
-        // Odd sample — advance filter states, discard output
-        let up_z = self.os_up_b.process(self.os_up_a.process(0.0));
-        let up_z = self.pre_clip_hp.process(up_z);
-        let s_z = fet_clip_asym(up_z * pregain) / pregain.sqrt();
-        let s_z = self.stage_hp_1.process(s_z);
-        let s_z = bjt_clip(s_z * 6.0) / 6.0_f32.sqrt();
-        let s_z = self.stage_hp_2.process(s_z);
-        let s_z = rail_clip(s_z * 3.0) / 3.0_f32.sqrt();
-        self.os_dn_b.process(self.os_dn_a.process(s_z));
+        // ── 4× oversampled nonlinear section ──────────────────────────────────
+        let up = self.os.upsample(x);
+        let mut down = [0.0f32; 4];
+        for (o, &u) in down.iter_mut().zip(up.iter()) {
+            let u = self.pre_clip_hp.process(u); // cut sub-bass before FET stage
+            let s = fet_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            let s = self.stage_hp_1.process(s);
+            let s = bjt_clip(s * 6.0) / 6.0_f32.sqrt();
+            let s = self.stage_hp_2.process(s);
+            *o = rail_clip(s * 3.0) / 3.0_f32.sqrt();
+        }
+        let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
 
-        let x = self.bass_shelf.process(x_os);
+        let x = self.bass_shelf.process(x);
         let x = self.mid_peak.process(x);
         let x = self.treble_shelf.process(x);
         let x = self.presence_shelf.process(x);
 
-        // Solid-state power section — stiff rails, no sag
-        // HP before tanh: prevents the output stage from distorting sub-bass
+        // Solid-state power section — stiff rails, no sag.
+        // HP before tanh: prevents the output stage from distorting sub-bass.
         let x = self.power_hp.process(x);
         let x = (x * 2.0).tanh() * 0.5;
 
