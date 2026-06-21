@@ -155,7 +155,10 @@ impl Amplifier for Marshall {
         // Presence: output transformer NFB shelf
         let x = self.presence_shelf.process(x);
 
-        x * master * 0.8
+        // Output trim: the tube power stage runs at a conservative level; this
+        // makeup brings the JCM800 up to the same loudness as the (much hotter)
+        // solid-state Randall so switching models doesn't jump in volume.
+        x * master * 3.6
     }
 }
 

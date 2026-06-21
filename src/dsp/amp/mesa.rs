@@ -24,6 +24,12 @@ pub struct Mesa {
     // Two inter-stage coupling HPs at 8× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
+    // Power-section subsonic cut (base rate, 4th-order = two cascaded biquads).
+    // The asymmetric silicon stage generates strong difference tones on a low
+    // power chord; this strips that inaudible sub-bass "fart" while leaving the
+    // 82 Hz low-E fundamental intact.
+    power_hp: Biquad,
+    power_hp2: Biquad,
     bloom: Bloom,
     // Passive FMV tone stack (base rate) — Fender-type values for the Recto's
     // thicker low end and gentler scoop.
@@ -48,13 +54,17 @@ impl Mesa {
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
             os: Oversampler8::new(sr),
-            // Recto input coupling HP at ~40 Hz — sub-rumble only, still preserves
-            // the 82 Hz low-E fundamental going into the gain stages.
-            pre_clip_hp: Biquad::highpass(sr8, 40.0, 0.707),
+            // Recto input coupling HP at ~70 Hz — keeps sub-bass out of the gain
+            // stages so they don't generate difference-tone mud, while preserving
+            // the 82 Hz low-E fundamental.
+            pre_clip_hp: Biquad::highpass(sr8, 70.0, 0.707),
             // Between stage 1 and 2: ~680 Hz (Recto coupling cap characteristic)
             stage_hp_1: Biquad::highpass(sr8, 680.0, 0.707),
             // Between stage 2 and 3: ~1 kHz (silicon stage compresses harder so HP is tighter)
             stage_hp_2: Biquad::highpass(sr8, 1000.0, 0.707),
+            // Subsonic cut at 70 Hz, cascaded → 24 dB/oct.
+            power_hp: Biquad::highpass(sr, 70.0, 0.707),
+            power_hp2: Biquad::highpass(sr, 70.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
             tone: ToneStack::new(sr, Components::FENDER),
             last_bass: -1.0,
@@ -145,11 +155,19 @@ impl Amplifier for Mesa {
 
         let x = self.tone.process(x);
 
+        // Subsonic cut before the power stage so the silicon clipper can't fold
+        // sub-bass into difference-tone mud.
+        let x = self.power_hp.process(x);
         let x = self.power_amp(x);
         let x = self.speaker.process(x, self.envelope);
+        // Second subsonic stage after the asymmetric clipper, which regenerates a
+        // low difference-tone "fart" from the chord's intervals.
+        let x = self.power_hp2.process(x);
         let x = self.presence_shelf.process(x);
 
-        x * master * 0.8
+        // Output trim: level-match the Recto to the hotter solid-state Randall so
+        // switching amp models doesn't produce a volume jump.
+        x * master * 2.6
     }
 }
 

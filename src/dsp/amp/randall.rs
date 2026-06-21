@@ -23,8 +23,12 @@ pub struct Randall {
     // Inter-stage HPs at 8× rate
     stage_hp_1: Biquad,
     stage_hp_2: Biquad,
-    // Power section bass cut (base rate) — prevents the output tanh distorting bass
+    // Power section subsonic cut (base rate, 4th-order = two cascaded biquads).
+    // Prevents the output tanh distorting sub-bass and strips the inaudible
+    // difference-tone "fart" a low power chord generates, while the 70 Hz corner
+    // leaves the 82 Hz low-E fundamental essentially intact.
     power_hp: Biquad,
+    power_hp2: Biquad,
     bloom: Bloom,
     // Active tone stack (base rate)
     bass_shelf: Biquad,
@@ -55,9 +59,10 @@ impl Randall {
             stage_hp_1: Biquad::highpass(sr8, 500.0, 0.707),
             // After BJT stage: 800 Hz (driver stage coupling)
             stage_hp_2: Biquad::highpass(sr8, 800.0, 0.707),
-            // Output stage HP at 80 Hz: lets the fundamental through while blocking
-            // sub-rumble from the tanh stage
-            power_hp: Biquad::highpass(sr, 80.0, 0.707),
+            // Output stage HP at 70 Hz, cascaded → 24 dB/oct. Lets the 82 Hz
+            // fundamental through while hard-killing the sub-bass fart below it.
+            power_hp: Biquad::highpass(sr, 70.0, 0.707),
+            power_hp2: Biquad::highpass(sr, 70.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 100.0),
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 500.0, 0.4, 0.0),
@@ -145,6 +150,9 @@ impl Amplifier for Randall {
         let x = self.power_hp.process(x);
         let x = (x * 2.0).tanh() * 0.5;
         let x = self.speaker.process(x, 0.0);
+        // Second subsonic stage after the tanh: the clipper regenerates a low
+        // difference-tone "fart" from the chord's intervals; strip it here.
+        let x = self.power_hp2.process(x);
 
         x * master * 0.8
     }

@@ -651,6 +651,73 @@ mod tests {
         );
     }
 
+    /// A low-E power chord through a high-gain, bass-heavy, mid-scooped rig (the
+    /// "Pantera rhythm" worst case) must not turn into sub-bass mush: the inaudible
+    /// difference-tone / rumble energy below the low-E fundamental must stay a small
+    /// fraction of the musical body harmonics, and the three amp models must be
+    /// roughly level-matched so switching models doesn't jump the volume.
+    #[test]
+    fn power_chord_low_end_is_tight_and_amps_level_matched() {
+        let sr = 48_000.0;
+        // E2 power chord: root + fifth + octave, like a palm-muted metal chord.
+        let chord = [82.41f32, 123.47, 164.81];
+        let run = |model: AmpModel| {
+            let params = Arc::new(Params::new());
+            params.amp_model.store(model as u8, Relaxed);
+            params.ts_enabled.store(false, Relaxed);
+            params.ds_enabled.store(true, Relaxed);
+            params.ds_drive.store(0.72, Relaxed);
+            params.ds_tone.store(0.68, Relaxed);
+            params.ds_level.store(0.80, Relaxed);
+            params.rev_enabled.store(false, Relaxed);
+            params.ng_enabled.store(false, Relaxed);
+            params.amp_gain.store(0.93, Relaxed);
+            params.amp_bass.store(0.82, Relaxed);
+            params.amp_mid.store(0.12, Relaxed);
+            params.amp_treble.store(0.86, Relaxed);
+            params.amp_presence.store(0.73, Relaxed);
+            params.amp_master.store(0.65, Relaxed);
+            let mut chain = DspChain::new(sr, params);
+            let n = sr as usize;
+            let warmup = sr as usize / 3;
+            let mut out = Vec::with_capacity(n - warmup);
+            for i in 0..n {
+                let t = i as f32 / sr;
+                let x: f32 =
+                    chord.iter().map(|&f| (2.0 * PI * f * t).sin()).sum::<f32>() * 0.18;
+                let (l, _r) = chain.process(x);
+                if i >= warmup {
+                    out.push(l);
+                }
+            }
+            let rms = (out.iter().map(|s| (s * s) as f64).sum::<f64>() / out.len() as f64).sqrt();
+            let m = |f| goertzel(&out, f, sr) as f64;
+            let sub = m(41.0) + m(55.0); // sub / difference-tone fart
+            let body = m(164.81) + m(247.0) + m(330.0); // musical body harmonics
+            (rms, sub / body.max(1e-9))
+        };
+
+        let mut rms = Vec::new();
+        for model in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
+            let (r, sub_body) = run(model);
+            assert!(
+                sub_body < 0.45,
+                "{} low end is farty: sub/body = {sub_body:.2}",
+                model.name()
+            );
+            rms.push(r);
+        }
+        // Loudness match: the quietest amp must be within ~6 dB of the loudest, so
+        // switching models doesn't produce the old 4–7× volume jump.
+        let lo = rms.iter().cloned().fold(f64::INFINITY, f64::min);
+        let hi = rms.iter().cloned().fold(0.0, f64::max);
+        assert!(
+            hi / lo < 2.0,
+            "amps not level-matched: rms spread {hi:.4}/{lo:.4} = {:.2}x",
+            hi / lo
+        );
+    }
+
     /// Every amp model should be stable (no NaN/blowup) at full gain.
     #[test]
     fn all_amps_stable_at_max_gain() {
