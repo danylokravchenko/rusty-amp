@@ -10,8 +10,9 @@ use std::sync::atomic::Ordering::Relaxed;
 use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
 use super::config::{
-    AMP_END, AMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END, EQ_START, FUZZ_END,
-    FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START, REV_END, REV_START, TS_END, TS_START,
+    AMP_END, AMP_START, CMP_END, CMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END,
+    EQ_START, FUZZ_END, FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START, PEQ_END,
+    PEQ_START, REV_END, REV_START, TS_END, TS_START,
 };
 use super::styles::*;
 
@@ -103,9 +104,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     f.render_widget(title, rows[0]);
 
     let ng_on = params.ng_enabled.load(Relaxed);
+    let cmp_on = params.cmp_enabled.load(Relaxed);
     let fz_on = params.fz_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
     let ds_on = params.ds_enabled.load(Relaxed);
+    let peq_on = params.peq_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
     let delay_on = params.delay_enabled.load(Relaxed);
     let rev_on = params.rev_enabled.load(Relaxed);
@@ -123,6 +126,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     ));
     chain.push(arrow.clone());
     chain.push(Span::styled(
+        "COMP",
+        Style::default().fg(pedal_color(cmp_on)),
+    ));
+    chain.push(arrow.clone());
+    chain.push(Span::styled(
         "FUZZ",
         Style::default().fg(pedal_color(fz_on)),
     ));
@@ -135,6 +143,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     chain.push(Span::styled(
         "DS-1",
         Style::default().fg(pedal_color(ds_on)),
+    ));
+    chain.push(arrow.clone());
+    chain.push(Span::styled(
+        "PRE-EQ",
+        Style::default().fg(pedal_color(peq_on)),
     ));
     chain.push(arrow.clone());
     chain.push(Span::styled("AMP", Style::default().fg(amp_color)));
@@ -541,19 +554,32 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
         params,
     );
 
-    // Row 2: Fuzz, Noise Gate, Parametric EQ.
+    // Row 2: Compressor, Fuzz, Noise Gate, Pre-amp EQ, Parametric EQ.
     let row2 = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Ratio(4, 12),
-            Constraint::Ratio(3, 12),
-            Constraint::Ratio(5, 12),
+            Constraint::Ratio(3, 14),
+            Constraint::Ratio(3, 14),
+            Constraint::Ratio(2, 14),
+            Constraint::Ratio(3, 14),
+            Constraint::Ratio(3, 14),
         ])
         .split(rows[1]);
 
     render_pedal(
         f,
         row2[0],
+        "COMP",
+        PEDAL_GOLD,
+        CMP_START,
+        CMP_END,
+        params.cmp_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row2[1],
         "FUZZ",
         PEDAL_RED,
         FUZZ_START,
@@ -564,7 +590,7 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     );
     render_pedal(
         f,
-        row2[1],
+        row2[2],
         "NOISE GATE",
         PEDAL_SILVER,
         NG_START,
@@ -575,7 +601,18 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     );
     render_pedal(
         f,
-        row2[2],
+        row2[3],
+        "PRE-AMP EQ",
+        PEDAL_LIME,
+        PEQ_START,
+        PEQ_END,
+        params.peq_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row2[4],
         "PARAMETRIC EQ",
         PEDAL_TEAL,
         EQ_START,

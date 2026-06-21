@@ -18,3 +18,5 @@ pub(super) const PEDAL_PURPLE: Color = Color::Rgb(160, 100, 225); // Delay
 pub(super) const PEDAL_SILVER: Color = Color::Rgb(165, 165, 180); // Noise Gate
 pub(super) const PEDAL_TEAL: Color = Color::Rgb(40, 190, 185); // Parametric EQ
 pub(super) const PEDAL_RED: Color = Color::Rgb(215, 60, 55); // Fuzz
+pub(super) const PEDAL_GOLD: Color = Color::Rgb(220, 175, 50); // Compressor
+pub(super) const PEDAL_LIME: Color = Color::Rgb(150, 200, 60); // Pre-amp EQ

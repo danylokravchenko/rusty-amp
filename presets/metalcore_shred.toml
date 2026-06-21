@@ -27,6 +27,17 @@ drive = 0.40
 tone  = 0.55
 level = 0.65
 
+# ── Pre-amp EQ ────────────────────────────────────────────────────────────────
+# The modern metalcore/djent staple: a graphic EQ in front of the amp to tighten
+# the low end and add upper-mid bite *before* the high-gain preamp clips it. This
+# is what keeps fast, down-tuned chugs articulate instead of woofy. Works with the
+# Skreamer's mid push rather than against it.
+[preamp_eq]
+enabled = true
+low  = 0.40   # ≈ −2.4 dB at 100 Hz — tightens the low end going into the amp
+mid  = 0.50   # flat — the Skreamer already supplies the mid hump
+high = 0.56   # ≈ +1.4 dB at 3 kHz — a little extra pick-attack bite pre-clip
+
 # ── Amp ───────────────────────────────────────────────────────────────────────
 # Guitar Rig's Fire Seeker is a modern high-gain amp in the Diezel / Mesa
 # tradition — three gain stages, tight low end, aggressive upper-mids.

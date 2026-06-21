@@ -10,6 +10,16 @@ enabled   = true
 threshold = 0.18   # lower — allows quiet sustain tails and harmonics through
 release   = 0.45   # slow — gate stays open while notes decay naturally
 
+# ── Compressor ────────────────────────────────────────────────────────────────
+# Adds the singing, infinite-sustain quality the Floods solo lives on — it holds
+# the level of decaying notes up so bends and vibrato ring on. Slow attack keeps
+# the pick attack intact so the lead still has articulation.
+[compressor]
+enabled = true
+sustain = 0.42   # moderate — sustain and smoothing without squashing the dynamics
+attack  = 0.38   # lets the pick attack through before clamping
+level   = 0.50   # unity with auto makeup
+
 # ── Tube Screamer ─────────────────────────────────────────────────────────────
 # Off — the DS-1 alone handles the boost and saturation for the solo.
 [tube_screamer]

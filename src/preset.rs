@@ -25,9 +25,11 @@ pub struct Preset {
     #[serde(skip)]
     pub path: Option<PathBuf>,
     pub noise_gate: Option<NgSection>,
+    pub compressor: Option<CmpSection>,
     pub fuzz: Option<FuzzSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
+    pub preamp_eq: Option<PeqSection>,
     pub amp: AmpSection,
     pub cabinet: Option<CabSection>,
     pub eq: Option<EqSection>,
@@ -40,6 +42,22 @@ pub struct NgSection {
     pub enabled: Option<bool>,
     pub threshold: f32,
     pub release: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct CmpSection {
+    pub enabled: Option<bool>,
+    pub sustain: f32,
+    pub attack: f32,
+    pub level: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PeqSection {
+    pub enabled: Option<bool>,
+    pub low: f32,
+    pub mid: f32,
+    pub high: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -176,6 +194,12 @@ impl Preset {
                 threshold: params.ng_threshold.load(Relaxed),
                 release: params.ng_release.load(Relaxed),
             }),
+            compressor: Some(CmpSection {
+                enabled: Some(params.cmp_enabled.load(Relaxed)),
+                sustain: params.cmp_sustain.load(Relaxed),
+                attack: params.cmp_attack.load(Relaxed),
+                level: params.cmp_level.load(Relaxed),
+            }),
             fuzz: Some(FuzzSection {
                 enabled: Some(params.fz_enabled.load(Relaxed)),
                 fuzz: params.fz_fuzz.load(Relaxed),
@@ -193,6 +217,12 @@ impl Preset {
                 drive: params.ds_drive.load(Relaxed),
                 tone: params.ds_tone.load(Relaxed),
                 level: params.ds_level.load(Relaxed),
+            }),
+            preamp_eq: Some(PeqSection {
+                enabled: Some(params.peq_enabled.load(Relaxed)),
+                low: params.peq_low.load(Relaxed),
+                mid: params.peq_mid.load(Relaxed),
+                high: params.peq_high.load(Relaxed),
             }),
             amp: AmpSection {
                 model: Some(amp_model_str.to_string()),
@@ -258,6 +288,19 @@ impl Preset {
             params.ng_release.store(ng.release.clamp(0.0, 1.0), Relaxed);
         }
 
+        if let Some(cmp) = &self.compressor {
+            params
+                .cmp_enabled
+                .store(cmp.enabled.unwrap_or(true), Relaxed);
+            params
+                .cmp_sustain
+                .store(cmp.sustain.clamp(0.0, 1.0), Relaxed);
+            params.cmp_attack.store(cmp.attack.clamp(0.0, 1.0), Relaxed);
+            params.cmp_level.store(cmp.level.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.cmp_enabled.store(false, Relaxed);
+        }
+
         if let Some(fz) = &self.fuzz {
             params.fz_enabled.store(fz.enabled.unwrap_or(true), Relaxed);
             params.fz_fuzz.store(fz.fuzz.clamp(0.0, 1.0), Relaxed);
@@ -280,6 +323,17 @@ impl Preset {
             params.ds_level.store(ds.level.clamp(0.0, 1.0), Relaxed);
         } else {
             params.ds_enabled.store(false, Relaxed);
+        }
+
+        if let Some(peq) = &self.preamp_eq {
+            params
+                .peq_enabled
+                .store(peq.enabled.unwrap_or(true), Relaxed);
+            params.peq_low.store(peq.low.clamp(0.0, 1.0), Relaxed);
+            params.peq_mid.store(peq.mid.clamp(0.0, 1.0), Relaxed);
+            params.peq_high.store(peq.high.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.peq_enabled.store(false, Relaxed);
         }
 
         let amp = &self.amp;
@@ -383,4 +437,25 @@ pub fn load_all() -> Vec<Preset> {
                 .ok()
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every bundled preset must deserialize against the current schema — guards
+    /// against a typo or a renamed field silently breaking a shipped preset.
+    #[test]
+    fn all_bundled_presets_parse() {
+        let mut count = 0;
+        for entry in std::fs::read_dir("presets").expect("presets/ dir") {
+            let p = entry.unwrap().path();
+            if p.extension().is_some_and(|ext| ext == "toml") {
+                Preset::load(&p, PresetSource::System)
+                    .unwrap_or_else(|e| panic!("failed to parse {}: {e}", p.display()));
+                count += 1;
+            }
+        }
+        assert!(count > 0, "no bundled presets found to validate");
+    }
 }

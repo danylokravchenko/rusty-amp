@@ -28,6 +28,17 @@ drive = 0.72   # hard DS-1 clipping — adds the sharp, percussive edge
 tone  = 0.68   # slightly bright — keeps pick-attack definition cutting through
 level = 0.80   # hot signal into the amp's already cranked preamp
 
+# ── Pre-amp EQ ────────────────────────────────────────────────────────────────
+# The other half of the Furman PQ-3 trick: as well as the post-cab mid scoop,
+# Dimebag's EQ sat in the amp's loop shaping what the gain stage clipped. Here it
+# tightens the low end *before* the preamp (so the massive bass setting stays
+# articulate instead of turning to mush) and adds a touch more pre-clip mid scoop.
+[preamp_eq]
+enabled = true
+low  = 0.40   # ≈ −2.4 dB at 100 Hz — tightens the front end before clipping
+mid  = 0.42   # ≈ −1.9 dB at 650 Hz — a little extra pre-clip hollowing
+high = 0.50   # flat — the post EQ already handles the top-end lift
+
 # ── Amp ───────────────────────────────────────────────────────────────────────
 # Dimebag's actual rig was Randall solid-state, but the JCM800 pushed to
 # extremes captures the same hyper-compressed, percussive character.

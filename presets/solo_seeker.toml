@@ -10,6 +10,16 @@ enabled   = true
 threshold = 0.16
 release   = 0.50
 
+# ── Compressor ────────────────────────────────────────────────────────────────
+# A compressor in front is the classic studio lead trick: it evens out picking
+# dynamics and feeds the amp a steady level, so sustained notes bloom and "sing"
+# rather than dying away. Slowish attack lets the pick transient through first.
+[compressor]
+enabled = true
+sustain = 0.45   # moderate squash — sustain without obvious pumping
+attack  = 0.40   # lets the initial pick attack speak before it clamps
+level   = 0.50   # unity with auto makeup — feeds the amp the same level
+
 # ── Tube Screamer ─────────────────────────────────────────────────────────────
 # No Skreamer in the signal flow — the Fire Seeker is driven directly.
 # The amp at near-maximum gain is the entire gain source.

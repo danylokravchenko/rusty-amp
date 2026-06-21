@@ -1,6 +1,7 @@
 pub mod amp;
 pub mod biquad;
 pub mod cab;
+pub mod compressor;
 pub mod conv;
 pub mod delay;
 pub mod distortion;
@@ -8,6 +9,7 @@ pub mod fuzz;
 pub mod noise_gate;
 pub mod oversample;
 pub mod parametric_eq;
+pub mod preamp_eq;
 pub mod reverb;
 pub mod tonestack;
 pub mod tube_screamer;
@@ -18,11 +20,13 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 
 use amp::AmpBank;
 use cab::CabBank;
+use compressor::Compressor;
 use delay::Delay;
 use distortion::Distortion;
 use fuzz::Fuzz;
 use noise_gate::NoiseGate;
 use parametric_eq::ParametricEq;
+use preamp_eq::PreampEq;
 use reverb::Reverb;
 use tube_screamer::TubeScreamer;
 
@@ -144,6 +148,18 @@ pub struct Params {
     pub ng_threshold: Arc<AtomicF32>,
     pub ng_release: Arc<AtomicF32>,
 
+    // Compressor (front of chain)
+    pub cmp_enabled: Arc<AtomicBool>,
+    pub cmp_sustain: Arc<AtomicF32>,
+    pub cmp_attack: Arc<AtomicF32>,
+    pub cmp_level: Arc<AtomicF32>,
+
+    // Pre-amp EQ (before the amp)
+    pub peq_enabled: Arc<AtomicBool>,
+    pub peq_low: Arc<AtomicF32>,
+    pub peq_mid: Arc<AtomicF32>,
+    pub peq_high: Arc<AtomicF32>,
+
     // Fuzz (Big Muff style)
     pub fz_enabled: Arc<AtomicBool>,
     pub fz_fuzz: Arc<AtomicF32>,
@@ -211,6 +227,16 @@ impl Params {
             ng_enabled: b!(true),
             ng_threshold: p!(0.20),
             ng_release: p!(0.30),
+
+            cmp_enabled: b!(false),
+            cmp_sustain: p!(0.40),
+            cmp_attack: p!(0.30),
+            cmp_level: p!(0.50),
+
+            peq_enabled: b!(false),
+            peq_low: p!(0.50),
+            peq_mid: p!(0.50),
+            peq_high: p!(0.50),
 
             fz_enabled: b!(false),
             fz_fuzz: p!(0.70),
@@ -280,9 +306,11 @@ impl Levels {
 
 pub struct DspChain {
     ng: NoiseGate,
+    cmp: Compressor,
     fz: Fuzz,
     ts: TubeScreamer,
     ds: Distortion,
+    peq: PreampEq,
     amp: AmpBank,
     cab: CabBank,
     eq: ParametricEq,
@@ -295,9 +323,11 @@ impl DspChain {
     pub fn new(sr: f32, params: Arc<Params>) -> Self {
         Self {
             ng: NoiseGate::new(sr),
+            cmp: Compressor::new(sr),
             fz: Fuzz::new(sr),
             ts: TubeScreamer::new(sr),
             ds: Distortion::new(sr),
+            peq: PreampEq::new(sr),
             amp: AmpBank::new(sr),
             cab: CabBank::new(sr),
             eq: ParametricEq::new(sr),
@@ -325,6 +355,18 @@ impl DspChain {
             )
         } else {
             sample
+        };
+
+        // Compressor — evens out picking dynamics before the drive stages
+        let x = if p.cmp_enabled.load(Relaxed) {
+            self.cmp.process(
+                x,
+                p.cmp_sustain.load(Relaxed),
+                p.cmp_attack.load(Relaxed),
+                p.cmp_level.load(Relaxed),
+            )
+        } else {
+            x
         };
 
         // Pedal chain — fuzz first, so it sees the rawest signal
@@ -356,6 +398,18 @@ impl DspChain {
                 p.ds_drive.load(Relaxed),
                 p.ds_tone.load(Relaxed),
                 p.ds_level.load(Relaxed),
+            )
+        } else {
+            x
+        };
+
+        // Pre-amp EQ — shapes what the amp's gain stage clips (before the amp)
+        let x = if p.peq_enabled.load(Relaxed) {
+            self.peq.process(
+                x,
+                p.peq_low.load(Relaxed),
+                p.peq_mid.load(Relaxed),
+                p.peq_high.load(Relaxed),
             )
         } else {
             x

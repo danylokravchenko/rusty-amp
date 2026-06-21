@@ -14,6 +14,10 @@ Noise Gate  [bypassable]
   Envelope follower → gain ramp (smooth open/close to avoid clicks)
   │
   ▼
+Compressor  [bypassable]
+  Peak-follower detector → hard-knee gain computer (2:1–10:1) → smoothed gain + auto makeup
+  │
+  ▼
 Fuzz  [bypassable · Big Muff style]
   DC block → 70 Hz HP → [4× OS: two cascaded asymmetric soft-clip stages] → DC block → 700 Hz mid scoop → variable tone LP
   │
@@ -24,6 +28,10 @@ TS-808 Tube Screamer  [bypassable]
   ▼
 DS-1 Distortion  [bypassable]
   DC block → 80 Hz HP → [4× OS: pre-clip HP → symmetric silicon diode clip] → active tone (LP+HP blend)
+  │
+  ▼
+Pre-amp EQ  [bypassable]
+  Low shelf (100 Hz) → Mid peak (650 Hz) → High shelf (3 kHz) — each ±12 dB — shapes what the amp clips
   │
   ▼
 Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
@@ -126,7 +134,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 
 ## Knob sections
 
-### Pedals row  _(Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate — each independently bypassable with Space)_
+### Pedals row  _(Compressor | Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate | Pre-amp EQ — each independently bypassable with Space)_
 
 #### Noise Gate
 
@@ -134,6 +142,16 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | ------ | ------- | -------- |
 | Thresh | 0–10 | Gate open threshold. 0 = opens at very low levels (−80 dB), 10 = always open. Start around 2–3 for high-gain tones |
 | Release | 0–10 | How long the gate stays open after the signal drops below threshold. Higher = slower, more natural decay |
+
+#### Compressor
+
+Sits right after the gate, before the drive stages, so it evens out picking dynamics and adds sustain going into the amp — the classic "studio" upgrade for clean and edge-of-breakup tones. A peak-follower detector drives a hard-knee gain computer; auto makeup keeps the level steady as you add compression.
+
+| Knob | Range | Effect |
+| ------ | ------- | -------- |
+| Sustain | 0–10 | Compression amount — lowers the threshold (−6 dB → −40 dB) and raises the ratio (2:1 → 10:1). Higher = more squash and sustain |
+| Attack | 0–10 | How fast the compressor clamps a transient (0.5 ms → 50 ms). Low = snappy/tight, high = lets the pick attack through |
+| Level | 0–10 | Output makeup gain (≈0–2×). 5 = unity with auto makeup |
 
 #### Fuzz  _(Big Muff style)_
 
@@ -201,9 +219,19 @@ speaker's impedance resonance blooms the low end dynamically as the supply sags
 under hard playing. The Randall keeps an active (independent-band) stack and a
 small static speaker resonance, true to its stiff solid-state design.
 
+#### Pre-amp EQ  _(bypassable with Space)_
+
+Sits **before the amp**, so it shapes the signal that the gain stage actually clips — a different job from the post-cab Parametric EQ below, which colours the final mix. Scoop the mids going in for a tighter chug, or push them for lead sustain. All three bands map 0–10 to −12 dB → 0 dB → +12 dB. Centre (5.0) is flat.
+
+| Knob | Frequency | Type |
+| ------ | ----------- | ---- |
+| Low | 100 Hz | Low shelf |
+| Mid | 650 Hz | Peak (Q 1.0) |
+| High | 3 kHz | High shelf |
+
 #### Parametric EQ  _(bypassable with Space)_
 
-All three bands map 0–10 to −15 dB → 0 dB → +15 dB. Centre (5.0) is unity gain.
+Post-cabinet — shapes the final stereo tone after distortion. All three bands map 0–10 to −15 dB → 0 dB → +15 dB. Centre (5.0) is unity gain.
 
 | Knob | Frequency | Type |
 | ------ | ----------- | ---- |
@@ -285,6 +313,14 @@ enabled   = true    # optional, defaults to true
 threshold = 0.20    # 0.0 – 1.0  (0 = barely open, 1 = always open)
 release   = 0.30    # 0.0 – 1.0  (0 = instant close, 1 = very slow)
 
+# Omit [compressor] entirely to leave it off,
+# or include it with enabled = false to store values but keep it bypassed.
+[compressor]
+enabled = false     # optional, defaults to true when the section is present
+sustain = 0.40      # 0.0 – 1.0  (compression amount)
+attack  = 0.30      # 0.0 – 1.0  (0.5 ms → 50 ms)
+level   = 0.50      # 0.0 – 1.0  (output makeup, 0.5 = unity)
+
 # Omit [fuzz] entirely to leave it off (the default for the bundled presets),
 # or include it with enabled = false to store values but keep it bypassed.
 [fuzz]
@@ -306,6 +342,14 @@ enabled = true
 drive = 0.50
 tone  = 0.55
 level = 0.65
+
+# Pre-amp EQ — shapes the signal before the amp's gain stage.
+# Omit [preamp_eq] entirely to leave it off, or include it with enabled = false.
+[preamp_eq]
+enabled = false       # optional, defaults to true when the section is present
+low  = 0.50           # 0.0 = −12 dB, 0.5 = flat, 1.0 = +12 dB
+mid  = 0.50
+high = 0.50
 
 [amp]
 model  = "marshall"   # "marshall" (default), "mesa", or "randall"
