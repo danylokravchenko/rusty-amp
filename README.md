@@ -1,6 +1,6 @@
 # rusty-amp
 
-A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. Presets can be loaded at any time without leaving the app.
+A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (dual-mic impulse-response convolution) and stays stereo through a ping-pong delay and stereo reverb for a wide, studio-grade image. Presets can be loaded at any time without leaving the app.
 
 ![Screenshot](/assets/screenshot.png)
 
@@ -15,37 +15,39 @@ Noise Gate  [bypassable]
   │
   ▼
 TS-808 Tube Screamer  [bypassable]
-  DC block → 340 Hz HP → 720 Hz mid-peak → asymmetric diode clip → variable tone LP
+  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → variable tone LP
   │
   ▼
 DS-1 Distortion  [bypassable]
-  DC block → 100 Hz HP → asymmetric hard-clip (op-amp + diodes) → active tone (LP+HP blend)
+  DC block → 80 Hz HP → [4× OS: pre-clip HP → symmetric silicon diode clip] → active tone (LP+HP blend)
   │
   ▼
 Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
+  4× oversampled nonlinear stages + dynamic grid-bias "bloom" for touch sensitivity
   JCM800:   dual 12AX7 atan soft-clip → passive tone stack → tube rectifier sag
   Mesa DR:  triple gain stage (atan + silicon clip) → tone stack → silicon rectifier sag
   Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section
   │
-  ▼
+  ▼  (mono → STEREO)
 Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback — switchable in real time]
-  Multi-stage biquad EQ chain modelling a close-mic'd 4×12 cabinet response:
-  sub-bass HPF → low shelf → mid character peak → presence peak → air shelf → fizz LPF → mic position shelf
+  Dual-mic impulse-response convolution modelling a close-mic'd 4×12 cabinet:
+  voiced EQ skeleton + early-reflection comb + speaker modal ring,
+  with decorrelated left/right IRs → natural stereo width · mic-position shelf
   │
-  ▼
+  ▼  (stereo from here on)
 Parametric EQ  [bypassable]
   Low shelf (120 Hz) → Mid peak (800 Hz, Q 1.5) → High shelf (5 kHz) — each ±15 dB
   │
   ▼
 Delay  [bypassable]
-  Digital delay with feedback — TIME 0–500 ms, FEEDBACK 0–85%, dry/wet MIX
+  Stereo ping-pong delay — repeats bounce L↔R — TIME 0–500 ms, FEEDBACK 0–85%, dry/wet MIX
   │
   ▼
-Spring Reverb  [bypassable]
-  8 parallel comb filters → 4 series allpass diffusers → dry/wet mix
+Stereo Reverb  [bypassable]
+  Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix
   │
   ▼
-Output soft limiter (tanh)
+Per-channel output soft limiter → stereo (L, R)
 ```
 
 ## Requirements
@@ -70,7 +72,7 @@ cargo run
 2. **Select guitar input channel** — Focusrite 2i2 has 2; guitar is usually channel 2 if plugged into Input 2
 3. **Select output device** — pick your speakers or headphones
 
-The processed signal is written to **all output channels** — both left and right on a stereo interface or headphones.
+The processed signal is **true stereo**: the left channel goes to output 0, the right to output 1 (a mono output device receives the summed mix). On a stereo interface or headphones you hear the full dual-mic cab spread, ping-pong delay, and stereo reverb.
 
 The app launches immediately with default values. Press **`P`** at any time to open the preset browser and load a preset while playing. Press **`S`** at any time to save the current state as a new preset. Press **`R`** to start or stop recording the processed output to a WAV file.
 
@@ -116,7 +118,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 
 ## Knob sections
 
-### Pedals row  _(TS-808 | DS-1 | Spring Reverb | Delay | Noise Gate — each independently bypassable with Space)_
+### Pedals row  _(TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate — each independently bypassable with Space)_
 
 #### Noise Gate
 
@@ -141,7 +143,9 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | Tone | 0–10 | Active LP/HP blend. 0 = dark & full, 5 = mid-scooped, 10 = bright & cutting |
 | Level | 0–10 | Output volume of the pedal into the next stage |
 
-#### Spring Reverb  _(bypassable with Space)_
+#### Stereo Reverb  _(bypassable with Space)_
+
+Two decorrelated Freeverb cores (the right channel's delay lines are offset) produce a wide, deep stereo tail.
 
 | Knob | Range | Effect |
 | ------ | ------- | -------- |
@@ -150,6 +154,8 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals 
 | Mix | 0–10 | Dry/wet blend (0 = fully dry, 10 = fully wet) |
 
 #### Delay  _(bypassable with Space)_
+
+Stereo ping-pong: feedback cross-feeds the two channels so repeats bounce left ↔ right.
 
 | Knob | Range | Effect |
 | ------ | ------- | -------- |
@@ -200,12 +206,14 @@ Simulates moving the SM57 between the speaker cone edge and centre.
 
 | Model | Character | Key frequencies |
 | ------- | ----------- | --------------- |
-| Mesa 4×12 (Vintage 30) | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +5 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
-| Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +3 dB body at 800 Hz, +4 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
+| Mesa 4×12 (Vintage 30) | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +7 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
+| Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
+
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IR is synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering) and speaker modal resonances add the time-domain depth of a real miked cab. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
 Toggle between them with `C` at any time. The cabinet state is preserved when switching amp models.
 
-The **Mic Pos** knob applies a high-shelf filter (±6 dB at 5 kHz) after all fixed cab EQ bands, modelling the tonal difference between an on-axis and off-axis microphone placement.
+The **Mic Pos** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis microphone placement.
 
 ## Presets
 
@@ -296,7 +304,7 @@ Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset
 
 Press **`R`** to start recording. The header switches from `○ OFF AIR` to a blinking `● ON AIR` indicator next to `POWER ON`. Press **`R`** again to stop — the file is written immediately and the saved path is shown briefly in the footer.
 
-Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float mono WAV at the same sample rate as your audio interface. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
+Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full dual-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
 
 ## License
 

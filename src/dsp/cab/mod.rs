@@ -1,3 +1,4 @@
+pub mod ir;
 pub mod marshall;
 pub mod mesa;
 
@@ -7,7 +8,8 @@ pub use mesa::MesaCab;
 // ── Trait ─────────────────────────────────────────────────────────────────────
 
 pub trait Cabinet {
-    fn process(&mut self, sample: f32, mic_pos: f32) -> f32;
+    /// Convolve a mono amp sample with the cab IR, returning a stereo (L, R) pair.
+    fn process(&mut self, sample: f32, mic_pos: f32) -> (f32, f32);
 }
 
 // ── Bank ──────────────────────────────────────────────────────────────────────
@@ -27,7 +29,7 @@ impl CabBank {
     }
 
     #[inline]
-    pub fn process(&mut self, model: super::CabModel, sample: f32, mic_pos: f32) -> f32 {
+    pub fn process(&mut self, model: super::CabModel, sample: f32, mic_pos: f32) -> (f32, f32) {
         match model {
             super::CabModel::Mesa => self.mesa.process(sample, mic_pos),
             super::CabModel::Marshall => self.marshall.process(sample, mic_pos),

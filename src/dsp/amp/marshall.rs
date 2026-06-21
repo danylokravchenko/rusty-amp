@@ -1,33 +1,33 @@
-use super::Amplifier;
+use super::{Amplifier, Bloom};
 use crate::dsp::biquad::Biquad;
+use crate::dsp::oversample::Oversampler4;
 
 /// Marshall JCM800 amplifier simulation.
 ///
 /// Signal path:
-///   DC block → input HP → [2× OS: stage-1 tube + inter-stage HP + stage-2 tube] → tone stack → power amp sag → presence
+///   DC block → input HP → [4× OS: stage-1 tube + inter-stage HP + stage-2 tube] → tone stack → power amp sag → presence
 ///
-/// Improvements over the naive model:
-///   • 2× oversampling through the nonlinear gain stages eliminates aliasing harmonics
-///   • Asymmetric 12AX7 waveshaper generates even harmonics (2nd, 4th) for tube warmth
+/// Character:
+///   • 4× oversampling through the nonlinear gain stages keeps aliasing well above
+///     the audible band, removing the harsh "digital" edge of stacked clippers
+///   • Asymmetric 12AX7 waveshaper generates even harmonics (2nd, 4th) for warmth
+///   • Dynamic grid-bias bloom adds touch sensitivity under hard playing
 ///   • Inter-stage coupling HP at ~720 Hz (JCM800 22 nF coupling cap) tightens low-end
-///     so each successive stage doesn't amplify bass mud
 ///   • Presence shelf in the power-amp NFB loop adds air and cut at 3.5 kHz
 pub struct Marshall {
     sr: f32,
     // Pre-gain linear filters (base rate)
     dc_block: Biquad,
     input_hp: Biquad,
-    // 2× oversampling half-band LP filters (built for sr*2)
-    os_up_a: Biquad,
-    os_up_b: Biquad,
-    os_dn_a: Biquad,
-    os_dn_b: Biquad,
-    // Bass cut before the first gain stage at 2× rate — prevents sub-bass from entering
-    // the clipper and generating low-frequency IM products ("fart").
-    // Models the input coupling capacitor's high-pass characteristic.
+    // 4× oversampling for the nonlinear section
+    os: Oversampler4,
+    // Bass cut before the first gain stage at 4× rate — prevents sub-bass from
+    // entering the clipper and generating low-frequency IM products ("fart").
     pre_clip_hp: Biquad,
-    // Inter-stage coupling HP between tube stages (at 2× rate)
+    // Inter-stage coupling HP between tube stages (at 4× rate)
     stage_hp: Biquad,
+    // Dynamic preamp bloom
+    bloom: Bloom,
     // Tone stack (base rate)
     bass_shelf: Biquad,
     mid_peak: Biquad,
@@ -44,23 +44,18 @@ pub struct Marshall {
 
 impl Marshall {
     pub fn new(sr: f32) -> Self {
-        let sr2 = sr * 2.0;
-        // Half-band LP cutoff = Nyquist of original rate; 4th-order Butterworth (two sections)
-        let half_nyq = sr / 2.0;
+        let sr4 = sr * 4.0;
         let mut m = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
             input_hp: Biquad::highpass(sr, 60.0, 0.707),
-            os_up_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
-            os_up_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
-            os_dn_a: Biquad::lowpass(sr2, half_nyq, 0.5412),
-            os_dn_b: Biquad::lowpass(sr2, half_nyq, 1.3066),
-            // JCM800 input coupling cap → sub-rumble cut at ~35 Hz.
-            // Must stay well below the 82 Hz low-E fundamental so we don't thin
-            // the distorted bass string; the 2× OS handles aliasing above this.
-            pre_clip_hp: Biquad::highpass(sr2, 35.0, 0.707),
+            os: Oversampler4::new(sr),
+            // JCM800 input coupling cap → sub-rumble cut at ~35 Hz, kept below the
+            // 82 Hz low-E fundamental so the distorted bass string stays intact.
+            pre_clip_hp: Biquad::highpass(sr4, 35.0, 0.707),
             // JCM800 22 nF inter-stage coupling cap → HP at ~720 Hz
-            stage_hp: Biquad::highpass(sr2, 720.0, 0.707),
+            stage_hp: Biquad::highpass(sr4, 720.0, 0.707),
+            bloom: Bloom::new(sr, 8.0, 120.0),
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 400.0, 0.7, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 2500.0, 0.0),
@@ -132,27 +127,23 @@ impl Amplifier for Marshall {
         let x = self.input_hp.process(x);
 
         let pregain = 1.0 + gain * 39.0;
+        // Dynamic grid-bias offset (removed downstream by the inter-stage HP).
+        let bias = self.bloom.follow(x) * 0.12;
 
-        // ── 2× oversampled nonlinear section ──────────────────────────────────
-        // Even sample (zero-insert upsampling scaled by 2 for energy conservation)
-        let up = self.os_up_b.process(self.os_up_a.process(x * 2.0));
-        let up = self.pre_clip_hp.process(up); // cut sub-bass before clipping
-        let s = tube_clip_asym(up * pregain) / pregain.sqrt();
-        let s = self.stage_hp.process(s);
-        let s = tube_clip_asym(s * 4.0) / 4.0_f32.sqrt();
-        let x_os = self.os_dn_b.process(self.os_dn_a.process(s));
-
-        // Odd sample (zero-inserted) — must run through filters to keep state correct
-        let up_z = self.os_up_b.process(self.os_up_a.process(0.0));
-        let up_z = self.pre_clip_hp.process(up_z);
-        let s_z = tube_clip_asym(up_z * pregain) / pregain.sqrt();
-        let s_z = self.stage_hp.process(s_z);
-        let s_z = tube_clip_asym(s_z * 4.0) / 4.0_f32.sqrt();
-        self.os_dn_b.process(self.os_dn_a.process(s_z));
+        // ── 4× oversampled nonlinear section ──────────────────────────────────
+        let up = self.os.upsample(x);
+        let mut down = [0.0f32; 4];
+        for (o, &u) in down.iter_mut().zip(up.iter()) {
+            let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
+            let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            let s = self.stage_hp.process(s);
+            *o = tube_clip_asym(s * 4.0) / 2.0;
+        }
+        let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
 
         // Passive tone stack (base rate — no aliasing risk)
-        let x = self.bass_shelf.process(x_os);
+        let x = self.bass_shelf.process(x);
         let x = self.mid_peak.process(x);
         let x = self.treble_shelf.process(x);
 

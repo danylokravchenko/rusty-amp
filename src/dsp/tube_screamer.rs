@@ -1,4 +1,5 @@
 use super::biquad::Biquad;
+use crate::dsp::oversample::Oversampler4;
 use std::f32::consts::PI;
 
 /// Ibanez TS-808 Tube Screamer simulation.
@@ -17,6 +18,7 @@ pub struct TubeScreamer {
     dc_block: Biquad,
     input_hp: Biquad,
     mid_peak: Biquad, // 720 Hz feedback network peak — TS mid-push character
+    os: Oversampler4, // oversample the soft-clip stage to suppress aliasing
     tone_z: f32,      // 1-pole LP state for variable tone control
     last_tone: f32,
     tone_coeff: f32,
@@ -33,6 +35,7 @@ impl TubeScreamer {
             input_hp: Biquad::highpass(sr, 340.0, 0.707),
             // Models the TS-808 feedback network resonance: mid-push centered at 720 Hz
             mid_peak: Biquad::peak_eq(sr, 720.0, 0.7, 6.0),
+            os: Oversampler4::new(sr),
             tone_z: 0.0,
             last_tone: -1.0, // force first update
             tone_coeff: 0.0,
@@ -61,7 +64,14 @@ impl TubeScreamer {
 
         // Drive: 10 kΩ fixed + up to 500 kΩ pot → gain ratio 1×–51×
         let gain = 1.0 + drive * 50.0;
-        let x = asymmetric_clip(x * gain) / gain.sqrt();
+
+        // 4× oversampled soft-clip stage
+        let up = self.os.upsample(x);
+        let mut down = [0.0f32; 4];
+        for (o, &u) in down.iter_mut().zip(up.iter()) {
+            *o = asymmetric_clip(u * gain) / gain.sqrt();
+        }
+        let x = self.os.downsample(down);
 
         // Tone: variable 1-pole low-pass
         self.tone_z += self.tone_coeff * (x - self.tone_z);

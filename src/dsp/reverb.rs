@@ -1,13 +1,18 @@
-//! Freeverb mono reverb by Jezar at Dreampoint (public domain algorithm).
+//! Stereo Freeverb (Jezar at Dreampoint, public domain algorithm).
 //!
-//! Architecture: input × gain → 8 parallel comb filters (summed) → 4 series allpass filters
-//! Comb filters provide the dense reflections; allpass filters diffuse them
+//! Architecture per channel: input × gain → 8 parallel comb filters (summed)
+//! → 4 series allpass filters. Comb filters provide the dense reflections; allpass
+//! filters diffuse them. The right channel's delay lines are offset by
+//! `STEREO_SPREAD` samples so the two channels decorrelate into a wide, deep tail.
 const FIXED_GAIN: f32 = 0.015;
 const SCALE_WET: f32 = 3.0;
 const SCALE_ROOM: f32 = 0.28;
 const OFFSET_ROOM: f32 = 0.7;
 const SCALE_DAMP: f32 = 0.4;
 const ALLPASS_FEEDBACK: f32 = 0.5;
+
+// Right-channel delay offset (samples at 44100 Hz) that decorrelates the stereo field.
+const STEREO_SPREAD: usize = 23;
 
 // Delay lengths tuned at 44100 Hz; scaled proportionally for other rates.
 const COMB_DELAYS: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
@@ -78,24 +83,56 @@ impl AllpassFilter {
     }
 }
 
-// ── Public reverb struct ─────────────────────────────────────────────────────
+// ── One reverb channel ───────────────────────────────────────────────────────
 
-pub struct Reverb {
+struct Channel {
     combs: [CombFilter; 8],
     allpasses: [AllpassFilter; 4],
+}
+
+impl Channel {
+    fn new(sr: f32, spread: usize) -> Self {
+        let scale = sr / 44100.0;
+        let combs =
+            COMB_DELAYS.map(|d| CombFilter::new((((d + spread) as f32 * scale) as usize).max(1)));
+        let allpasses = ALLPASS_DELAYS
+            .map(|d| AllpassFilter::new((((d + spread) as f32 * scale) as usize).max(1)));
+        Self { combs, allpasses }
+    }
+
+    #[inline]
+    fn process(&mut self, input: f32) -> f32 {
+        let mut wet = 0.0f32;
+        for c in &mut self.combs {
+            wet += c.process(input);
+        }
+        for ap in &mut self.allpasses {
+            wet = ap.process(wet);
+        }
+        wet
+    }
+
+    fn set_params(&mut self, room: f32, damp: f32) {
+        for c in &mut self.combs {
+            c.set_params(room, damp);
+        }
+    }
+}
+
+// ── Public stereo reverb ─────────────────────────────────────────────────────
+
+pub struct Reverb {
+    left: Channel,
+    right: Channel,
     last_room: f32,
     last_damp: f32,
 }
 
 impl Reverb {
     pub fn new(sr: f32) -> Self {
-        let scale = sr / 44100.0;
-        let combs = COMB_DELAYS.map(|d| CombFilter::new(((d as f32 * scale) as usize).max(1)));
-        let allpasses =
-            ALLPASS_DELAYS.map(|d| AllpassFilter::new(((d as f32 * scale) as usize).max(1)));
         let mut r = Self {
-            combs,
-            allpasses,
+            left: Channel::new(sr, 0),
+            right: Channel::new(sr, STEREO_SPREAD),
             last_room: -1.0,
             last_damp: -1.0,
         };
@@ -106,29 +143,32 @@ impl Reverb {
     fn update_params(&mut self, room: f32, damp: f32) {
         let room_size = room * SCALE_ROOM + OFFSET_ROOM;
         let damp_scaled = damp * SCALE_DAMP;
-        for c in &mut self.combs {
-            c.set_params(room_size, damp_scaled);
-        }
+        self.left.set_params(room_size, damp_scaled);
+        self.right.set_params(room_size, damp_scaled);
         self.last_room = room;
         self.last_damp = damp;
     }
 
-    /// `room` 0–1, `damp` 0–1, `mix` 0–1 (dry/wet)
+    /// `room` 0–1, `damp` 0–1, `mix` 0–1 (dry/wet). Stereo in, stereo out.
     #[inline]
-    pub fn process(&mut self, dry: f32, room: f32, damp: f32, mix: f32) -> f32 {
+    pub fn process(
+        &mut self,
+        dry_l: f32,
+        dry_r: f32,
+        room: f32,
+        damp: f32,
+        mix: f32,
+    ) -> (f32, f32) {
         if (room - self.last_room).abs() > 0.001 || (damp - self.last_damp).abs() > 0.001 {
             self.update_params(room, damp);
         }
 
-        let input = dry * FIXED_GAIN;
-        let mut wet = 0.0f32;
-        for c in &mut self.combs {
-            wet += c.process(input);
-        }
-        for ap in &mut self.allpasses {
-            wet = ap.process(wet);
-        }
+        let input = (dry_l + dry_r) * 0.5 * FIXED_GAIN;
+        let wet_l = self.left.process(input);
+        let wet_r = self.right.process(input);
 
-        dry * (1.0 - mix) + wet * SCALE_WET * mix
+        let out_l = dry_l * (1.0 - mix) + wet_l * SCALE_WET * mix;
+        let out_r = dry_r * (1.0 - mix) + wet_r * SCALE_WET * mix;
+        (out_l, out_r)
     }
 }
