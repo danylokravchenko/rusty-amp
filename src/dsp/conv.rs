@@ -14,16 +14,26 @@
 //!   • The coefficient buffer can be swapped (`load`) without clearing history,
 //!     so changing mic position / cabinet does not click — the delay line stays
 //!     continuous and only the taps change.
+//!   • The history is stored in a **mirrored** (doubled) buffer: every incoming
+//!     sample is written both at `pos` and at `pos + cap`. This lets `process`
+//!     read the relevant window as a single *contiguous* slice — the inner dot
+//!     product has no per-tap wrap-around branch, so the compiler can
+//!     auto-vectorise it (SIMD). For a ~1100-tap cab IR that is the difference
+//!     between a scalar MAC loop and a vectorised one — several× throughput.
 
-/// A fixed-capacity FIR convolver with a circular history buffer.
+/// A fixed-capacity FIR convolver with a mirrored history buffer.
 pub struct FirConvolver {
-    /// Impulse-response taps (length == `len`, padded to `capacity`).
+    /// Impulse-response taps (length == `len`, padded to `cap`).
     taps: Vec<f32>,
-    /// Circular buffer of past input samples, same capacity as `taps`.
+    /// Mirrored history of past input samples, length `2 * cap`: the logical
+    /// circular content of length `cap` is duplicated so any `cap`-long window
+    /// starting at `pos` is contiguous (`history[j] == history[j + cap]`).
     history: Vec<f32>,
+    /// Tap capacity (one logical copy of the history).
+    cap: usize,
     /// Current number of active taps.
     len: usize,
-    /// Write cursor into `history`.
+    /// Write cursor into the first half of `history`, in `[0, cap)`.
     pos: usize,
 }
 
@@ -36,7 +46,8 @@ impl FirConvolver {
         taps[0] = 1.0;
         Self {
             taps,
-            history: vec![0.0; cap],
+            history: vec![0.0; cap * 2],
+            cap,
             len: 1,
             pos: 0,
         }
@@ -56,19 +67,20 @@ impl FirConvolver {
     /// Convolve one input sample, returning one output sample.
     #[inline]
     pub fn process(&mut self, x: f32) -> f32 {
-        // Newest sample at `pos`, walking backward in time.
+        // Step the cursor backward, then write the newest sample into both halves
+        // of the mirrored buffer so the window read below is always contiguous.
+        self.pos = if self.pos == 0 { self.cap - 1 } else { self.pos - 1 };
         self.history[self.pos] = x;
-        let cap = self.history.len();
+        self.history[self.pos + self.cap] = x;
 
+        // taps[0] multiplies the newest sample (at `pos`), taps[k] the sample k
+        // steps back (at `pos + k`). Because the buffer is mirrored, this window
+        // never wraps — a branch-free dot product the compiler can vectorise.
+        let window = &self.history[self.pos..self.pos + self.len];
         let mut acc = 0.0f32;
-        let mut h = self.pos;
-        // taps[0] multiplies the newest sample, taps[k] the sample k steps back.
-        for &t in &self.taps[..self.len] {
-            acc += t * self.history[h];
-            h = if h == 0 { cap - 1 } else { h - 1 };
+        for (&t, &h) in self.taps[..self.len].iter().zip(window) {
+            acc += t * h;
         }
-
-        self.pos = if self.pos + 1 == cap { 0 } else { self.pos + 1 };
         acc
     }
 }
