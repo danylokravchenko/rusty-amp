@@ -70,7 +70,7 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
         .split(inner);
 
     let amp_name = params.amp_model().name().to_uppercase();
-    let chain = format!("  TS-808 → {} → REVERB  ", params.amp_model().name());
+    let cab_name = params.cab_model().name().to_uppercase();
 
     let title = Paragraph::new(Line::from(vec![
         Span::styled(
@@ -83,7 +83,10 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
             Style::default().fg(CHROME).add_modifier(Modifier::BOLD),
         ),
         Span::styled("▐", Style::default().fg(WARM)),
-        Span::styled(chain, Style::default().fg(DIM)),
+        Span::styled(
+            format!("  {cab_name}  "),
+            Style::default().fg(CHROME).add_modifier(Modifier::BOLD),
+        ),
         Span::styled("▐", Style::default().fg(WARM)),
         Span::styled(
             "  ● POWER ON  ",
