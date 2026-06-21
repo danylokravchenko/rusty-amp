@@ -12,6 +12,7 @@ publish = false
 
 [dependencies]
 cpal = "0.18.1"
+rust-embed = { version = "8.11.0", features = ["include-exclude"] }
 rtrb = "0.3.4"
 ratatui = "0.30.2"
 crossterm = "0.29.0"
@@ -24,7 +25,10 @@ hound = "3.5.1"
 
 [profile.release]
 opt-level = 3
-
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+panic = "abort"
 
 [workspace.lints.rust]
 unsafe_code = "warn"             # Warn unsafe code
