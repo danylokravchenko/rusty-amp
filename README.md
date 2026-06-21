@@ -69,12 +69,29 @@ Per-channel output soft limiter → stereo (L, R)
 ## Requirements
 
 - **macOS** (uses CoreAudio via cpal)
-- **Rust** 1.95+ (`rustup` recommended)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
 - macOS **microphone permission** granted to Terminal.app
   → System Settings › Privacy & Security › Microphone
 
-## Run
+## Install (pre-built binary)
+
+Download the latest binary from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest):
+
+```bash
+curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp -o rusty-amp
+chmod +x rusty-amp
+
+# Remove the macOS quarantine flag (required for unsigned binaries)
+xattr -d com.apple.quarantine rusty-amp
+
+./rusty-amp
+```
+
+Presets are embedded in the binary — nothing else to download.
+
+## Build from source
+
+Requires **Rust 1.95+** (`rustup` recommended).
 
 ```bash
 cargo run
