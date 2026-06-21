@@ -26,10 +26,12 @@ pub(super) const REV_START: usize = 13;
 pub(super) const REV_END: usize = 16;
 pub(super) const DELAY_START: usize = 16;
 pub(super) const DELAY_END: usize = 19;
-pub(super) const NG_START: usize = 19;
-pub(super) const NG_END: usize = 21;
-pub(super) const EQ_START: usize = 21;
-pub(super) const EQ_END: usize = 24;
+pub(super) const FUZZ_START: usize = 19;
+pub(super) const FUZZ_END: usize = 22;
+pub(super) const NG_START: usize = 22;
+pub(super) const NG_END: usize = 24;
+pub(super) const EQ_START: usize = 24;
+pub(super) const EQ_END: usize = 27;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -114,7 +116,20 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.delay_mix,
     },
-    // 19–20: Noise Gate
+    // 19–21: Fuzz
+    Knob {
+        label: "FUZZ",
+        param: |p| &p.fz_fuzz,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.fz_tone,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.fz_level,
+    },
+    // 22–23: Noise Gate
     Knob {
         label: "THRESH",
         param: |p| &p.ng_threshold,
@@ -123,7 +138,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "RELEASE",
         param: |p| &p.ng_release,
     },
-    // 21–23: Parametric EQ
+    // 24–26: Parametric EQ
     Knob {
         label: "LOW",
         param: |p| &p.eq_low,
@@ -147,6 +162,7 @@ pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     Some(DS_START),
     Some(REV_START),
     Some(DELAY_START),
+    Some(FUZZ_START),
     Some(NG_START),
     Some(EQ_START),
 ];

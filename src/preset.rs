@@ -25,6 +25,7 @@ pub struct Preset {
     #[serde(skip)]
     pub path: Option<PathBuf>,
     pub noise_gate: Option<NgSection>,
+    pub fuzz: Option<FuzzSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
     pub amp: AmpSection,
@@ -39,6 +40,14 @@ pub struct NgSection {
     pub enabled: Option<bool>,
     pub threshold: f32,
     pub release: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FuzzSection {
+    pub enabled: Option<bool>,
+    pub fuzz: f32,
+    pub tone: f32,
+    pub level: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -152,6 +161,12 @@ impl Preset {
                 threshold: params.ng_threshold.load(Relaxed),
                 release: params.ng_release.load(Relaxed),
             }),
+            fuzz: Some(FuzzSection {
+                enabled: Some(params.fz_enabled.load(Relaxed)),
+                fuzz: params.fz_fuzz.load(Relaxed),
+                tone: params.fz_tone.load(Relaxed),
+                level: params.fz_level.load(Relaxed),
+            }),
             tube_screamer: TsSection {
                 enabled: Some(params.ts_enabled.load(Relaxed)),
                 drive: params.ts_drive.load(Relaxed),
@@ -224,6 +239,15 @@ impl Preset {
                 .ng_threshold
                 .store(ng.threshold.clamp(0.0, 1.0), Relaxed);
             params.ng_release.store(ng.release.clamp(0.0, 1.0), Relaxed);
+        }
+
+        if let Some(fz) = &self.fuzz {
+            params.fz_enabled.store(fz.enabled.unwrap_or(true), Relaxed);
+            params.fz_fuzz.store(fz.fuzz.clamp(0.0, 1.0), Relaxed);
+            params.fz_tone.store(fz.tone.clamp(0.0, 1.0), Relaxed);
+            params.fz_level.store(fz.level.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.fz_enabled.store(false, Relaxed);
         }
 
         let ts = &self.tube_screamer;

@@ -10,8 +10,8 @@ use std::sync::atomic::Ordering::Relaxed;
 use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
 use super::config::{
-    AMP_END, AMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END, EQ_START, KNOBS,
-    MIC_START, NG_END, NG_START, REV_END, REV_START, TS_END, TS_START,
+    AMP_END, AMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END, EQ_START, FUZZ_END,
+    FUZZ_START, KNOBS, MIC_START, NG_END, NG_START, REV_END, REV_START, TS_END, TS_START,
 };
 use super::styles::*;
 
@@ -103,6 +103,7 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     f.render_widget(title, rows[0]);
 
     let ng_on = params.ng_enabled.load(Relaxed);
+    let fz_on = params.fz_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
     let ds_on = params.ds_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
@@ -119,6 +120,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     chain.push(Span::styled(
         "GATE",
         Style::default().fg(pedal_color(ng_on)),
+    ));
+    chain.push(arrow.clone());
+    chain.push(Span::styled(
+        "FUZZ",
+        Style::default().fg(pedal_color(fz_on)),
     ));
     chain.push(arrow.clone());
     chain.push(Span::styled(
@@ -524,12 +530,12 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
         params,
     );
 
-    // Row 2: Noise Gate, Parametric EQ (left-aligned, room to spare).
+    // Row 2: Fuzz, Noise Gate, Parametric EQ.
     let row2 = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Ratio(3, 12),
             Constraint::Ratio(4, 12),
+            Constraint::Ratio(3, 12),
             Constraint::Ratio(5, 12),
         ])
         .split(rows[1]);
@@ -537,6 +543,17 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     render_pedal(
         f,
         row2[0],
+        "FUZZ",
+        PEDAL_RED,
+        FUZZ_START,
+        FUZZ_END,
+        params.fz_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row2[1],
         "NOISE GATE",
         PEDAL_SILVER,
         NG_START,
@@ -547,7 +564,7 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     );
     render_pedal(
         f,
-        row2[1],
+        row2[2],
         "PARAMETRIC EQ",
         PEDAL_TEAL,
         EQ_START,
@@ -556,7 +573,6 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
         focus,
         params,
     );
-    // row2[2] is intentionally empty board space.
 }
 
 #[allow(clippy::too_many_arguments)]

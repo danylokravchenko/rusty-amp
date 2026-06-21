@@ -4,6 +4,7 @@ pub mod cab;
 pub mod conv;
 pub mod delay;
 pub mod distortion;
+pub mod fuzz;
 pub mod noise_gate;
 pub mod oversample;
 pub mod parametric_eq;
@@ -18,6 +19,7 @@ use amp::AmpBank;
 use cab::CabBank;
 use delay::Delay;
 use distortion::Distortion;
+use fuzz::Fuzz;
 use noise_gate::NoiseGate;
 use parametric_eq::ParametricEq;
 use reverb::Reverb;
@@ -132,6 +134,12 @@ pub struct Params {
     pub ng_threshold: Arc<AtomicF32>,
     pub ng_release: Arc<AtomicF32>,
 
+    // Fuzz (Big Muff style)
+    pub fz_enabled: Arc<AtomicBool>,
+    pub fz_fuzz: Arc<AtomicF32>,
+    pub fz_tone: Arc<AtomicF32>,
+    pub fz_level: Arc<AtomicF32>,
+
     // TS-808
     pub ts_enabled: Arc<AtomicBool>,
     pub ts_drive: Arc<AtomicF32>,
@@ -191,6 +199,11 @@ impl Params {
             ng_enabled: b!(true),
             ng_threshold: p!(0.20),
             ng_release: p!(0.30),
+
+            fz_enabled: b!(false),
+            fz_fuzz: p!(0.70),
+            fz_tone: p!(0.50),
+            fz_level: p!(0.60),
 
             ts_enabled: b!(true),
             ts_drive: p!(0.45),
@@ -255,6 +268,7 @@ impl Levels {
 
 pub struct DspChain {
     ng: NoiseGate,
+    fz: Fuzz,
     ts: TubeScreamer,
     ds: Distortion,
     amp: AmpBank,
@@ -269,6 +283,7 @@ impl DspChain {
     pub fn new(sr: f32, params: Arc<Params>) -> Self {
         Self {
             ng: NoiseGate::new(sr),
+            fz: Fuzz::new(sr),
             ts: TubeScreamer::new(sr),
             ds: Distortion::new(sr),
             amp: AmpBank::new(sr),
@@ -300,7 +315,18 @@ impl DspChain {
             sample
         };
 
-        // Pedal chain
+        // Pedal chain — fuzz first, so it sees the rawest signal
+        let x = if p.fz_enabled.load(Relaxed) {
+            self.fz.process(
+                x,
+                p.fz_fuzz.load(Relaxed),
+                p.fz_tone.load(Relaxed),
+                p.fz_level.load(Relaxed),
+            )
+        } else {
+            x
+        };
+
         let x = if p.ts_enabled.load(Relaxed) {
             self.ts.process(
                 x,
@@ -518,6 +544,37 @@ mod tests {
             "DS-1 output too hot, will slam the amp: {through:.2}x"
         );
         let _ = inp;
+    }
+
+    /// The fuzz must stay finite and bounded even at maximum sustain on a hot,
+    /// low note — its two cascaded clippers run at enormous gain, so any
+    /// instability or runaway DC would show up here.
+    #[test]
+    fn fuzz_is_finite_bounded_and_saturates() {
+        let sr = 48_000.0;
+        let mut fz = fuzz::Fuzz::new(sr);
+        let mut max_abs = 0.0f32;
+        let mut sum = 0.0f64;
+        let warmup = sr as usize / 4;
+        let total = sr as usize;
+        let mut count = 0u32;
+        for n in 0..total {
+            let x = (2.0 * PI * 82.41 * n as f32 / sr).sin() * 0.8;
+            let y = fz.process(x, 1.0, 0.5, 0.7);
+            assert!(y.is_finite(), "fuzz produced non-finite output at {n}");
+            if n >= warmup {
+                max_abs = max_abs.max(y.abs());
+                sum += y as f64;
+                count += 1;
+            }
+        }
+        assert!(max_abs <= 1.0, "fuzz output exceeded bounds: {max_abs}");
+        // Heavy clipping should still produce a healthy signal, not silence.
+        assert!(max_abs > 0.05, "fuzz output too quiet: {max_abs}");
+        // Asymmetric clipping is fine, but the post-DC block must keep the mean
+        // near zero so the fuzz doesn't push DC into the amp.
+        let dc = (sum / count as f64).abs();
+        assert!(dc < 0.02, "fuzz has DC offset: {dc}");
     }
 
     /// Every amp model should be stable (no NaN/blowup) at full gain.
