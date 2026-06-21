@@ -3,7 +3,8 @@ use std::sync::atomic::Ordering::Relaxed;
 use crate::dsp::{AmpModel, CabModel, Params};
 
 use super::config::{
-    AMP_END, DELAY_END, DS_END, EQ_END, KNOBS, MIC_END, NG_END, REV_END, SECTION_STARTS, TS_END,
+    AMP_END, AMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END, EQ_START, KNOBS, MIC_END,
+    MIC_START, NG_END, NG_START, REV_END, REV_START, SECTION_STARTS, TS_END, TS_START,
 };
 
 pub(super) fn next_section(focus: Option<usize>) -> Option<usize> {
@@ -39,42 +40,37 @@ pub(super) fn cycle_cab(params: &Params) {
 }
 
 pub(super) fn toggle_pedal(params: &Params, knob_idx: usize) {
-    if knob_idx < TS_END {
-        let v = params.ts_enabled.load(Relaxed);
-        params.ts_enabled.store(!v, Relaxed);
-    } else if knob_idx < DS_END {
-        let v = params.ds_enabled.load(Relaxed);
-        params.ds_enabled.store(!v, Relaxed);
-    } else if knob_idx < REV_END {
-        let v = params.rev_enabled.load(Relaxed);
-        params.rev_enabled.store(!v, Relaxed);
-    } else if knob_idx < DELAY_END {
-        let v = params.delay_enabled.load(Relaxed);
-        params.delay_enabled.store(!v, Relaxed);
-    } else if knob_idx < NG_END {
-        let v = params.ng_enabled.load(Relaxed);
-        params.ng_enabled.store(!v, Relaxed);
-    } else if knob_idx < AMP_END {
-        // Amp has no toggle
-    } else if knob_idx < EQ_END {
-        let v = params.eq_enabled.load(Relaxed);
-        params.eq_enabled.store(!v, Relaxed);
-    }
-    // MIC section has no toggle
+    // Amp and mic sections have no on/off toggle.
+    let flag = if (TS_START..TS_END).contains(&knob_idx) {
+        &params.ts_enabled
+    } else if (DS_START..DS_END).contains(&knob_idx) {
+        &params.ds_enabled
+    } else if (REV_START..REV_END).contains(&knob_idx) {
+        &params.rev_enabled
+    } else if (DELAY_START..DELAY_END).contains(&knob_idx) {
+        &params.delay_enabled
+    } else if (NG_START..NG_END).contains(&knob_idx) {
+        &params.ng_enabled
+    } else if (EQ_START..EQ_END).contains(&knob_idx) {
+        &params.eq_enabled
+    } else {
+        return;
+    };
+    let v = flag.load(Relaxed);
+    flag.store(!v, Relaxed);
 }
 
 fn section_of(focus: Option<usize>) -> usize {
-    // Matches SECTION_STARTS order: None, TS, DS, Rev, Delay, NG, Amp, EQ, Mic
+    // Matches SECTION_STARTS order: None, Amp, Mic, TS, DS, Rev, Delay, NG, EQ
     match focus {
         None => 0,
-        Some(i) if i < TS_END => 1,
-        Some(i) if i < DS_END => 2,
-        Some(i) if i < REV_END => 3,
-        Some(i) if i < DELAY_END => 4,
-        Some(i) if i < NG_END => 5,
-        Some(i) if i < AMP_END => 6,
-        Some(i) if i < EQ_END => 7,
-        Some(i) if i < MIC_END => 8,
-        Some(_) => 8,
+        Some(i) if (AMP_START..AMP_END).contains(&i) => 1,
+        Some(i) if (MIC_START..MIC_END).contains(&i) => 2,
+        Some(i) if (TS_START..TS_END).contains(&i) => 3,
+        Some(i) if (DS_START..DS_END).contains(&i) => 4,
+        Some(i) if (REV_START..REV_END).contains(&i) => 5,
+        Some(i) if (DELAY_START..DELAY_END).contains(&i) => 6,
+        Some(i) if (NG_START..NG_END).contains(&i) => 7,
+        _ => 8,
     }
 }

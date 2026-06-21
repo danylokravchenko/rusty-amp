@@ -1,7 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Modifier, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
@@ -9,7 +9,10 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
-use super::config::{AMP_SECTIONS, KNOBS, PEDAL_SECTIONS};
+use super::config::{
+    AMP_END, AMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END, EQ_START, KNOBS,
+    MIC_START, NG_END, NG_START, REV_END, REV_START, TS_END, TS_START,
+};
 use super::styles::*;
 
 pub(super) fn draw(
@@ -27,27 +30,27 @@ pub(super) fn draw(
         .borders(Borders::ALL)
         .border_type(BorderType::Double)
         .border_style(Style::default().fg(WARM))
-        .style(Style::default().bg(ratatui::style::Color::Black));
+        .style(Style::default().bg(Color::Black));
     let inner = outer.inner(area);
     f.render_widget(outer, area);
 
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(3),
-            Constraint::Length(5),
-            Constraint::Length(3),
-            Constraint::Ratio(1, 2),
-            Constraint::Ratio(1, 2),
-            Constraint::Length(1),
+            Constraint::Length(3), // header
+            Constraint::Length(3), // meters
+            Constraint::Length(3), // amp / cab selector
+            Constraint::Length(7), // amplifier + cabinet/mic
+            Constraint::Min(0),    // guitar rig
+            Constraint::Length(1), // help
         ])
         .split(inner);
 
     render_header(f, rows[0], params, recording, blink);
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
-    render_section_row(f, rows[3], PEDAL_SECTIONS, params, focus);
-    render_section_row(f, rows[4], AMP_SECTIONS, params, focus);
+    render_amp(f, rows[3], params, focus);
+    render_rig(f, rows[4], params, focus);
     render_help(f, rows[5], status);
 }
 
@@ -56,7 +59,7 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
         .borders(Borders::BOTTOM)
         .border_type(BorderType::Double)
         .border_style(Style::default().fg(WARM))
-        .style(Style::default().bg(ratatui::style::Color::Black));
+        .style(Style::default().bg(Color::Black));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -151,10 +154,8 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
 
 fn render_meters(f: &mut Frame, area: Rect, levels: &Levels) {
     let block = Block::default()
-        .borders(Borders::BOTTOM)
-        .border_type(BorderType::Double)
-        .border_style(Style::default().fg(WARM))
-        .style(Style::default().bg(ratatui::style::Color::Black));
+        .borders(Borders::NONE)
+        .style(Style::default().bg(Color::Black));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -240,7 +241,7 @@ fn render_vu_row(f: &mut Frame, area: Rect, label: &str, level: f32) {
                 HOT
             }
         } else {
-            ratatui::style::Color::Rgb(30, 30, 30)
+            Color::Rgb(30, 30, 30)
         };
         spans.push(Span::styled(ch.to_string(), Style::default().fg(color)));
     }
@@ -252,14 +253,14 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
     let border_color = if focused {
         ORANGE
     } else {
-        ratatui::style::Color::Rgb(60, 40, 0)
+        Color::Rgb(60, 40, 0)
     };
 
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Thick)
         .border_style(Style::default().fg(border_color))
-        .style(Style::default().bg(ratatui::style::Color::Black));
+        .style(Style::default().bg(Color::Black));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
@@ -285,7 +286,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
                 .fg(ORANGE)
                 .add_modifier(Modifier::BOLD | Modifier::REVERSED)
         } else {
-            Style::default().fg(ratatui::style::Color::Rgb(80, 60, 0))
+            Style::default().fg(Color::Rgb(80, 60, 0))
         };
         let (bl, br) = if selected {
             ("◀ ", " ▶")
@@ -318,7 +319,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
                 .fg(ORANGE)
                 .add_modifier(Modifier::BOLD | Modifier::REVERSED)
         } else {
-            Style::default().fg(ratatui::style::Color::Rgb(80, 60, 0))
+            Style::default().fg(Color::Rgb(80, 60, 0))
         };
         let (bl, br) = if selected {
             ("◀ ", " ▶")
@@ -337,197 +338,360 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
     f.render_widget(Paragraph::new(Line::from(cab_spans)), cols[1]);
 }
 
-fn render_section_row(
-    f: &mut Frame,
-    area: Rect,
-    sections: &[super::config::SectionDef],
-    params: &Params,
-    focus: Option<usize>,
-) {
-    let total_weight: u32 = sections.iter().map(|s| s.4).sum();
-    let constraints: Vec<Constraint> = sections
-        .iter()
-        .map(|s| Constraint::Ratio(s.4, total_weight))
-        .collect();
+// ── Amplifier head + cabinet/mic ──────────────────────────────────────────────
+fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) {
+    let amp_active = focus.is_some_and(|i| (AMP_START..AMP_END).contains(&i));
+    let mic_active = focus == Some(MIC_START);
+    let border_color = if amp_active || mic_active {
+        ORANGE
+    } else {
+        WARM
+    };
 
-    let cols = Layout::default()
+    let amp_name = params.amp_model().name().to_uppercase();
+    let cab_name = params.cab_model().short_name();
+
+    let left_title = Line::from(vec![
+        Span::styled("┤ ", Style::default().fg(border_color)),
+        Span::styled(
+            amp_name,
+            Style::default().fg(AMBER).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ├", Style::default().fg(border_color)),
+    ]);
+    let right_title = Line::from(vec![
+        Span::styled("┤ 🎙 ", Style::default().fg(border_color)),
+        Span::styled(
+            cab_name,
+            Style::default().fg(CHROME).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(" ├", Style::default().fg(border_color)),
+    ])
+    .right_aligned();
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(Style::default().fg(border_color))
+        .title(left_title)
+        .title(right_title)
+        .style(Style::default().bg(Color::Black));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    // Control panel (knobs + mic) on top, speaker grille below.
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(4), Constraint::Length(1)])
+        .split(inner);
+
+    let panel = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(constraints)
-        .split(area);
+        .constraints([Constraint::Min(0), Constraint::Length(18)])
+        .split(parts[0]);
 
-    for (i, (title_fn, start, end, enabled_fn, _)) in sections.iter().enumerate() {
-        let title = title_fn(params);
-        let enabled = enabled_fn(params);
-        render_section(f, cols[i], &title, params, *start, *end, enabled, focus);
+    // Amp tone stack knobs.
+    let count = AMP_END - AMP_START;
+    let knob_cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            (0..count)
+                .map(|_| Constraint::Ratio(1, count as u32))
+                .collect::<Vec<_>>(),
+        )
+        .split(panel[0]);
+    for (i, ki) in (AMP_START..AMP_END).enumerate() {
+        let val = (KNOBS[ki].param)(params).load(Relaxed);
+        render_compact_knob(
+            f,
+            knob_cols[i],
+            KNOBS[ki].label,
+            val,
+            focus == Some(ki),
+            true,
+            AMBER,
+        );
     }
+
+    // Mic position (in front of the cabinet).
+    let mic_val = (KNOBS[MIC_START].param)(params).load(Relaxed);
+    render_compact_knob(
+        f,
+        panel[1],
+        KNOBS[MIC_START].label,
+        mic_val,
+        mic_active,
+        true,
+        CHROME,
+    );
+
+    render_grille(f, parts[1], shade(WARM, 0.45));
+}
+
+fn render_grille(f: &mut Frame, area: Rect, color: Color) {
+    let w = area.width as usize;
+    let lines: Vec<Line> = (0..area.height as usize)
+        .map(|row| {
+            let s: String = (0..w)
+                .map(|col| if (row + col) % 2 == 0 { '▚' } else { '▞' })
+                .collect();
+            Line::from(Span::styled(s, Style::default().fg(color)))
+        })
+        .collect();
+    f.render_widget(Paragraph::new(lines), area);
+}
+
+// ── Guitar rig (pedalboard) ───────────────────────────────────────────────────
+fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Plain)
+        .border_style(Style::default().fg(WARM))
+        .title(Line::from(Span::styled(
+            " GUITAR RIG ",
+            Style::default().fg(AMBER).add_modifier(Modifier::BOLD),
+        )))
+        .style(Style::default().bg(Color::Black));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    // Split into two equal-height pedal rows so the second row (noise gate /
+    // parametric EQ) gets dials the same size as the first. Any odd leftover
+    // row is absorbed as a thin gap at the bottom rather than inflating row 1.
+    let half = inner.height / 2;
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(half),
+            Constraint::Length(half),
+            Constraint::Min(0),
+        ])
+        .split(inner);
+
+    // Row 1: TS-808, DS-1, Reverb, Delay.
+    let row1 = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 4),
+        ])
+        .split(rows[0]);
+
+    render_pedal(
+        f,
+        row1[0],
+        "TS-808",
+        PEDAL_GREEN,
+        TS_START,
+        TS_END,
+        params.ts_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row1[1],
+        "DS-1",
+        PEDAL_ORANGE,
+        DS_START,
+        DS_END,
+        params.ds_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row1[2],
+        "SPRING REVERB",
+        PEDAL_BLUE,
+        REV_START,
+        REV_END,
+        params.rev_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row1[3],
+        "DELAY",
+        PEDAL_PURPLE,
+        DELAY_START,
+        DELAY_END,
+        params.delay_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+
+    // Row 2: Noise Gate, Parametric EQ (left-aligned, room to spare).
+    let row2 = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Ratio(3, 12),
+            Constraint::Ratio(4, 12),
+            Constraint::Ratio(5, 12),
+        ])
+        .split(rows[1]);
+
+    render_pedal(
+        f,
+        row2[0],
+        "NOISE GATE",
+        PEDAL_SILVER,
+        NG_START,
+        NG_END,
+        params.ng_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row2[1],
+        "PARAMETRIC EQ",
+        PEDAL_TEAL,
+        EQ_START,
+        EQ_END,
+        params.eq_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    // row2[2] is intentionally empty board space.
 }
 
 #[allow(clippy::too_many_arguments)]
-fn render_section(
+fn render_pedal(
     f: &mut Frame,
     area: Rect,
-    title: &str,
-    params: &Params,
+    name: &str,
+    color: Color,
     start: usize,
     end: usize,
-    enabled: Option<bool>,
+    on: bool,
     focus: Option<usize>,
+    params: &Params,
 ) {
-    let focused_knob = focus.unwrap_or(usize::MAX);
-    let active = focus.is_some_and(|f| f >= start && f < end);
-    let is_on = enabled.unwrap_or(true);
-
-    let border_color = if active {
-        ORANGE
-    } else if !is_on {
-        ratatui::style::Color::Rgb(40, 30, 0)
+    let active = focus.is_some_and(|i| (start..end).contains(&i));
+    let body = if active {
+        color
+    } else if on {
+        shade(color, 0.8)
     } else {
-        ratatui::style::Color::Rgb(60, 40, 0)
+        shade(color, 0.35)
     };
+    let name_color = if on { color } else { shade(color, 0.5) };
 
-    let title_color = if !is_on {
-        OFF
-    } else if active {
-        AMBER
-    } else {
-        DIM
-    };
-    let badge_color = if !is_on {
-        OFF
-    } else if active {
-        SAFE
-    } else {
-        ratatui::style::Color::Rgb(0, 100, 0)
-    };
-
-    let title_spans = if let Some(on) = enabled {
-        vec![
-            Span::styled(
-                format!(" {title} "),
-                Style::default()
-                    .fg(title_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                if on { "● " } else { "○ " },
-                Style::default()
-                    .fg(badge_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        ]
-    } else {
-        vec![Span::styled(
-            format!(" {title} "),
+    let led = if on {
+        Span::styled(
+            "◉",
             Style::default()
-                .fg(title_color)
+                .fg(Color::Rgb(255, 70, 70))
                 .add_modifier(Modifier::BOLD),
-        )]
+        )
+    } else {
+        Span::styled("○", Style::default().fg(OFF))
     };
+
+    let title = Line::from(vec![
+        Span::styled(
+            format!(" {name} "),
+            Style::default().fg(name_color).add_modifier(Modifier::BOLD),
+        ),
+        led,
+        Span::raw(" "),
+    ]);
 
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Double)
-        .border_style(Style::default().fg(border_color))
-        .title(Line::from(title_spans))
-        .style(Style::default().bg(ratatui::style::Color::Black));
-
+        .border_style(Style::default().fg(body))
+        .title(title)
+        .style(Style::default().bg(Color::Black));
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    let count = end - start;
-    let constraints: Vec<Constraint> = (0..count)
-        .map(|_| Constraint::Ratio(1, count as u32))
-        .collect();
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(3), Constraint::Length(1)])
+        .split(inner);
 
+    let count = end - start;
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(constraints)
-        .split(inner);
+        .constraints(
+            (0..count)
+                .map(|_| Constraint::Ratio(1, count as u32))
+                .collect::<Vec<_>>(),
+        )
+        .split(parts[0]);
 
     for (i, ki) in (start..end).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
-        render_knob(f, cols[i], KNOBS[ki].label, val, ki == focused_knob, is_on);
+        render_compact_knob(
+            f,
+            cols[i],
+            KNOBS[ki].label,
+            val,
+            focus == Some(ki),
+            on,
+            color,
+        );
     }
+
+    // Footswitch (stomp pad).
+    let foot_color = if on { body } else { shade(color, 0.3) };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "▗▄▄▄▄▄▄▄▖",
+            Style::default().fg(foot_color),
+        )))
+        .alignment(Alignment::Center),
+        parts[1],
+    );
 }
 
-fn render_knob(f: &mut Frame, area: Rect, label: &str, value: f32, focused: bool, active: bool) {
+#[allow(clippy::too_many_arguments)]
+fn render_compact_knob(
+    f: &mut Frame,
+    area: Rect,
+    label: &str,
+    value: f32,
+    focused: bool,
+    active: bool,
+    accent: Color,
+) {
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Min(3),
-            Constraint::Length(1),
-            Constraint::Length(1),
-        ])
+        .constraints([Constraint::Min(2), Constraint::Length(1)])
         .split(area);
 
     let dial_color = if focused {
-        if active {
-            AMBER
-        } else {
-            ratatui::style::Color::Rgb(110, 80, 0)
-        }
+        AMBER
     } else if active {
-        ratatui::style::Color::Rgb(100, 70, 0)
+        accent
     } else {
         OFF
     };
 
-    let dial_lines = build_dial(value, focused && active);
-    let art: Vec<Line> = dial_lines
+    let dial_h = (rows[0].height as usize).clamp(2, 5);
+    let art: Vec<Line> = build_dial(value, focused, dial_h)
         .iter()
-        .map(|l| Line::from(Span::styled(l.as_str(), Style::default().fg(dial_color))))
+        .map(|l| Line::from(Span::styled(l.clone(), Style::default().fg(dial_color))))
         .collect();
     f.render_widget(Paragraph::new(art).alignment(Alignment::Center), rows[0]);
 
-    let bar_w = rows[1].width as usize;
-    let filled = (value as f64 * bar_w as f64) as usize;
-    let green_end = (bar_w as f64 * 0.60) as usize;
-    let yellow_end = (bar_w as f64 * 0.85) as usize;
-
-    let mut bar_spans = Vec::with_capacity(bar_w);
-    for i in 0..bar_w {
-        let (ch, color) = if i < filled {
-            let c = if active {
-                if i < green_end {
-                    SAFE
-                } else if i < yellow_end {
-                    WARN
-                } else {
-                    HOT
-                }
-            } else if focused {
-                ratatui::style::Color::Rgb(90, 65, 0)
-            } else {
-                OFF
-            };
-            ('█', c)
-        } else {
-            ('░', ratatui::style::Color::Rgb(30, 30, 30))
-        };
-        bar_spans.push(Span::styled(ch.to_string(), Style::default().fg(color)));
-    }
-    f.render_widget(Paragraph::new(Line::from(bar_spans)), rows[1]);
-
     let num = value * 10.0;
     let label_color = if focused {
-        if active {
-            AMBER
-        } else {
-            ratatui::style::Color::Rgb(110, 80, 0)
-        }
+        AMBER
     } else if active {
         DIM
     } else {
         OFF
     };
     let value_color = if focused {
-        if active {
-            ORANGE
-        } else {
-            ratatui::style::Color::Rgb(130, 90, 0)
-        }
+        ORANGE
     } else if active {
-        ratatui::style::Color::Rgb(120, 80, 0)
+        accent
     } else {
         OFF
     };
@@ -548,7 +712,7 @@ fn render_knob(f: &mut Frame, area: Rect, label: &str, value: f32, focused: bool
     ]);
     f.render_widget(
         Paragraph::new(label_line).alignment(Alignment::Center),
-        rows[2],
+        rows[1],
     );
 }
 
@@ -582,52 +746,81 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
     };
     let help = Paragraph::new(line)
         .alignment(Alignment::Center)
-        .style(Style::default().bg(ratatui::style::Color::Black));
+        .style(Style::default().bg(Color::Black));
     f.render_widget(help, area);
 }
 
-fn build_dial(value: f32, focused: bool) -> Vec<String> {
+/// Builds an ASCII rotary knob `rows` lines tall: a hub, a dotted rim, and a
+/// pointer "hand" that swings 270° (7 o'clock → 5 o'clock) as `value` goes
+/// 0.0 → 1.0. The hand is a real line whose glyph and direction track the
+/// value, so even neighbouring settings look visibly different.
+fn build_dial(value: f32, focused: bool, rows: usize) -> Vec<String> {
     use std::f32::consts::PI;
+
+    let rows = rows.max(2);
+    let cols = rows * 2 - 1;
 
     let start_deg = 225.0_f32;
     let sweep = 270.0_f32;
-    let angle = (start_deg - value * sweep) * PI / 180.0;
+    let deg = start_deg - value.clamp(0.0, 1.0) * sweep;
+    let angle = deg * PI / 180.0;
 
     // rx:ry = 2:1 compensates for terminal char aspect ratio (~2x taller than wide)
-    let rx = 4.0_f32;
-    let ry = 2.0_f32;
-    let cx = 4.0_f32;
-    let cy = 2.0_f32;
+    let cx = (cols as f32 - 1.0) / 2.0;
+    let cy = (rows as f32 - 1.0) / 2.0;
+    let rx = cx.max(1.0);
+    let ry = cy.max(0.5);
 
-    let ix = (cx + angle.cos() * rx).round() as isize;
-    let iy = (cy - angle.sin() * ry).round() as isize;
+    let mut grid = vec![vec![' '; cols]; rows];
+    let put = |grid: &mut Vec<Vec<char>>, x: isize, y: isize, ch: char| {
+        if x >= 0 && (x as usize) < cols && y >= 0 && (y as usize) < rows {
+            grid[y as usize][x as usize] = ch;
+        }
+    };
 
-    let dot = if focused { '◆' } else { '◇' };
-
-    (0..5isize)
-        .map(|row| {
-            (0..9isize)
-                .map(|col| {
-                    let dx = (col as f32 - cx) / rx;
-                    let dy = (row as f32 - cy) / ry;
-                    let dist = (dx * dx + dy * dy).sqrt();
-
-                    if col == cx as isize && row == cy as isize {
-                        '●'
-                    } else if col == ix && row == iy {
-                        dot
-                    } else if (dist - 1.0).abs() < 0.25 {
-                        let a = (-(row as f32 - cy)).atan2(col as f32 - cx).to_degrees();
-                        // CCW distance from start: (start - a) mod 360
-                        let rel = (start_deg - a).rem_euclid(360.0);
-                        if rel <= sweep { '·' } else { ' ' }
-                    } else {
-                        ' '
+    // Dotted rim, drawn only across the live 270° sweep.
+    if rows >= 3 {
+        for row in 0..rows as isize {
+            for col in 0..cols as isize {
+                let dx = (col as f32 - cx) / rx;
+                let dy = (row as f32 - cy) / ry;
+                let dist = (dx * dx + dy * dy).sqrt();
+                if (dist - 1.0).abs() < 0.35 {
+                    let a = (-(row as f32 - cy)).atan2(col as f32 - cx).to_degrees();
+                    let rel = (start_deg - a).rem_euclid(360.0);
+                    if rel <= sweep {
+                        put(&mut grid, col, row, '·');
                     }
-                })
-                .collect()
-        })
-        .collect()
+                }
+            }
+        }
+    }
+
+    // Pointer. Small (pedal) dials draw a full "hand" line from the hub to the
+    // rim so their limited resolution still reads as rotation; larger (amp)
+    // dials stay clean with just a tip marker at the rim.
+    let tip = if focused { '◆' } else { '◇' };
+
+    let x = (cx + angle.cos() * rx).round() as isize;
+    let y = (cy - angle.sin() * ry).round() as isize;
+    put(&mut grid, x, y, tip);
+
+    // Center hub last so it always shows.
+    put(&mut grid, cx.round() as isize, cy.round() as isize, '●');
+
+    grid.into_iter().map(|r| r.into_iter().collect()).collect()
+}
+
+/// Scales an RGB color toward black by `factor` (0.0 = black, 1.0 = unchanged).
+fn shade(c: Color, factor: f32) -> Color {
+    match c {
+        Color::Rgb(r, g, b) => Color::Rgb(
+            (f32::from(r) * factor) as u8,
+            (f32::from(g) * factor) as u8,
+            (f32::from(b) * factor) as u8,
+        ),
+        other => other,
+    }
 }
 
 fn amp_to_db(amp: f32) -> f32 {

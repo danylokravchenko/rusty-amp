@@ -9,3 +9,11 @@ pub(super) const WARM: Color = Color::Rgb(200, 100, 0);
 pub(super) const SAFE: Color = Color::Rgb(40, 180, 40);
 pub(super) const WARN: Color = Color::Rgb(220, 180, 0);
 pub(super) const OFF: Color = Color::Rgb(50, 50, 50);
+
+// ── Pedal body colors (real-world stompbox liveries) ──────────────────────────
+pub(super) const PEDAL_GREEN: Color = Color::Rgb(60, 170, 80); // TS-808 Tube Screamer
+pub(super) const PEDAL_ORANGE: Color = Color::Rgb(235, 120, 25); // DS-1 Distortion
+pub(super) const PEDAL_BLUE: Color = Color::Rgb(70, 130, 230); // Spring Reverb
+pub(super) const PEDAL_PURPLE: Color = Color::Rgb(160, 100, 225); // Delay
+pub(super) const PEDAL_SILVER: Color = Color::Rgb(165, 165, 180); // Noise Gate
+pub(super) const PEDAL_TEAL: Color = Color::Rgb(40, 190, 185); // Parametric EQ
