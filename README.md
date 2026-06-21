@@ -1,6 +1,6 @@
 # rusty-amp
 
-A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (a blended multi-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** for creamy, alias-free high-gain saturation; the tube amps use a real **passive FMV tone stack** with a modelled **power-amp ↔ speaker interaction**; and the cabinets blend three mics (close SM57 + ribbon + room) over **long (~46 ms) impulse responses** with room reflections and deep cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
+A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (a blended multi-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** for creamy, alias-free high-gain saturation; the tube amps use a real **passive FMV tone stack** with a modelled **power-amp ↔ speaker interaction**; and the cabinets blend three mics (close SM57 + ribbon + room) over **~23 ms impulse responses** with room reflections and cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
 
 ![Screenshot](/assets/screenshot.png)
 
@@ -35,7 +35,7 @@ Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in 
   ▼  (mono → STEREO)
 Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback — switchable in real time]
   Blended multi-mic impulse-response convolution of a 4×12 cabinet:
-  close SM57 dynamic + R121 ribbon + room mic, each a long (~46 ms) voiced EQ
+  close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced EQ
   skeleton + early-reflection comb + late room reflections + deep cone-resonance
   ring, decorrelated L/R → natural stereo width and depth · mic-position shelf
   │
@@ -238,7 +238,7 @@ three mics' impulse responses, so it costs no extra per-sample CPU.
 | Mesa 4×12 (Vintage 30) | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +7 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
 | Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IRs are synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~46 ms (~2200 taps at 48 kHz), long enough for the low resonance to bloom and ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IRs are synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
 Each cabinet is captured by **three mics** — a close SM57 dynamic, a close R121 ribbon, and a room mic — each with its own voicing and reflection texture (the room mic carries extra pre-delay and denser late reflections for air). The **Blend** and **Room** knobs mix these captures. Because convolution is linear, the blend is just a weighted **sum of the three IRs**, recombined into the live convolver only when a knob moves — so any mic mix costs exactly two convolutions per sample, no more.
 

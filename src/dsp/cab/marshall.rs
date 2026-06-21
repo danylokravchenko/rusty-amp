@@ -35,12 +35,12 @@ const TEX_L: Texture = Texture {
         (3.40, 0.05),
         (7.10, -0.050),
         (12.40, 0.038),
-        (20.00, -0.024),
-        (30.00, 0.015),
+        (17.00, -0.024),
+        (20.00, 0.015),
     ],
     modes: &[
-        (66.0, 240.0, 0.005),
-        (90.0, 165.0, 0.007),
+        (66.0, 120.0, 0.005),
+        (90.0, 100.0, 0.007),
         (2500.0, 5.0, 0.009),
     ],
 };
@@ -53,13 +53,13 @@ const TEX_R: Texture = Texture {
         (3.70, 0.05),
         (7.80, -0.046),
         (13.30, 0.035),
-        (21.50, -0.022),
-        (32.00, 0.014),
+        (17.50, -0.022),
+        (20.50, 0.014),
     ],
     modes: &[
-        (70.0, 250.0, 0.005),
-        (96.0, 175.0, 0.007),
-        (2600.0, 5.0, 0.08),
+        (70.0, 125.0, 0.005),
+        (96.0, 105.0, 0.007),
+        (2600.0, 5.0, 0.009),
     ],
 };
 
@@ -70,11 +70,11 @@ const ROOM_TEX_L: Texture = Texture {
         (2.80, 0.20),
         (5.90, -0.16),
         (9.80, 0.13),
-        (15.00, -0.10),
-        (22.00, 0.075),
-        (31.00, -0.055),
+        (13.00, -0.10),
+        (15.50, 0.075),
+        (18.00, -0.055),
     ],
-    modes: &[(72.0, 260.0, 0.006), (170.0, 130.0, 0.005)],
+    modes: &[(72.0, 125.0, 0.006), (170.0, 95.0, 0.005)],
 };
 const ROOM_TEX_R: Texture = Texture {
     predelay: 150,
@@ -82,11 +82,11 @@ const ROOM_TEX_R: Texture = Texture {
         (3.20, 0.18),
         (6.60, -0.15),
         (11.00, 0.12),
-        (16.50, -0.095),
-        (24.00, 0.07),
-        (33.00, -0.05),
+        (13.50, -0.095),
+        (15.50, 0.07),
+        (17.50, -0.05),
     ],
-    modes: &[(76.0, 270.0, 0.009), (180.0, 135.0, 0.005)],
+    modes: &[(76.0, 130.0, 0.006), (180.0, 100.0, 0.005)],
 };
 
 impl MarshallCab {
@@ -153,5 +153,44 @@ impl Cabinet for MarshallCab {
     #[inline]
     fn process(&mut self, sample: f32, mic_pos: f32, blend: f32, room: f32) -> (f32, f32) {
         self.inner.process(sample, mic_pos, blend, room)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ir::analysis;
+
+    #[test]
+    fn textures_are_plausible_and_symmetric() {
+        let sr = 48_000.0;
+        analysis::assert_plausible("marshall close L", sr, &TEX_L);
+        analysis::assert_plausible("marshall close R", sr, &TEX_R);
+        analysis::assert_plausible("marshall room L", sr, &ROOM_TEX_L);
+        analysis::assert_plausible("marshall room R", sr, &ROOM_TEX_R);
+        analysis::assert_lr_symmetry("marshall close", &TEX_L, &TEX_R);
+        analysis::assert_lr_symmetry("marshall room", &ROOM_TEX_L, &ROOM_TEX_R);
+    }
+
+    #[test]
+    fn modes_are_realized_in_the_rendered_ir() {
+        let sr = 48_000.0;
+        let len = ir::ir_len(sr);
+        let strip = |t: &Texture| Texture {
+            predelay: t.predelay,
+            reflections: t.reflections,
+            modes: &[],
+        };
+        macro_rules! check {
+            ($tag:expr, $voicing:expr, $tex:expr) => {{
+                let full = ir::synth(sr, len, &mut $voicing(sr), $tex);
+                let bare = ir::synth(sr, len, &mut $voicing(sr), &strip($tex));
+                analysis::assert_modes_realized($tag, &full, &bare, sr, $tex);
+            }};
+        }
+        check!("marshall close L", MarshallCab::voicing_sm57, &TEX_L);
+        check!("marshall close R", MarshallCab::voicing_sm57, &TEX_R);
+        check!("marshall room L", MarshallCab::voicing_room, &ROOM_TEX_L);
+        check!("marshall room R", MarshallCab::voicing_room, &ROOM_TEX_R);
     }
 }

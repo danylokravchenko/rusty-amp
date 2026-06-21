@@ -523,8 +523,7 @@ mod tests {
 
     /// Diagnostic: measure the low-frequency intermodulation ("fart") content of
     /// the DS-1 on a power chord. The difference tone E2↔B2 lands at ~41 Hz — a
-    /// sub-fundamental blat that is the classic distortion fart. Run with:
-    ///   cargo test distortion_fart_spectrum -- --nocapture --include-ignored
+    /// sub-fundamental blat that is the classic distortion fart.
     /// The DS-1 must stay tight, not blubbery: the "woof" energy at/below the
     /// low-E fundamental should be a small fraction of the body harmonics, and the
     /// pedal must not pump a hot level into the amp. Guards against regressing to
@@ -683,8 +682,7 @@ mod tests {
             let mut out = Vec::with_capacity(n - warmup);
             for i in 0..n {
                 let t = i as f32 / sr;
-                let x: f32 =
-                    chord.iter().map(|&f| (2.0 * PI * f * t).sin()).sum::<f32>() * 0.18;
+                let x: f32 = chord.iter().map(|&f| (2.0 * PI * f * t).sin()).sum::<f32>() * 0.18;
                 let (l, _r) = chain.process(x);
                 if i >= warmup {
                     out.push(l);

@@ -41,11 +41,11 @@ const TEX_L: Texture = Texture {
         (6.30, -0.055),
         (10.80, 0.040),
         (17.50, -0.026),
-        (26.00, 0.015),
+        (20.50, 0.015),
     ],
     modes: &[
-        (74.0, 210.0, 0.005),
-        (95.0, 150.0, 0.007),
+        (74.0, 110.0, 0.005),
+        (95.0, 95.0, 0.007),
         (3400.0, 4.0, 0.1),
     ],
 };
@@ -59,11 +59,11 @@ const TEX_R: Texture = Texture {
         (6.90, -0.050),
         (11.60, 0.037),
         (18.80, -0.024),
-        (28.00, 0.014),
+        (20.50, 0.014),
     ],
     modes: &[
-        (79.0, 220.0, 0.005),
-        (102.0, 160.0, 0.007),
+        (79.0, 115.0, 0.005),
+        (102.0, 100.0, 0.007),
         (3550.0, 4.0, 0.10),
     ],
 };
@@ -77,10 +77,10 @@ const ROOM_TEX_L: Texture = Texture {
         (5.40, -0.18),
         (9.10, 0.14),
         (14.00, -0.11),
-        (20.00, 0.08),
-        (28.00, -0.06),
+        (16.50, 0.08),
+        (18.50, -0.06),
     ],
-    modes: &[(82.0, 240.0, 0.006), (180.0, 120.0, 0.005)],
+    modes: &[(82.0, 120.0, 0.006), (180.0, 95.0, 0.005)],
 };
 const ROOM_TEX_R: Texture = Texture {
     predelay: 138,
@@ -88,11 +88,11 @@ const ROOM_TEX_R: Texture = Texture {
         (2.90, 0.20),
         (6.10, -0.17),
         (10.20, 0.13),
-        (15.40, -0.10),
-        (22.00, 0.075),
-        (30.00, -0.055),
+        (14.00, -0.10),
+        (16.00, 0.075),
+        (18.00, -0.055),
     ],
-    modes: &[(86.0, 250.0, 0.09), (190.0, 125.0, 0.055)],
+    modes: &[(86.0, 125.0, 0.006), (190.0, 100.0, 0.005)],
 };
 
 impl MesaCab {
@@ -160,5 +160,44 @@ impl Cabinet for MesaCab {
     #[inline]
     fn process(&mut self, sample: f32, mic_pos: f32, blend: f32, room: f32) -> (f32, f32) {
         self.inner.process(sample, mic_pos, blend, room)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ir::analysis;
+
+    #[test]
+    fn textures_are_plausible_and_symmetric() {
+        let sr = 48_000.0;
+        analysis::assert_plausible("mesa close L", sr, &TEX_L);
+        analysis::assert_plausible("mesa close R", sr, &TEX_R);
+        analysis::assert_plausible("mesa room L", sr, &ROOM_TEX_L);
+        analysis::assert_plausible("mesa room R", sr, &ROOM_TEX_R);
+        analysis::assert_lr_symmetry("mesa close", &TEX_L, &TEX_R);
+        analysis::assert_lr_symmetry("mesa room", &ROOM_TEX_L, &ROOM_TEX_R);
+    }
+
+    #[test]
+    fn modes_are_realized_in_the_rendered_ir() {
+        let sr = 48_000.0;
+        let len = ir::ir_len(sr);
+        let strip = |t: &Texture| Texture {
+            predelay: t.predelay,
+            reflections: t.reflections,
+            modes: &[],
+        };
+        macro_rules! check {
+            ($tag:expr, $voicing:expr, $tex:expr) => {{
+                let full = ir::synth(sr, len, &mut $voicing(sr), $tex);
+                let bare = ir::synth(sr, len, &mut $voicing(sr), &strip($tex));
+                analysis::assert_modes_realized($tag, &full, &bare, sr, $tex);
+            }};
+        }
+        check!("mesa close L", MesaCab::voicing_sm57, &TEX_L);
+        check!("mesa close R", MesaCab::voicing_sm57, &TEX_R);
+        check!("mesa room L", MesaCab::voicing_room, &ROOM_TEX_L);
+        check!("mesa room R", MesaCab::voicing_room, &ROOM_TEX_R);
     }
 }
