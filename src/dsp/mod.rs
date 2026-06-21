@@ -431,6 +431,95 @@ mod tests {
         );
     }
 
+    /// The DS-1's symmetric clipper must not inject a DC offset on a sustained
+    /// low note — a wandering DC bias was the source of the "farty" blocking
+    /// distortion. Measure the mean of the (settled) output on a low-E sine.
+    #[test]
+    fn distortion_has_no_dc_offset_on_low_e() {
+        let sr = 48_000.0;
+        let mut ds = distortion::Distortion::new(sr);
+        let mut sum = 0.0f64;
+        let mut count = 0u32;
+        let warmup = sr as usize / 4; // let filters settle
+        let total = sr as usize;
+        for n in 0..total {
+            let x = (2.0 * PI * 82.41 * n as f32 / sr).sin() * 0.7;
+            let y = ds.process(x, 0.8, 0.5, 0.7);
+            if n >= warmup {
+                sum += y as f64;
+                count += 1;
+            }
+        }
+        let dc = (sum / count as f64).abs();
+        assert!(dc < 0.01, "distortion has DC offset (fart risk): {dc}");
+    }
+
+    fn goertzel(samples: &[f32], f: f32, sr: f32) -> f32 {
+        let w = 2.0 * PI * f / sr;
+        let coeff = 2.0 * w.cos();
+        let (mut s1, mut s2) = (0.0f32, 0.0f32);
+        for &x in samples {
+            let s0 = x + coeff * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+        let real = s1 - s2 * w.cos();
+        let imag = s2 * w.sin();
+        (real * real + imag * imag).sqrt() / (samples.len() as f32 / 2.0)
+    }
+
+    /// Diagnostic: measure the low-frequency intermodulation ("fart") content of
+    /// the DS-1 on a power chord. The difference tone E2↔B2 lands at ~41 Hz — a
+    /// sub-fundamental blat that is the classic distortion fart. Run with:
+    ///   cargo test distortion_fart_spectrum -- --nocapture --include-ignored
+    /// The DS-1 must stay tight, not blubbery: the "woof" energy at/below the
+    /// low-E fundamental should be a small fraction of the body harmonics, and the
+    /// pedal must not pump a hot level into the amp. Guards against regressing to
+    /// the loose, bass-heavy voicing.
+    #[test]
+    fn distortion_low_end_balance() {
+        let sr = 48_000.0;
+        let mut ds = distortion::Distortion::new(sr);
+        // Guitar-ish low E: fundamental + a few harmonics at a realistic pickup level.
+        let e2 = 82.41;
+        let n = sr as usize;
+        let warmup = sr as usize / 4;
+        let mut inp = 0.0f64;
+        let mut out = Vec::with_capacity(n - warmup);
+        let mut in_buf = Vec::with_capacity(n - warmup);
+        for i in 0..n {
+            let t = i as f32 / sr;
+            let x = 0.15
+                * ((2.0 * PI * e2 * t).sin()
+                    + 0.5 * (2.0 * PI * 2.0 * e2 * t).sin()
+                    + 0.3 * (2.0 * PI * 3.0 * e2 * t).sin());
+            let y = ds.process(x, 0.5, 0.5, 0.65);
+            if i >= warmup {
+                out.push(y);
+                in_buf.push(x);
+                inp += (x * x) as f64;
+            }
+        }
+        let rms =
+            |v: &[f32]| (v.iter().map(|s| (s * s) as f64).sum::<f64>() / v.len() as f64).sqrt();
+        let m = |v: &[f32], f| goertzel(v, f, sr);
+        // "Woof" = energy at/below the low-E fundamental region; the blubber.
+        let woof = m(&out, 55.0) + m(&out, 82.41) + m(&out, 110.0);
+        let body = m(&out, 165.0) + m(&out, 247.0) + m(&out, 330.0);
+        let through = rms(&out) / rms(&in_buf);
+        let ratio = woof / body.max(1e-9);
+        println!("DS-1 woof/body={ratio:.2}  through-level={through:.2}x");
+        assert!(
+            ratio < 0.5,
+            "DS-1 low end is blubbery: woof/body = {ratio:.2}"
+        );
+        assert!(
+            through < 1.0,
+            "DS-1 output too hot, will slam the amp: {through:.2}x"
+        );
+        let _ = inp;
+    }
+
     /// Every amp model should be stable (no NaN/blowup) at full gain.
     #[test]
     fn all_amps_stable_at_max_gain() {

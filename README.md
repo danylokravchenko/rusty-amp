@@ -15,11 +15,11 @@ Noise Gate  [bypassable]
   │
   ▼
 TS-808 Tube Screamer  [bypassable]
-  DC block → 340 Hz HP → 720 Hz mid-peak → asymmetric diode clip → variable tone LP
+  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → variable tone LP
   │
   ▼
 DS-1 Distortion  [bypassable]
-  DC block → 100 Hz HP → asymmetric hard-clip (op-amp + diodes) → active tone (LP+HP blend)
+  DC block → 80 Hz HP → [4× OS: pre-clip HP → symmetric silicon diode clip] → active tone (LP+HP blend)
   │
   ▼
 Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
