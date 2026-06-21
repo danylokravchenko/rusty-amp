@@ -68,7 +68,7 @@ impl Randall {
             last_treble: -1.0,
             last_presence: -1.0,
             // Tight 4×12 resonance ~90 Hz, modest and static (no rectifier sag).
-            speaker: SpeakerLoad::new(sr, 90.0, 1.3, 0.10, 0.0, 1.0),
+            speaker: SpeakerLoad::new(sr, 90.0, 1.0, 0.05, 0.0, 0.8),
         };
         r.update_tone_stack(0.5, 0.3, 0.75);
         r.update_presence(0.5);

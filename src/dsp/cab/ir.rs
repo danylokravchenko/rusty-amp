@@ -64,7 +64,25 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
         *out = acc;
     }
 
-    // 4. Add decaying modal resonances (cone + breakup ring).
+    // 4. Normalise the *direct body* (skeleton + comb) to the skeleton's energy
+    //    BEFORE adding the modal resonances. This is the crucial ordering: the
+    //    modes are long, decaying sinusoids that carry a lot of energy, so if we
+    //    normalised the finished IR (body + modes) to the skeleton, the booming
+    //    low-frequency modes would force the whole IR — including the mid/high
+    //    direct sound — to be scaled *down*, leaving a quiet, all-bass cab. By
+    //    levelling the body first, the modes become coloration that rings on top
+    //    of a full-level direct sound rather than swallowing it.
+    let e_skel = skel.iter().map(|v| v * v).sum::<f32>().sqrt();
+    let e_body = ir.iter().map(|v| v * v).sum::<f32>().sqrt();
+    if e_body > 1e-9 {
+        let g = e_skel / e_body;
+        for v in &mut ir {
+            *v *= g;
+        }
+    }
+
+    // 5. Add decaying modal resonances (cone + breakup ring) on top of the
+    //    level-matched body — a controlled amount of resonance, not a takeover.
     for &(f, t60_ms, g) in tex.modes {
         // t60 (−60 dB) → exponential time constant: ln(1000) ≈ 6.908.
         let tau = (t60_ms / 1000.0) * sr / 6.908;
@@ -75,22 +93,11 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
         }
     }
 
-    // 5. Raised-cosine fade over the final quarter to avoid a truncation click.
+    // 6. Raised-cosine fade over the final quarter to avoid a truncation click.
     let fade_start = len * 3 / 4;
     for (n, out) in ir.iter_mut().enumerate().skip(fade_start) {
         let p = (n - fade_start) as f32 / (len - fade_start).max(1) as f32;
         *out *= 0.5 * (1.0 + (PI * p).cos());
-    }
-
-    // 6. Normalise to the skeleton's energy so overall loudness matches the
-    //    original EQ voicing (the rest of the chain was gain-staged around it).
-    let e_skel = skel.iter().map(|v| v * v).sum::<f32>().sqrt();
-    let e_ir = ir.iter().map(|v| v * v).sum::<f32>().sqrt();
-    if e_ir > 1e-9 {
-        let g = e_skel / e_ir;
-        for v in &mut ir {
-            *v *= g;
-        }
     }
 
     ir
@@ -105,5 +112,5 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
 /// this is ~2230 taps per channel — direct-form convolution at that length is a
 /// few hundred MFLOP/s, well within a real-time budget on a modern CPU.
 pub fn ir_len(sr: f32) -> usize {
-    ((sr / 44100.0) * 2048.0) as usize
+    ((sr / 44100.0) * 512.0) as usize
 }

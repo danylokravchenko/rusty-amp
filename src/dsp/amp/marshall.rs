@@ -67,7 +67,7 @@ impl Marshall {
             envelope: 0.0,
             // 4×12 resonance ~95 Hz; tube amp has moderate damping, so a healthy
             // dynamic bloom under sag and a gentle inductive top lift.
-            speaker: SpeakerLoad::new(sr, 95.0, 1.1, 0.18, 0.55, 1.5),
+            speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.55, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);

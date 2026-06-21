@@ -65,7 +65,7 @@ impl Mesa {
             envelope: 0.0,
             // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
             // rectifier, so a slightly tighter dynamic bloom than the JCM800.
-            speaker: SpeakerLoad::new(sr, 100.0, 1.2, 0.16, 0.45, 1.5),
+            speaker: SpeakerLoad::new(sr, 100.0, 1.0, 0.06, 0.45, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);
