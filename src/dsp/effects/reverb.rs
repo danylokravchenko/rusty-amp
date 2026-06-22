@@ -4,6 +4,8 @@
 //! → 4 series allpass filters. Comb filters provide the dense reflections; allpass
 //! filters diffuse them. The right channel's delay lines are offset by
 //! `STEREO_SPREAD` samples so the two channels decorrelate into a wide, deep tail.
+use super::param_changed;
+
 const FIXED_GAIN: f32 = 0.015;
 const SCALE_WET: f32 = 3.0;
 const SCALE_ROOM: f32 = 0.28;
@@ -159,7 +161,7 @@ impl Reverb {
         damp: f32,
         mix: f32,
     ) -> (f32, f32) {
-        if (room - self.last_room).abs() > 0.001 || (damp - self.last_damp).abs() > 0.001 {
+        if param_changed(room, self.last_room) || param_changed(damp, self.last_damp) {
             self.update_params(room, damp);
         }
 
@@ -170,5 +172,43 @@ impl Reverb {
         let out_l = dry_l * (1.0 - mix) + wet_l * SCALE_WET * mix;
         let out_r = dry_r * (1.0 - mix) + wet_r * SCALE_WET * mix;
         (out_l, out_r)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `mix = 0` must return the dry signal untouched (pure bypass).
+    #[test]
+    fn fully_dry_is_passthrough() {
+        let mut rv = Reverb::new(48_000.0);
+        for n in 0..1000 {
+            let x = (n as f32 * 0.01).sin();
+            let (l, r) = rv.process(x, x, 0.5, 0.4, 0.0);
+            assert!(
+                (l - x).abs() < 1e-6 && (r - x).abs() < 1e-6,
+                "dry path altered"
+            );
+        }
+    }
+
+    /// An impulse must produce a decaying stereo tail: output keeps ringing after
+    /// the input stops, the two channels decorrelate, and everything stays finite.
+    #[test]
+    fn produces_decaying_stereo_tail() {
+        let sr = 48_000.0;
+        let mut rv = Reverb::new(sr);
+        rv.process(1.0, 1.0, 0.7, 0.3, 1.0); // impulse
+        let mut tail_energy = 0.0f64;
+        let mut channel_diff = 0.0f32;
+        for _ in 0..(sr as usize / 2) {
+            let (l, r) = rv.process(0.0, 0.0, 0.7, 0.3, 1.0);
+            assert!(l.is_finite() && r.is_finite(), "reverb non-finite");
+            tail_energy += (l * l + r * r) as f64;
+            channel_diff += (l - r).abs();
+        }
+        assert!(tail_energy > 1e-4, "reverb produced no tail");
+        assert!(channel_diff > 0.01, "reverb tail is mono");
     }
 }

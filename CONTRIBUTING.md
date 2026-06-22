@@ -28,10 +28,14 @@ src/
   dsp/              — all signal processing
     amp/            — amp models (marshall, mesa, randall)
     cab/            — cabinet IR convolution and mic models
+    effects/        — pedals & rack effects + their shared building blocks
+      mod.rs        — OnePoleLp, ThreeBandEq, dB/param helpers (shared logic)
+      compressor.rs, fuzz.rs, tube_screamer.rs, distortion.rs,
+      preamp_eq.rs, parametric_eq.rs, delay.rs, reverb.rs, noise_gate.rs
     biquad.rs       — biquad filter building block
     tonestack.rs    — passive FMV tone stack
-    oversample.rs   — 8× oversampling scaffolding
-    compressor.rs, delay.rs, reverb.rs, fuzz.rs, …
+    oversample.rs   — polyphase N× oversampling (with a `process(x, f)` clip helper)
+    mod.rs          — Params, DspChain, and the bypass-stage macros that wire it
   ui/
     draw.rs         — ratatui rendering
     input.rs        — keyboard handling
@@ -64,12 +68,33 @@ The audio callback runs on a dedicated real-time thread. Code that touches the s
 
 ### Adding a new DSP effect
 
-1. Create `src/dsp/<effect>.rs` with a `struct` that holds state and a `process(sample: f32) -> f32` (or stereo equivalent) method.
-2. Add it to `src/dsp/mod.rs`.
-3. Wire it into the signal chain in `src/audio/` (the processing closure).
-4. Expose knobs in `src/ui/config.rs` and render them in `src/ui/draw.rs`.
-5. Handle keyboard input in `src/ui/input.rs`.
-6. Add preset fields in `src/preset.rs`.
+Effects live in `src/dsp/effects/`. Each is a self-contained `struct` with a
+`process` method; logic shared between several effects lives in
+`src/dsp/effects/mod.rs` so the individual files stay focused on their *voicing*:
+
+- `OnePoleLp` — the variable low-pass behind passive tone controls (TS, fuzz).
+- `ThreeBandEq` — low-shelf / mid-peak / high-shelf trio shared by the pre-amp and
+  parametric EQs.
+- `db_to_lin` / `lin_to_db` — decibel conversions for dynamics stages.
+- `param_changed` — the "did this knob move enough to rebuild coefficients?" test.
+- `Oversampler::process(x, f)` (in `oversample.rs`) — runs a clipper closure at the
+  oversampled rate; reuse it instead of re-writing the up/map/down loop.
+
+To add one:
+
+1. Create `src/dsp/effects/<effect>.rs` with a `struct` that holds state and a
+   `process(sample: f32) -> f32` (or stereo equivalent) method. Reuse the shared
+   helpers above rather than re-implementing tone LPs, EQ trios or dirty-checks.
+2. Declare and re-export it in `src/dsp/effects/mod.rs`.
+3. Add a field to `DspChain` and a line in `DspChain::process` using the
+   `mono_stage!` / `stereo_stage!` macro (in `src/dsp/mod.rs`) so it bypasses
+   cleanly and reads its knobs from the shared `Params`.
+4. Add the `Params` fields + defaults in `src/dsp/mod.rs`.
+5. Expose knobs in `src/ui/config.rs` and render them in `src/ui/draw.rs`.
+6. Handle keyboard input in `src/ui/input.rs`.
+7. Add preset fields in `src/preset.rs`.
+8. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
+   (finite/bounded output, and that each knob moves the band/level it should).
 
 ### Adding a new amp model
 
@@ -91,14 +116,22 @@ Bundled presets cannot be deleted by users, so only add presets that are genuine
 
 ## Testing
 
-There are no automated tests for rendering and controls yet. Manual testing is required:
+The DSP path has a unit-test suite — every effect, amp and cabinet model carries
+`#[cfg(test)]` tests covering stability (finite, bounded output) and behaviour
+(each control moves the band/level it should). Run them with:
+
+```bash
+cargo test
+```
+
+New DSP code must come with tests in the same file, and they run on every commit in
+CI. There are no automated tests for rendering and controls yet, so the UI still
+needs manual testing:
 
 1. `cargo run --release` with an audio interface connected
 2. Verify the effect under test across the full gain range
 3. Confirm no audible clicks or artifacts when toggling bypass or switching models
 4. Confirm the preset round-trips correctly (save → reload → values match)
-
-If you add a pure DSP utility (filter math, IR generation), unit tests are welcome in a `#[cfg(test)]` module in the same file.
 
 ## Submitting a PR
 

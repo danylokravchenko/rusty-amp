@@ -108,6 +108,20 @@ impl<const N: usize> Oversampler<N> {
         }
     }
 
+    /// Run a per-sample nonlinearity at the `N`× rate: upsample one base-rate
+    /// sample, apply `f` to each of the `N` high-rate samples, then band-limit and
+    /// decimate back down. This is the canonical "oversample a clipper" loop, so
+    /// the drive pedals share it instead of each repeating the up/map/down dance.
+    #[inline]
+    pub fn process<F: FnMut(f32) -> f32>(&mut self, x: f32, mut f: F) -> f32 {
+        let up = self.upsample(x);
+        let mut down = [0.0f32; N];
+        for (o, &u) in down.iter_mut().zip(up.iter()) {
+            *o = f(u);
+        }
+        self.downsample(down)
+    }
+
     /// Interpolate one base-rate sample into `N` high-rate samples. Each output
     /// phase `p` is the dot product of sub-filter `proto[p + j·N]` with the recent
     /// base-rate history — no zeros are ever multiplied.
