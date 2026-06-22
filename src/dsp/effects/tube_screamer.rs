@@ -1,6 +1,6 @@
-use super::biquad::Biquad;
+use super::{OnePoleLp, param_changed};
+use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler4;
-use std::f32::consts::PI;
 
 /// Ibanez TS-808 Tube Screamer simulation.
 ///
@@ -21,9 +21,8 @@ pub struct TubeScreamer {
     os: Oversampler4, // 4× oversample the soft-clip stage to suppress aliasing
     // (the TS is a mild tanh soft-clip — 4× already keeps fold-back well down,
     // unlike the amp's harsher cascaded stages which earn 8×)
-    tone_z: f32, // 1-pole LP state for variable tone control
+    tone: OnePoleLp, // variable 1-pole LP tone control
     last_tone: f32,
-    tone_coeff: f32,
 }
 
 impl TubeScreamer {
@@ -38,9 +37,8 @@ impl TubeScreamer {
             // Models the TS-808 feedback network resonance: mid-push centered at 720 Hz
             mid_peak: Biquad::peak_eq(sr, 720.0, 0.7, 6.0),
             os: Oversampler4::new(sr),
-            tone_z: 0.0,
+            tone: OnePoleLp::new(),
             last_tone: -1.0, // force first update
-            tone_coeff: 0.0,
         };
         ts.set_tone(0.6);
         ts
@@ -49,14 +47,14 @@ impl TubeScreamer {
     fn set_tone(&mut self, tone: f32) {
         // tone 0 → ~500 Hz (dark), tone 1 → ~7 kHz (bright)
         let freq = 500.0 * (7000.0_f32 / 500.0).powf(tone);
-        self.tone_coeff = 1.0 - (-2.0 * PI * freq / self.sr).exp();
+        self.tone.set_cutoff(freq, self.sr);
         self.last_tone = tone;
     }
 
     /// `drive` 0–1, `tone` 0–1, `level` 0–1
     #[inline]
     pub fn process(&mut self, x: f32, drive: f32, tone: f32, level: f32) -> f32 {
-        if (tone - self.last_tone).abs() > 0.001 {
+        if param_changed(tone, self.last_tone) {
             self.set_tone(tone);
         }
 
@@ -68,17 +66,11 @@ impl TubeScreamer {
         let gain = 1.0 + drive * 50.0;
 
         // 4× oversampled soft-clip stage
-        let up = self.os.upsample(x);
-        let mut down = [0.0f32; 4];
-        for (o, &u) in down.iter_mut().zip(up.iter()) {
-            *o = asymmetric_clip(u * gain) / gain.sqrt();
-        }
-        let x = self.os.downsample(down);
+        let x = self
+            .os
+            .process(x, |u| asymmetric_clip(u * gain) / gain.sqrt());
 
-        // Tone: variable 1-pole low-pass
-        self.tone_z += self.tone_coeff * (x - self.tone_z);
-
-        self.tone_z * level * 0.5
+        self.tone.process(x) * level * 0.5
     }
 }
 
@@ -97,5 +89,60 @@ fn asymmetric_clip(x: f32) -> f32 {
         // two diodes in series: higher threshold, asymmetric saturation
         let t = 1.5_f32;
         -(t * (x / t).tanh())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::f32::consts::PI;
+
+    /// The TS must stay finite and bounded driving a hot low note, and its drive
+    /// knob must actually add saturation harmonics (more drive → hotter output).
+    #[test]
+    fn finite_bounded_and_drive_adds_gain() {
+        let sr = 48_000.0;
+        let rms_at = |drive: f32| {
+            let mut ts = TubeScreamer::new(sr);
+            let mut sum = 0.0f64;
+            let warmup = sr as usize / 4;
+            let mut count = 0u32;
+            for n in 0..(sr as usize) {
+                let x = (2.0 * PI * 110.0 * n as f32 / sr).sin() * 0.5;
+                let y = ts.process(x, drive, 0.6, 0.7);
+                assert!(y.is_finite(), "TS produced non-finite output");
+                assert!(y.abs() < 2.0, "TS output unbounded: {y}");
+                if n >= warmup {
+                    sum += (y * y) as f64;
+                    count += 1;
+                }
+            }
+            (sum / count as f64).sqrt()
+        };
+        assert!(rms_at(0.9) > rms_at(0.1), "drive knob did not add level");
+    }
+
+    /// Turning the tone knob up must brighten the output: more high-frequency
+    /// energy passes through the variable low-pass.
+    #[test]
+    fn tone_controls_brightness() {
+        let sr = 48_000.0;
+        let high_energy = |tone: f32| {
+            let mut ts = TubeScreamer::new(sr);
+            let mut sum = 0.0f64;
+            let warmup = sr as usize / 4;
+            for n in 0..(sr as usize) {
+                let x = (2.0 * PI * 4000.0 * n as f32 / sr).sin() * 0.4;
+                let y = ts.process(x, 0.5, tone, 0.7);
+                if n >= warmup {
+                    sum += (y * y) as f64;
+                }
+            }
+            sum
+        };
+        assert!(
+            high_energy(0.9) > high_energy(0.1),
+            "tone knob did not control brightness"
+        );
     }
 }

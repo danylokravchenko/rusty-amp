@@ -1,3 +1,5 @@
+use super::{db_to_lin, lin_to_db};
+
 /// Front-of-chain feed-forward compressor — evens out picking dynamics and adds
 /// sustain, the single biggest "studio" upgrade for clean and edge-of-breakup
 /// tones. A peak-follower detector drives a hard-knee gain computer in the dB
@@ -50,16 +52,6 @@ impl Compressor {
         let auto_makeup = db_to_lin(-thresh_db * (1.0 - 1.0 / ratio) * 0.5);
         x * self.gain * auto_makeup * (level * 2.0)
     }
-}
-
-#[inline]
-fn lin_to_db(x: f32) -> f32 {
-    20.0 * x.max(1e-6).log10()
-}
-
-#[inline]
-fn db_to_lin(db: f32) -> f32 {
-    10.0_f32.powf(db / 20.0)
 }
 
 #[cfg(test)]

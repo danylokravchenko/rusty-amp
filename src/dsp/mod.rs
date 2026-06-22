@@ -1,18 +1,10 @@
 pub mod amp;
 pub mod biquad;
 pub mod cab;
-pub mod compressor;
 pub mod conv;
-pub mod delay;
-pub mod distortion;
-pub mod fuzz;
-pub mod noise_gate;
+pub mod effects;
 pub mod oversample;
-pub mod parametric_eq;
-pub mod preamp_eq;
-pub mod reverb;
 pub mod tonestack;
-pub mod tube_screamer;
 
 use atomic_float::AtomicF32;
 use std::sync::Arc;
@@ -20,15 +12,9 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 
 use amp::AmpBank;
 use cab::CabBank;
-use compressor::Compressor;
-use delay::Delay;
-use distortion::Distortion;
-use fuzz::Fuzz;
-use noise_gate::NoiseGate;
-use parametric_eq::ParametricEq;
-use preamp_eq::PreampEq;
-use reverb::Reverb;
-use tube_screamer::TubeScreamer;
+use effects::{
+    Compressor, Delay, Distortion, Fuzz, NoiseGate, ParametricEq, PreampEq, Reverb, TubeScreamer,
+};
 
 // ── Amp model ─────────────────────────────────────────────────────────────────
 
@@ -420,6 +406,34 @@ impl Levels {
 
 // ── DSP chain (owned by audio thread, never shared) ───────────────────────────
 
+/// Run a mono effect when its enable flag is set, otherwise pass `$x` through.
+///
+/// Every pedal in the chain is bypassable and reads its knobs from the shared,
+/// lock-free [`Params`]. Spelling that `if enabled { effect.process(load…) } else
+/// { x }` dance out once per pedal was the bulk of the old `process` body; this
+/// macro expands to the exact same straight-line code (no allocation, no dynamic
+/// dispatch) so the audio thread pays nothing for the deduplication.
+macro_rules! mono_stage {
+    ($self:ident, $p:ident, $x:ident, $enabled:ident, $field:ident, $($param:ident),+) => {
+        if $p.$enabled.load(Relaxed) {
+            $self.$field.process($x, $($p.$param.load(Relaxed)),+)
+        } else {
+            $x
+        }
+    };
+}
+
+/// Stereo counterpart of [`mono_stage!`]: passes `($l, $r)` through when bypassed.
+macro_rules! stereo_stage {
+    ($self:ident, $p:ident, $l:ident, $r:ident, $enabled:ident, $field:ident, $($param:ident),+) => {
+        if $p.$enabled.load(Relaxed) {
+            $self.$field.process($l, $r, $($p.$param.load(Relaxed)),+)
+        } else {
+            ($l, $r)
+        }
+    };
+}
+
 pub struct DspChain {
     ng: NoiseGate,
     cmp: Compressor,
@@ -462,74 +476,25 @@ impl DspChain {
     pub fn process(&mut self, sample: f32) -> (f32, f32) {
         let p = &self.params;
 
-        // Noise gate
-        let x = if p.ng_enabled.load(Relaxed) {
-            self.ng.process(
-                sample,
-                p.ng_threshold.load(Relaxed),
-                p.ng_release.load(Relaxed),
-            )
-        } else {
-            sample
-        };
-
-        // Compressor — evens out picking dynamics before the drive stages
-        let x = if p.cmp_enabled.load(Relaxed) {
-            self.cmp.process(
-                x,
-                p.cmp_sustain.load(Relaxed),
-                p.cmp_attack.load(Relaxed),
-                p.cmp_level.load(Relaxed),
-            )
-        } else {
-            x
-        };
-
-        // Pedal chain — fuzz first, so it sees the rawest signal
-        let x = if p.fz_enabled.load(Relaxed) {
-            self.fz.process(
-                x,
-                p.fz_fuzz.load(Relaxed),
-                p.fz_tone.load(Relaxed),
-                p.fz_level.load(Relaxed),
-            )
-        } else {
-            x
-        };
-
-        let x = if p.ts_enabled.load(Relaxed) {
-            self.ts.process(
-                x,
-                p.ts_drive.load(Relaxed),
-                p.ts_tone.load(Relaxed),
-                p.ts_level.load(Relaxed),
-            )
-        } else {
-            x
-        };
-
-        let x = if p.ds_enabled.load(Relaxed) {
-            self.ds.process(
-                x,
-                p.ds_drive.load(Relaxed),
-                p.ds_tone.load(Relaxed),
-                p.ds_level.load(Relaxed),
-            )
-        } else {
-            x
-        };
-
-        // Pre-amp EQ — shapes what the amp's gain stage clips (before the amp)
-        let x = if p.peq_enabled.load(Relaxed) {
-            self.peq.process(
-                x,
-                p.peq_low.load(Relaxed),
-                p.peq_mid.load(Relaxed),
-                p.peq_high.load(Relaxed),
-            )
-        } else {
-            x
-        };
+        // Mono pedal chain (gate → compressor → fuzz → TS → DS → pre-amp EQ).
+        // Fuzz comes first so it sees the rawest signal; the pre-amp EQ comes last
+        // so it shapes exactly what the amp's gain stage clips.
+        let x = sample;
+        let x = mono_stage!(self, p, x, ng_enabled, ng, ng_threshold, ng_release);
+        let x = mono_stage!(
+            self,
+            p,
+            x,
+            cmp_enabled,
+            cmp,
+            cmp_sustain,
+            cmp_attack,
+            cmp_level
+        );
+        let x = mono_stage!(self, p, x, fz_enabled, fz, fz_fuzz, fz_tone, fz_level);
+        let x = mono_stage!(self, p, x, ts_enabled, ts, ts_drive, ts_tone, ts_level);
+        let x = mono_stage!(self, p, x, ds_enabled, ds, ds_drive, ds_tone, ds_level);
+        let x = mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high);
 
         // Amp
         let x = self.amp.process(
@@ -552,44 +517,30 @@ impl DspChain {
             p.mic_room.load(Relaxed),
         );
 
-        // Parametric EQ
-        let (l, r) = if p.eq_enabled.load(Relaxed) {
-            self.eq.process(
-                l,
-                r,
-                p.eq_low.load(Relaxed),
-                p.eq_mid.load(Relaxed),
-                p.eq_high.load(Relaxed),
-            )
-        } else {
-            (l, r)
-        };
-
-        // Delay (ping-pong stereo)
-        let (l, r) = if p.delay_enabled.load(Relaxed) {
-            self.delay.process(
-                l,
-                r,
-                p.delay_time.load(Relaxed),
-                p.delay_feedback.load(Relaxed),
-                p.delay_mix.load(Relaxed),
-            )
-        } else {
-            (l, r)
-        };
-
-        // Reverb (stereo)
-        let (l, r) = if p.rev_enabled.load(Relaxed) {
-            self.reverb.process(
-                l,
-                r,
-                p.rev_room.load(Relaxed),
-                p.rev_damp.load(Relaxed),
-                p.rev_mix.load(Relaxed),
-            )
-        } else {
-            (l, r)
-        };
+        // Stereo rack (parametric EQ → ping-pong delay → reverb).
+        let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);
+        let (l, r) = stereo_stage!(
+            self,
+            p,
+            l,
+            r,
+            delay_enabled,
+            delay,
+            delay_time,
+            delay_feedback,
+            delay_mix
+        );
+        let (l, r) = stereo_stage!(
+            self,
+            p,
+            l,
+            r,
+            rev_enabled,
+            reverb,
+            rev_room,
+            rev_damp,
+            rev_mix
+        );
 
         // Master-bus stereo widening — push the cab/reverb decorrelation out for a
         // wider, deeper image without losing mono punch (the mid is untouched).
@@ -659,29 +610,6 @@ mod tests {
         );
     }
 
-    /// The DS-1's symmetric clipper must not inject a DC offset on a sustained
-    /// low note — a wandering DC bias was the source of the "farty" blocking
-    /// distortion. Measure the mean of the (settled) output on a low-E sine.
-    #[test]
-    fn distortion_has_no_dc_offset_on_low_e() {
-        let sr = 48_000.0;
-        let mut ds = distortion::Distortion::new(sr);
-        let mut sum = 0.0f64;
-        let mut count = 0u32;
-        let warmup = sr as usize / 4; // let filters settle
-        let total = sr as usize;
-        for n in 0..total {
-            let x = (2.0 * PI * 82.41 * n as f32 / sr).sin() * 0.7;
-            let y = ds.process(x, 0.8, 0.5, 0.7);
-            if n >= warmup {
-                sum += y as f64;
-                count += 1;
-            }
-        }
-        let dc = (sum / count as f64).abs();
-        assert!(dc < 0.01, "distortion has DC offset (fart risk): {dc}");
-    }
-
     fn goertzel(samples: &[f32], f: f32, sr: f32) -> f32 {
         let w = 2.0 * PI * f / sr;
         let coeff = 2.0 * w.cos();
@@ -694,88 +622,6 @@ mod tests {
         let real = s1 - s2 * w.cos();
         let imag = s2 * w.sin();
         (real * real + imag * imag).sqrt() / (samples.len() as f32 / 2.0)
-    }
-
-    /// Diagnostic: measure the low-frequency intermodulation ("fart") content of
-    /// the DS-1 on a power chord. The difference tone E2↔B2 lands at ~41 Hz — a
-    /// sub-fundamental blat that is the classic distortion fart.
-    /// The DS-1 must stay tight, not blubbery: the "woof" energy at/below the
-    /// low-E fundamental should be a small fraction of the body harmonics, and the
-    /// pedal must not pump a hot level into the amp. Guards against regressing to
-    /// the loose, bass-heavy voicing.
-    #[test]
-    fn distortion_low_end_balance() {
-        let sr = 48_000.0;
-        let mut ds = distortion::Distortion::new(sr);
-        // Guitar-ish low E: fundamental + a few harmonics at a realistic pickup level.
-        let e2 = 82.41;
-        let n = sr as usize;
-        let warmup = sr as usize / 4;
-        let mut inp = 0.0f64;
-        let mut out = Vec::with_capacity(n - warmup);
-        let mut in_buf = Vec::with_capacity(n - warmup);
-        for i in 0..n {
-            let t = i as f32 / sr;
-            let x = 0.15
-                * ((2.0 * PI * e2 * t).sin()
-                    + 0.5 * (2.0 * PI * 2.0 * e2 * t).sin()
-                    + 0.3 * (2.0 * PI * 3.0 * e2 * t).sin());
-            let y = ds.process(x, 0.5, 0.5, 0.65);
-            if i >= warmup {
-                out.push(y);
-                in_buf.push(x);
-                inp += (x * x) as f64;
-            }
-        }
-        let rms =
-            |v: &[f32]| (v.iter().map(|s| (s * s) as f64).sum::<f64>() / v.len() as f64).sqrt();
-        let m = |v: &[f32], f| goertzel(v, f, sr);
-        // "Woof" = energy at/below the low-E fundamental region; the blubber.
-        let woof = m(&out, 55.0) + m(&out, 82.41) + m(&out, 110.0);
-        let body = m(&out, 165.0) + m(&out, 247.0) + m(&out, 330.0);
-        let through = rms(&out) / rms(&in_buf);
-        let ratio = woof / body.max(1e-9);
-        println!("DS-1 woof/body={ratio:.2}  through-level={through:.2}x");
-        assert!(
-            ratio < 0.5,
-            "DS-1 low end is blubbery: woof/body = {ratio:.2}"
-        );
-        assert!(
-            through < 1.0,
-            "DS-1 output too hot, will slam the amp: {through:.2}x"
-        );
-        let _ = inp;
-    }
-
-    /// The fuzz must stay finite and bounded even at maximum sustain on a hot,
-    /// low note — its two cascaded clippers run at enormous gain, so any
-    /// instability or runaway DC would show up here.
-    #[test]
-    fn fuzz_is_finite_bounded_and_saturates() {
-        let sr = 48_000.0;
-        let mut fz = fuzz::Fuzz::new(sr);
-        let mut max_abs = 0.0f32;
-        let mut sum = 0.0f64;
-        let warmup = sr as usize / 4;
-        let total = sr as usize;
-        let mut count = 0u32;
-        for n in 0..total {
-            let x = (2.0 * PI * 82.41 * n as f32 / sr).sin() * 0.8;
-            let y = fz.process(x, 1.0, 0.5, 0.7);
-            assert!(y.is_finite(), "fuzz produced non-finite output at {n}");
-            if n >= warmup {
-                max_abs = max_abs.max(y.abs());
-                sum += y as f64;
-                count += 1;
-            }
-        }
-        assert!(max_abs <= 1.0, "fuzz output exceeded bounds: {max_abs}");
-        // Heavy clipping should still produce a healthy signal, not silence.
-        assert!(max_abs > 0.05, "fuzz output too quiet: {max_abs}");
-        // Asymmetric clipping is fine, but the post-DC block must keep the mean
-        // near zero so the fuzz doesn't push DC into the amp.
-        let dc = (sum / count as f64).abs();
-        assert!(dc < 0.02, "fuzz has DC offset: {dc}");
     }
 
     /// The passive FMV tone stack must be stable, peak-bounded (it only cuts), and
