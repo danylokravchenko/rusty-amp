@@ -1,6 +1,6 @@
 # rusty-amp
 
-A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (a blended multi-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** for creamy, alias-free high-gain saturation; the tube amps use a real **passive FMV tone stack** with a modelled **power-amp ↔ speaker interaction**; and the cabinets blend three mics (close SM57 + ribbon + room) over **~23 ms impulse responses** with room reflections and cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
+A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (a blended multi-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** (efficient linear-phase polyphase-FIR up/downsampling) for creamy, alias-free high-gain saturation; the tube amps use a real **passive FMV tone stack** with a modelled **power-amp ↔ speaker interaction**; and the cabinets blend three mics (close SM57 + ribbon + room) over **~23 ms impulse responses** with room reflections and cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
 
 ![Screenshot](/assets/screenshot.png)
 
@@ -35,7 +35,7 @@ Pre-amp EQ  [bypassable]
   │
   ▼
 Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
-  8× oversampled nonlinear stages (8th-order Butterworth anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
+  8× oversampled nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
   JCM800:   dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom
   Mesa DR:  triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom
   Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
@@ -285,6 +285,8 @@ three mics' impulse responses, so it costs no extra per-sample CPU.
 | Orange PPC412 (Vintage 30) | Thick, chunky, mid-forward (closed-back birch) | +5 dB low-mid "wall" at 600 Hz, +3 dB grind at 1.2 kHz, +5 dB presence at 3.2 kHz |
 
 Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IRs are synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
+
+The convolution is computed with a **partitioned-FFT (uniformly-partitioned overlap-save)** engine rather than a direct tap-by-tap loop. At ~1100 taps per channel this is the single heaviest DSP stage, and the frequency-domain approach cuts its cost several-fold while producing the exact same linear convolution — so the tone is unchanged. The only trade-off is a fixed ~2.7 ms of latency (128 samples at 48 kHz), shared equally by both channels so the stereo image stays aligned.
 
 Each cabinet is captured by **three mics** — a close SM57 dynamic, a close R121 ribbon, and a room mic — each with its own voicing and reflection texture (the room mic carries extra pre-delay and denser late reflections for air). The **Blend** and **Room** knobs mix these captures. Because convolution is linear, the blend is just a weighted **sum of the three IRs**, recombined into the live convolver only when a knob moves — so any mic mix costs exactly two convolutions per sample, no more.
 

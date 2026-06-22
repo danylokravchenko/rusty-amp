@@ -4,7 +4,7 @@ pub mod mesa;
 pub mod orange;
 
 use crate::dsp::biquad::Biquad;
-use crate::dsp::conv::FirConvolver;
+use crate::dsp::conv::FftConvolver;
 
 pub use marshall::MarshallCab;
 pub use mesa::MesaCab;
@@ -36,8 +36,8 @@ pub trait Cabinet {
 /// taps preserves the delay-line history so it never clicks.
 pub struct BlendedCab {
     sr: f32,
-    conv_l: FirConvolver,
-    conv_r: FirConvolver,
+    conv_l: FftConvolver,
+    conv_r: FftConvolver,
     // Per-mic impulse responses (close / ribbon / room), per channel.
     close_l: Vec<f32>,
     close_r: Vec<f32>,
@@ -64,8 +64,8 @@ impl BlendedCab {
         let cap = close_l.len() + 1;
         let mut cab = Self {
             sr,
-            conv_l: FirConvolver::new(cap),
-            conv_r: FirConvolver::new(cap),
+            conv_l: FftConvolver::new(cap),
+            conv_r: FftConvolver::new(cap),
             scratch_l: vec![0.0; close_l.len()],
             scratch_r: vec![0.0; close_r.len()],
             close_l,

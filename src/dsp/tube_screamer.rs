@@ -21,7 +21,7 @@ pub struct TubeScreamer {
     os: Oversampler4, // 4× oversample the soft-clip stage to suppress aliasing
     // (the TS is a mild tanh soft-clip — 4× already keeps fold-back well down,
     // unlike the amp's harsher cascaded stages which earn 8×)
-    tone_z: f32,      // 1-pole LP state for variable tone control
+    tone_z: f32, // 1-pole LP state for variable tone control
     last_tone: f32,
     tone_coeff: f32,
 }
