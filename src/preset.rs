@@ -1,9 +1,15 @@
 use anyhow::{Context, Result};
+use rust_embed::Embed;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{AmpModel, CabModel, Params};
+
+#[derive(Embed)]
+#[folder = "presets/"]
+#[include = "*.toml"]
+struct BundledPresets;
 
 // ── Preset source ─────────────────────────────────────────────────────────────
 
@@ -428,15 +434,43 @@ pub fn find_preset_files() -> Vec<(PathBuf, PresetSource)> {
     result
 }
 
+fn load_embedded() -> Vec<Preset> {
+    let mut names: Vec<String> = BundledPresets::iter().map(|n| n.into_owned()).collect();
+    names.sort();
+    names
+        .into_iter()
+        .filter_map(|name| {
+            let file = BundledPresets::get(&name)?;
+            let src = std::str::from_utf8(file.data.as_ref()).ok()?;
+            let mut preset: Preset = toml::from_str(src)
+                .map_err(|e| eprintln!("Warning: skipping embedded preset {name}: {e}"))
+                .ok()?;
+            preset.source = PresetSource::System;
+            preset.path = None;
+            Some(preset)
+        })
+        .collect()
+}
+
 pub fn load_all() -> Vec<Preset> {
-    find_preset_files()
+    let from_disk: Vec<Preset> = find_preset_files()
         .into_iter()
         .filter_map(|(path, source)| {
             Preset::load(&path, source)
                 .map_err(|e| eprintln!("Warning: skipping preset {}: {e}", path.display()))
                 .ok()
         })
-        .collect()
+        .collect();
+
+    // If the ./presets/ directory is absent (installed binary), fall back to embedded.
+    let system_on_disk = from_disk.iter().any(|p| p.source == PresetSource::System);
+    if system_on_disk {
+        from_disk
+    } else {
+        let mut all = load_embedded();
+        all.extend(from_disk);
+        all
+    }
 }
 
 #[cfg(test)]

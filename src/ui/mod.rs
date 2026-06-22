@@ -163,7 +163,9 @@ pub fn run(
                         preset_cursor = (preset_cursor + 1).min(total - 1);
                     }
                     KeyCode::Enter => {
-                        if preset_cursor > 0 {
+                        if preset_cursor == 0 {
+                            params.reset_to_defaults();
+                        } else {
                             presets[preset_cursor - 1].apply(&params);
                         }
                         preset_open = false;

@@ -69,12 +69,29 @@ Per-channel output soft limiter → stereo (L, R)
 ## Requirements
 
 - **macOS** (uses CoreAudio via cpal)
-- **Rust** 1.95+ (`rustup` recommended)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
 - macOS **microphone permission** granted to Terminal.app
   → System Settings › Privacy & Security › Microphone
 
-## Run
+## Install (pre-built binary)
+
+Download the latest binary from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest):
+
+```bash
+curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp -o rusty-amp
+chmod +x rusty-amp
+
+# Remove the macOS quarantine flag (required for unsigned binaries)
+xattr -d com.apple.quarantine rusty-amp
+
+./rusty-amp
+```
+
+Presets are embedded in the binary — nothing else to download.
+
+## Build from source
+
+Requires **Rust 1.95+** (`rustup` recommended).
 
 ```bash
 cargo run
@@ -391,6 +408,10 @@ Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset
 Press **`R`** to start recording. The header switches from `○ OFF AIR` to a blinking `● ON AIR` indicator next to `POWER ON`. Press **`R`** again to stop — the file is written immediately and the saved path is shown briefly in the footer.
 
 Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full multi-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions, code style rules, DSP conventions, and how to add new effects, amp models, cabinets, or presets.
 
 ## License
 
