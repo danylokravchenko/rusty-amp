@@ -1,5 +1,5 @@
 use super::biquad::Biquad;
-use crate::dsp::oversample::Oversampler8;
+use crate::dsp::oversample::Oversampler4;
 
 /// Boss DS-1 Distortion simulation.
 ///
@@ -20,15 +20,16 @@ use crate::dsp::oversample::Oversampler8;
 ///   • The tone control is a **tilt** (bass↔treble seesaw around ~1 kHz), like the
 ///     real pedal — NOT a mid scoop. The old LP/HP-blend tone scooped the mids,
 ///     which is exactly what left the low end loose and the top fizzy.
-///   • 8× oversampling keeps the clip harmonics above the audible band.
+///   • 4× oversampling keeps the clip harmonics above the audible band; the
+///     post-clip HP and the downstream cab low-pass mop up the rest.
 pub struct Distortion {
     sr: f32,
     dc_block: Biquad,
     input_hp: Biquad,
     // Mid-focused pre-clip emphasis (base rate) — the DS-1's voice + definition.
     mid_emphasis: Biquad,
-    os: Oversampler8,
-    // Pre-clip HP at 8× rate — tightens the low end before the clipper.
+    os: Oversampler4,
+    // Pre-clip HP at 4× rate — tightens the low end before the clipper.
     pre_clip_hp: Biquad,
     // Post-clip HP (base rate) — removes the blubber the clipper generates so the
     // DS-1 doesn't dump a woofy low end into the amp.
@@ -41,7 +42,7 @@ pub struct Distortion {
 
 impl Distortion {
     pub fn new(sr: f32) -> Self {
-        let sr8 = sr * 8.0;
+        let sr4 = sr * 4.0;
         let mut d = Self {
             sr,
             dc_block: Biquad::highpass(sr, 10.0, 0.707),
@@ -49,9 +50,9 @@ impl Distortion {
             // +3 dB around 800 Hz: gentle mid focus for definition (kept small so
             // it doesn't pump the output level into the amp).
             mid_emphasis: Biquad::peak_eq(sr, 800.0, 0.9, 3.0),
-            os: Oversampler8::new(sr),
+            os: Oversampler4::new(sr),
             // 130 Hz pre-clip HP: trims low-mid mud before the clipper.
-            pre_clip_hp: Biquad::highpass(sr8, 130.0, 0.707),
+            pre_clip_hp: Biquad::highpass(sr4, 130.0, 0.707),
             // 150 Hz post-clip HP: the decisive tightener — keeps the low E present
             // but strips the loose, blubbery woof the clipper produces.
             post_clip_hp: Biquad::highpass(sr, 150.0, 0.707),
@@ -84,9 +85,9 @@ impl Distortion {
 
         let gain = 1.0 + drive * 60.0;
 
-        // ── 8× oversampled clip stage ─────────────────────────────────────────
+        // ── 4× oversampled clip stage ─────────────────────────────────────────
         let up = self.os.upsample(x);
-        let mut down = [0.0f32; 8];
+        let mut down = [0.0f32; 4];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // tighten lows before clipping
             *o = ds1_clip(u * gain) / gain.sqrt();
