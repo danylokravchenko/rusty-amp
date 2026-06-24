@@ -202,7 +202,7 @@ pub mod analysis {
     }
 
     /// Assert a single texture is physically plausible and fully realizable in the
-    /// IR window (nothing the author wrote is silently truncated).
+    /// IR window (nothing is silently truncated).
     pub fn assert_plausible(tag: &str, sr: f32, tex: &super::Texture) {
         let win_ms = super::ir_len_ms(sr);
         let predelay_ms = tex.predelay as f32 / sr * 1000.0;

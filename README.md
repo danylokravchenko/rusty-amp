@@ -68,17 +68,19 @@ Per-channel output soft limiter → stereo (L, R)
 
 ## Requirements
 
-- **macOS** (uses CoreAudio via cpal)
+- **macOS, Windows, or Linux** — audio I/O goes through [cpal](https://github.com/RustAudio/cpal), which picks the native backend automatically (CoreAudio, WASAPI/ASIO, or ALSA/JACK respectively)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
-- macOS **microphone permission** granted to Terminal.app
-  → System Settings › Privacy & Security › Microphone
 
 ## Install (pre-built binary)
 
+Pre-built binaries for **macOS (Apple Silicon)** and **Linux (x86_64)** are published with each release. On Windows, [build from source](#build-from-source) — the codebase is fully cross-platform.
+
 Download the latest binary from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest):
 
+**macOS (Apple Silicon):**
+
 ```bash
-curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp -o rusty-amp
+curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp-macos-aarch64 -o rusty-amp
 chmod +x rusty-amp
 
 # Remove the macOS quarantine flag (required for unsigned binaries)
@@ -87,11 +89,20 @@ xattr -d com.apple.quarantine rusty-amp
 ./rusty-amp
 ```
 
+**Linux (x86_64):**
+
+```bash
+curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp-linux-x86_64 -o rusty-amp
+chmod +x rusty-amp
+
+./rusty-amp
+```
+
 Presets are embedded in the binary — nothing else to download.
 
 ## Build from source
 
-Requires **Rust 1.95+** (`rustup` recommended).
+Runs on **macOS, Windows, and Linux**. Requires **Rust 1.95+** (`rustup` recommended).
 
 ```bash
 cargo run
