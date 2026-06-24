@@ -68,9 +68,12 @@ Per-channel output soft limiter → stereo (L, R)
 
 ## Requirements
 
+- **macOS, Windows, or Linux** — audio I/O goes through [cpal](https://github.com/RustAudio/cpal), which picks the native backend automatically (CoreAudio, WASAPI/ASIO, or ALSA/JACK respectively)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
 
 ## Install (pre-built binary)
+
+A pre-built **macOS** binary is published with each release. On Windows and Linux, [build from source](#build-from-source) — the codebase is fully cross-platform.
 
 Download the latest binary from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest):
 
@@ -88,7 +91,7 @@ Presets are embedded in the binary — nothing else to download.
 
 ## Build from source
 
-Requires **Rust 1.95+** (`rustup` recommended).
+Runs on **macOS, Windows, and Linux**. Requires **Rust 1.95+** (`rustup` recommended).
 
 ```bash
 cargo run
