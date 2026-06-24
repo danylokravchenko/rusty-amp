@@ -5,10 +5,10 @@ use crate::dsp::oversample::Oversampler8;
 /// Randall Warhead solid-state amp simulation.
 ///
 /// Signal path:
-///   DC block → input HP → [4× OS: FET + HP + BJT + HP + rail clip] → active tone stack → presence → stiff power section
+///   DC block → input HP → [8× OS: FET + HP + BJT + HP + rail clip] → active tone stack → presence → stiff power section
 ///
 /// Character:
-///   • 4× oversampling through all three gain stages keeps aliasing inaudible
+///   • 8× oversampling through all three gain stages keeps aliasing inaudible
 ///   • Asymmetric FET waveshaper adds subtle even harmonics
 ///   • A touch of dynamic bloom keeps the otherwise stiff solid-state feel responsive
 ///   • Two inter-stage HPs (500 Hz and 800 Hz) tighten the solid-state response
@@ -72,7 +72,7 @@ impl Randall {
             last_mid: -1.0,
             last_treble: -1.0,
             last_presence: -1.0,
-            // Tight 4×12 resonance ~90 Hz, modest and static (no rectifier sag).
+            // Tight 8×12 resonance ~90 Hz, modest and static (no rectifier sag).
             speaker: SpeakerLoad::new(sr, 90.0, 1.0, 0.05, 0.0, 0.8),
         };
         r.update_tone_stack(0.5, 0.3, 0.75);
@@ -126,7 +126,7 @@ impl Amplifier for Randall {
         let pregain = 1.0 + gain * 45.0;
         let bias = self.bloom.follow(x) * 0.08;
 
-        // ── 4× oversampled nonlinear section ──────────────────────────────────
+        // ── 8× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {

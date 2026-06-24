@@ -6,10 +6,10 @@ use crate::dsp::tonestack::{Components, ToneStack};
 /// Marshall JCM800 amplifier simulation.
 ///
 /// Signal path:
-///   DC block → input HP → [4× OS: stage-1 tube + inter-stage HP + stage-2 tube] → tone stack → power amp sag → presence
+///   DC block → input HP → [8× OS: stage-1 tube + inter-stage HP + stage-2 tube] → tone stack → power amp sag → presence
 ///
 /// Character:
-///   • 4× oversampling through the nonlinear gain stages keeps aliasing well above
+///   • 8× oversampling through the nonlinear gain stages keeps aliasing well above
 ///     the audible band, removing the harsh "digital" edge of stacked clippers
 ///   • Asymmetric 12AX7 waveshaper generates even harmonics (2nd, 4th) for warmth
 ///   • Dynamic grid-bias bloom adds touch sensitivity under hard playing
@@ -22,10 +22,10 @@ pub struct Marshall {
     input_hp: Biquad,
     // 8× oversampling for the nonlinear section
     os: Oversampler8,
-    // Bass cut before the first gain stage at 4× rate — prevents sub-bass from
+    // Bass cut before the first gain stage at 8× rate — prevents sub-bass from
     // entering the clipper and generating low-frequency IM products ("fart").
     pre_clip_hp: Biquad,
-    // Inter-stage coupling HP between tube stages (at 4× rate)
+    // Inter-stage coupling HP between tube stages (at 8× rate)
     stage_hp: Biquad,
     // Dynamic preamp bloom
     bloom: Bloom,
@@ -65,7 +65,7 @@ impl Marshall {
             presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
             last_presence: -1.0,
             envelope: 0.0,
-            // 4×12 resonance ~95 Hz; tube amp has moderate damping, so a healthy
+            // 8×12 resonance ~95 Hz; tube amp has moderate damping, so a healthy
             // dynamic bloom under sag and a gentle inductive top lift.
             speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.55, 0.8),
         };
@@ -131,7 +131,7 @@ impl Amplifier for Marshall {
         // Dynamic grid-bias offset (removed downstream by the inter-stage HP).
         let bias = self.bloom.follow(x) * 0.12;
 
-        // ── 4× oversampled nonlinear section ──────────────────────────────────
+        // ── 8× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {

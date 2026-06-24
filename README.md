@@ -68,10 +68,7 @@ Per-channel output soft limiter → stereo (L, R)
 
 ## Requirements
 
-- **macOS** (uses CoreAudio via cpal)
 - An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
-- macOS **microphone permission** granted to Terminal.app
-  → System Settings › Privacy & Security › Microphone
 
 ## Install (pre-built binary)
 

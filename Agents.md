@@ -4,8 +4,8 @@
 
 rusty-amp is a real-time guitar amplifier emulator that runs in the terminal. It captures audio from an audio interface, processes it through a full signal chain (noise gate → overdrive pedals → amp model → cabinet simulation → EQ → delay → reverb), and writes the processed signal back out. The UI is a ratatui TUI with live VU meters, knob sections, and a preset browser.
 
-**Platform:** macOS only (CoreAudio via cpal)  
-**Language:** Rust  
+**Platform:** multiplatform (via cpal)
+**Language:** Rust
 **Minimum Rust:** 1.95+
 
 ---
@@ -17,14 +17,18 @@ rusty-amp is a real-time guitar amplifier emulator that runs in the terminal. It
 ```text
 Guitar input
   → Noise Gate          (envelope follower + gain ramp)
-  → TS-808 Tube Screamer (DC block → HP → asymmetric diode clip → tone LP)
-  → DS-1 Distortion     (DC block → HP → asymmetric hard-clip → active tone)
-  → Amp model           (switchable: Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead)
-  → Cabinet sim         (switchable: Mesa 4×12 V30 | Marshall 4×12 Greenback)
-  → Parametric EQ       (low shelf 120 Hz / mid peak 800 Hz / high shelf 5 kHz)
-  → Delay               (digital, 0–500 ms, feedback capped at 85%)
-  → Spring Reverb       (8 parallel combs → 4 allpass diffusers)
-  → Output soft limiter (tanh)
+  → Compressor          (peak-follower detector → hard-knee gain computer)
+  → Fuzz                (Big Muff style: DC block → 70 Hz HP → two cascaded soft-clips → mid scoop → variable tone LP)
+  → TS-808 Tube Screamer (DC block → 340 Hz HP → asymmetric diode soft-clip → variable tone LP)
+  → DS-1 Distortion     (DC block → 80 Hz HP → silicon diode hard-clip → active tone LP/HP blend)
+  → Pre-amp EQ          (low shelf 100 Hz / mid peak 650 Hz / high shelf 3 kHz — shapes what the amp clips)
+  → Amp model           (switchable: Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — 8× oversampled)
+  → Cabinet sim         (switchable: Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback | Orange PPC412 Vintage 30 — multi-mic IR)
+  → Parametric EQ       (low shelf 120 Hz / mid peak 800 Hz Q 1.5 / high shelf 5 kHz)
+  → Delay               (stereo ping-pong, 0–500 ms, feedback capped at 85%)
+  → Stereo Reverb       (dual decorrelated Freeverb cores: 8 parallel combs → 4 series allpasses each)
+  → Master-bus widener  (stereo mid/side enhancement)
+  → Output limiter      (per-channel soft-clip)
 ```
 
 Every bypassable stage can be toggled independently with `Space`.
@@ -58,27 +62,56 @@ Presets are `.toml` files. All sections except `[tube_screamer]`, `[amp]`, and `
 
 ```toml
 name        = "My Preset"
-description = "Optional description shown in the preset browser."
+description = "Optional one-line description shown in the preset browser."
+
+# All sections except [tube_screamer], [amp], and [reverb] are optional.
+# Omitting a section leaves that effect's current state unchanged.
 
 [noise_gate]
-enabled   = true
-threshold = 0.20    # 0.0–1.0
-release   = 0.30
+enabled   = true    # optional, defaults to true
+threshold = 0.20    # 0.0 – 1.0  (0 = barely open, 1 = always open)
+release   = 0.30    # 0.0 – 1.0  (0 = instant close, 1 = very slow)
+
+# Omit [compressor] entirely to leave it off,
+# or include it with enabled = false to store values but keep it bypassed.
+[compressor]
+enabled = false     # optional, defaults to true when the section is present
+sustain = 0.40      # 0.0 – 1.0  (compression amount)
+attack  = 0.30      # 0.0 – 1.0  (0.5 ms → 50 ms)
+level   = 0.50      # 0.0 – 1.0  (output makeup, 0.5 = unity)
+
+# Omit [fuzz] entirely to leave it off (the default for the bundled presets),
+# or include it with enabled = false to store values but keep it bypassed.
+[fuzz]
+enabled = false     # optional, defaults to true when the section is present
+fuzz  = 0.70        # 0.0 – 1.0  (sustain/gain)
+tone  = 0.50
+level = 0.60
 
 [tube_screamer]
-enabled = true
-drive = 0.40
+enabled = true      # optional, defaults to true
+drive = 0.40        # 0.0 – 1.0
 tone  = 0.60
 level = 0.70
 
+# Omit [distortion] entirely to leave it off,
+# or include it with enabled = false to store values but keep it bypassed.
 [distortion]
 enabled = true
 drive = 0.50
 tone  = 0.55
 level = 0.65
 
+# Pre-amp EQ — shapes the signal before the amp's gain stage.
+# Omit [preamp_eq] entirely to leave it off, or include it with enabled = false.
+[preamp_eq]
+enabled = false       # optional, defaults to true when the section is present
+low  = 0.50           # 0.0 = −12 dB, 0.5 = flat, 1.0 = +12 dB
+mid  = 0.50
+high = 0.50
+
 [amp]
-model  = "marshall"   # "marshall" | "mesa" | "randall"
+model  = "marshall"   # "marshall" (default), "mesa", or "randall"
 gain   = 0.65
 bass   = 0.50
 mid    = 0.45
@@ -86,22 +119,25 @@ treble = 0.65
 master = 0.55
 
 [cabinet]
-model = "mesa"        # "mesa" | "marshall"
+model     = "mesa"    # "mesa" (default), "marshall", or "orange"
+mic_pos   = 0.5       # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (default 0.5)
+mic_blend = 0.15      # 0.0 = SM57 dynamic, 1.0 = R121 ribbon (default 0.15)
+mic_room  = 0.15      # 0.0 = dry close mic, 1.0 = full room mic (default 0.15)
 
 [eq]
-enabled = true
+enabled = true        # optional, defaults to true
 low  = 0.50           # 0.0 = −15 dB, 0.5 = 0 dB, 1.0 = +15 dB
 mid  = 0.50
 high = 0.50
 
 [delay]
-enabled  = true
+enabled  = true       # optional, defaults to true
 time     = 0.30       # 0.0 = 0 ms, 1.0 = 500 ms
-feedback = 0.40
-mix      = 0.30
+feedback = 0.40       # 0.0 – 1.0 (internally capped at 85%)
+mix      = 0.30       # 0.0 = dry, 1.0 = fully wet
 
 [reverb]
-enabled = true
+enabled = true        # optional, defaults to true
 room = 0.55
 damp = 0.40
 mix  = 0.25

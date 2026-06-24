@@ -6,10 +6,10 @@ use crate::dsp::tonestack::{Components, ToneStack};
 /// Mesa/Boogie Dual Rectifier — Modern channel simulation.
 ///
 /// Signal path:
-///   DC block → input HP → [4× OS: stage-1 + HP + stage-2 + HP + stage-3 silicon] → tone stack → power amp → presence
+///   DC block → input HP → [8× OS: stage-1 + HP + stage-2 + HP + stage-3 silicon] → tone stack → power amp → presence
 ///
 /// Character:
-///   • 4× oversampling through all three nonlinear stages keeps aliasing inaudible
+///   • 8× oversampling through all three nonlinear stages keeps aliasing inaudible
 ///   • Asymmetric waveshapers on tube stages add even-harmonic warmth
 ///   • Dynamic grid-bias bloom adds touch sensitivity under hard playing
 ///   • Two inter-stage HPs (680 Hz and 1 kHz) prevent bass accumulation across stages
@@ -139,7 +139,7 @@ impl Amplifier for Mesa {
         let pregain = 1.0 + gain * 35.0;
         let bias = self.bloom.follow(x) * 0.12;
 
-        // ── 4× oversampled nonlinear section ──────────────────────────────────
+        // ── 8× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
