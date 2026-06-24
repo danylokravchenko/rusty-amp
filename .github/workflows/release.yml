@@ -7,7 +7,18 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset_name: rusty-amp-macos-aarch64
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            asset_name: rusty-amp-linux-x86_64
+
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: write
 
@@ -16,6 +27,12 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install ALSA dev libraries (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -28,10 +45,13 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Rename binary
+        run: cp target/${{ matrix.target }}/release/rusty-amp ${{ matrix.asset_name }}
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/rusty-amp
+          files: ${{ matrix.asset_name }}
           generate_release_notes: true

@@ -73,16 +73,27 @@ Per-channel output soft limiter → stereo (L, R)
 
 ## Install (pre-built binary)
 
-A pre-built **macOS** binary is published with each release. On Windows and Linux, [build from source](#build-from-source) — the codebase is fully cross-platform.
+Pre-built binaries for **macOS (Apple Silicon)** and **Linux (x86_64)** are published with each release. On Windows, [build from source](#build-from-source) — the codebase is fully cross-platform.
 
 Download the latest binary from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest):
 
+**macOS (Apple Silicon):**
+
 ```bash
-curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp -o rusty-amp
+curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp-macos-aarch64 -o rusty-amp
 chmod +x rusty-amp
 
 # Remove the macOS quarantine flag (required for unsigned binaries)
 xattr -d com.apple.quarantine rusty-amp
+
+./rusty-amp
+```
+
+**Linux (x86_64):**
+
+```bash
+curl -L https://github.com/danylokravchenko/rusty-amp/releases/latest/download/rusty-amp-linux-x86_64 -o rusty-amp
+chmod +x rusty-amp
 
 ./rusty-amp
 ```
