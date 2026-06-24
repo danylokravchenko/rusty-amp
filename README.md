@@ -1,81 +1,29 @@
-# rusty-amp
+# 🎸 rusty-amp
 
-A guitar amplifier emulator that runs in your terminal. Connect an audio interface and play — all controls live in a ratatui TUI with real-time VU meters, two rows of effect sections, and switchable amp and cabinet models. The signal becomes **stereo** at the cabinet stage (a blended multi-mic impulse-response convolution) and stays stereo through a ping-pong delay, stereo reverb, and a master-bus widener for a wide, studio-grade image. The amp's nonlinear stages run at **8× oversampling** (efficient linear-phase polyphase-FIR up/downsampling) for creamy, alias-free high-gain saturation; the tube amps use a real **passive FMV tone stack** with a modelled **power-amp ↔ speaker interaction**; and the cabinets blend three mics (close SM57 + ribbon + room) over **~23 ms impulse responses** with room reflections and cone resonance for three-dimensional depth. Presets can be loaded at any time without leaving the app.
+**A complete guitar amp and pedalboard rig that runs right in your terminal.**
+
+Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and solid-state amplifiers, a full board of stompbox effects, and multi-mic'd 4×12 cabinets — all driven from a fast, keyboard-only interface with live metering. It ships with artist-inspired presets, so you can dial in a great tone in seconds and tweak from there.
 
 ![Screenshot](/assets/screenshot.png)
 
-## Signal chain
+## Highlights
 
-```text
-Guitar
-  │
-  ▼
-Noise Gate  [bypassable]
-  Envelope follower → gain ramp (smooth open/close to avoid clicks)
-  │
-  ▼
-Compressor  [bypassable]
-  Peak-follower detector → hard-knee gain computer (2:1–10:1) → smoothed gain + auto makeup
-  │
-  ▼
-Fuzz  [bypassable · Big Muff style]
-  DC block → 70 Hz HP → [4× OS: two cascaded asymmetric soft-clip stages] → DC block → 700 Hz mid scoop → variable tone LP
-  │
-  ▼
-TS-808 Tube Screamer  [bypassable]
-  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → variable tone LP
-  │
-  ▼
-DS-1 Distortion  [bypassable]
-  DC block → 80 Hz HP → [4× OS: pre-clip HP → symmetric silicon diode clip] → active tone (LP+HP blend)
-  │
-  ▼
-Pre-amp EQ  [bypassable]
-  Low shelf (100 Hz) → Mid peak (650 Hz) → High shelf (3 kHz) — each ±12 dB — shapes what the amp clips
-  │
-  ▼
-Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
-  8× oversampled nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
-  JCM800:   dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom
-  Mesa DR:  triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom
-  Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
-  │
-  ▼  (mono → STEREO)
-Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback | Orange PPC412 Vintage 30 — switchable in real time]
-  Blended multi-mic impulse-response convolution of a 4×12 cabinet:
-  close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced EQ
-  skeleton + early-reflection comb + late room reflections + deep cone-resonance
-  ring, decorrelated L/R → natural stereo width and depth · mic-position shelf
-  │
-  ▼  (stereo from here on)
-Parametric EQ  [bypassable]
-  Low shelf (120 Hz) → Mid peak (800 Hz, Q 1.5) → High shelf (5 kHz) — each ±15 dB
-  │
-  ▼
-Delay  [bypassable]
-  Stereo ping-pong delay — repeats bounce L↔R — TIME 0–500 ms, FEEDBACK 0–85%, dry/wet MIX
-  │
-  ▼
-Stereo Reverb  [bypassable]
-  Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix
-  │
-  ▼
-Master-bus mid/side stereo widener (mono center preserved)
-  │
-  ▼
-Per-channel output soft limiter → stereo (L, R)
-```
+- 🔊 **3 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, and Randall Warhead, switchable while you play
+- 📦 **3 cabinets** — Mesa, Marshall, and Orange 4×12s, each captured with three mics you can blend
+- 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, ping-pong delay, and stereo reverb, each independently bypassable
+- 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
+- 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
+- ⏺️ **One-key recording** straight to a stereo WAV file
+- 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
 
-## Requirements
+## What you need
 
-- **macOS, Windows, or Linux** — audio I/O goes through [cpal](https://github.com/RustAudio/cpal), which picks the native backend automatically (CoreAudio, WASAPI/ASIO, or ALSA/JACK respectively)
-- An **audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
+- **A guitar and an audio interface** with a high-impedance instrument input (e.g. Focusrite Scarlett)
+- Speakers or headphones — for the full stereo image, use stereo output
 
-## Install (pre-built binary)
+## Install
 
-Pre-built binaries for **macOS (Apple Silicon)** and **Linux (x86_64)** are published with each release. On Windows, [build from source](#build-from-source) — the codebase is fully cross-platform.
-
-Download the latest binary from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest):
+The fastest way to start is a pre-built binary — presets are baked in, so there's nothing else to download. Grab the latest from [Releases](https://github.com/danylokravchenko/rusty-amp/releases/latest), or [build from source](#build-from-source).
 
 **macOS (Apple Silicon):**
 
@@ -98,14 +46,14 @@ chmod +x rusty-amp
 ./rusty-amp
 ```
 
-Presets are embedded in the binary — nothing else to download.
+> On **Windows**, no pre-built binary is published yet — [build from source](#build-from-source) instead. rusty-amp runs natively on all three platforms via [cpal](https://github.com/RustAudio/cpal), which selects the OS audio backend automatically (CoreAudio, WASAPI/ASIO, or ALSA/JACK).
 
 ## Build from source
 
 Runs on **macOS, Windows, and Linux**. Requires **Rust 1.95+** (`rustup` recommended).
 
 ```bash
-cargo run
+cargo run --release
 # or after building:
 ./target/release/rusty-amp
 ```
@@ -278,6 +226,70 @@ three mics' impulse responses, so it costs no extra per-sample CPU.
 | Mic | 0–10 | Close-mic position: 0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz) |
 | Blend | 0–10 | Close-mic capsule: 0 = SM57 dynamic (bright, present) · 10 = R121 ribbon (darker, fuller low-mids, silky top) |
 | Room | 0–10 | Amount of a distant room mic mixed in — adds air and three-dimensional depth (0 = dry close mic only) |
+
+## How it works
+
+Under the hood, rusty-amp runs your guitar through a full signal chain — pedals, amp, cabinet, and a stereo effects rack — sample by sample. The amp's distortion stages run at **8× oversampling** (linear-phase polyphase-FIR) for smooth, alias-free high-gain saturation, the tube amps use a real **passive FMV tone stack** with modelled **power-amp ↔ speaker interaction**, and the cabinets are rendered by **multi-mic impulse-response convolution** for three-dimensional depth.
+
+```text
+Guitar
+  │
+  ▼
+Noise Gate  [bypassable]
+  Envelope follower → gain ramp (smooth open/close to avoid clicks)
+  │
+  ▼
+Compressor  [bypassable]
+  Peak-follower detector → hard-knee gain computer (2:1–10:1) → smoothed gain + auto makeup
+  │
+  ▼
+Fuzz  [bypassable · Big Muff style]
+  DC block → 70 Hz HP → [4× OS: two cascaded asymmetric soft-clip stages] → DC block → 700 Hz mid scoop → variable tone LP
+  │
+  ▼
+TS-808 Tube Screamer  [bypassable]
+  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → variable tone LP
+  │
+  ▼
+DS-1 Distortion  [bypassable]
+  DC block → 80 Hz HP → [4× OS: pre-clip HP → symmetric silicon diode clip] → active tone (LP+HP blend)
+  │
+  ▼
+Pre-amp EQ  [bypassable]
+  Low shelf (100 Hz) → Mid peak (650 Hz) → High shelf (3 kHz) — each ±12 dB — shapes what the amp clips
+  │
+  ▼
+Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
+  8× oversampled nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
+  JCM800:   dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom
+  Mesa DR:  triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom
+  Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
+  │
+  ▼  (mono → STEREO)
+Cabinet  [Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback | Orange PPC412 Vintage 30 — switchable in real time]
+  Blended multi-mic impulse-response convolution of a 4×12 cabinet:
+  close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced EQ
+  skeleton + early-reflection comb + late room reflections + deep cone-resonance
+  ring, decorrelated L/R → natural stereo width and depth · mic-position shelf
+  │
+  ▼  (stereo from here on)
+Parametric EQ  [bypassable]
+  Low shelf (120 Hz) → Mid peak (800 Hz, Q 1.5) → High shelf (5 kHz) — each ±15 dB
+  │
+  ▼
+Delay  [bypassable]
+  Stereo ping-pong delay — repeats bounce L↔R — TIME 0–500 ms, FEEDBACK 0–85%, dry/wet MIX
+  │
+  ▼
+Stereo Reverb  [bypassable]
+  Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix
+  │
+  ▼
+Master-bus mid/side stereo widener (mono center preserved)
+  │
+  ▼
+Per-channel output soft limiter → stereo (L, R)
+```
 
 ## Amp models
 
