@@ -11,8 +11,8 @@ use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
 use super::config::{
     AMP_END, AMP_START, CMP_END, CMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END,
-    EQ_START, FUZZ_END, FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START, PEQ_END,
-    PEQ_START, REV_END, REV_START, TS_END, TS_START,
+    EQ_START, FB_END, FB_START, FUZZ_END, FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START,
+    PEQ_END, PEQ_START, REV_END, REV_START, TS_END, TS_START,
 };
 use super::styles::*;
 
@@ -111,6 +111,7 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     let fz_on = params.fz_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
     let ds_on = params.ds_enabled.load(Relaxed);
+    let fb_on = params.fb_enabled.load(Relaxed);
     let peq_on = params.peq_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
     let delay_on = params.delay_enabled.load(Relaxed);
@@ -146,6 +147,11 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     chain.push(Span::styled(
         "DS-1",
         Style::default().fg(pedal_color(ds_on)),
+    ));
+    chain.push(arrow.clone());
+    chain.push(Span::styled(
+        "FUZZBOY",
+        Style::default().fg(pedal_color(fb_on)),
     ));
     chain.push(arrow.clone());
     chain.push(Span::styled(
@@ -501,14 +507,15 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
         ])
         .split(inner);
 
-    // Row 1: TS-808, DS-1, Reverb, Delay.
+    // Row 1: TS-808, DS-1, Fuzzboy, Reverb, Delay.
     let row1 = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
+            Constraint::Ratio(1, 5),
         ])
         .split(rows[0]);
 
@@ -534,9 +541,21 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
         focus,
         params,
     );
+    let fb_label = format!("FUZZBOY/{}", params.fb_mode().name());
     render_pedal(
         f,
         row1[2],
+        &fb_label,
+        PEDAL_PINK,
+        FB_START,
+        FB_END,
+        params.fb_enabled.load(Relaxed),
+        focus,
+        params,
+    );
+    render_pedal(
+        f,
+        row1[3],
         "SPRING REVERB",
         PEDAL_BLUE,
         REV_START,
@@ -547,7 +566,7 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     );
     render_pedal(
         f,
-        row1[3],
+        row1[4],
         "DELAY",
         PEDAL_PURPLE,
         DELAY_START,
@@ -803,6 +822,8 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
             Span::styled(" amp  ", Style::default().fg(DIM)),
             Span::styled("C", Style::default().fg(AMBER)),
             Span::styled(" cab  ", Style::default().fg(DIM)),
+            Span::styled("M", Style::default().fg(AMBER)),
+            Span::styled(" fuzzboy mode  ", Style::default().fg(DIM)),
             Span::styled("P", Style::default().fg(AMBER)),
             Span::styled(" presets  ", Style::default().fg(DIM)),
             Span::styled("R", Style::default().fg(AMBER)),

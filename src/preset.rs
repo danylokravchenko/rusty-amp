@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering::Relaxed;
 
-use crate::dsp::{AmpModel, CabModel, Params};
+use crate::dsp::{AmpModel, CabModel, FuzzboyMode, Params};
 
 #[derive(Embed)]
 #[folder = "presets/"]
@@ -33,6 +33,7 @@ pub struct Preset {
     pub noise_gate: Option<NgSection>,
     pub compressor: Option<CmpSection>,
     pub fuzz: Option<FuzzSection>,
+    pub fuzzboy: Option<FuzzboySection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
     pub preamp_eq: Option<PeqSection>,
@@ -72,6 +73,17 @@ pub struct FuzzSection {
     pub fuzz: f32,
     pub tone: f32,
     pub level: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct FuzzboySection {
+    pub enabled: Option<bool>,
+    /// "crunch" | "potato" | "hiss" | "sour"
+    pub mode: Option<String>,
+    pub in_gain: f32,
+    pub tone: f32,
+    pub power: f32,
+    pub out_gain: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -212,6 +224,18 @@ impl Preset {
                 tone: params.fz_tone.load(Relaxed),
                 level: params.fz_level.load(Relaxed),
             }),
+            fuzzboy: Some(FuzzboySection {
+                enabled: Some(params.fb_enabled.load(Relaxed)),
+                mode: Some(
+                    FuzzboyMode::from_u8(params.fb_mode.load(Relaxed))
+                        .name()
+                        .to_lowercase(),
+                ),
+                in_gain: params.fb_in.load(Relaxed),
+                tone: params.fb_tone.load(Relaxed),
+                power: params.fb_power.load(Relaxed),
+                out_gain: params.fb_out.load(Relaxed),
+            }),
             tube_screamer: TsSection {
                 enabled: Some(params.ts_enabled.load(Relaxed)),
                 drive: params.ts_drive.load(Relaxed),
@@ -314,6 +338,25 @@ impl Preset {
             params.fz_level.store(fz.level.clamp(0.0, 1.0), Relaxed);
         } else {
             params.fz_enabled.store(false, Relaxed);
+        }
+
+        if let Some(fb) = &self.fuzzboy {
+            params
+                .fb_enabled
+                .store(fb.enabled.unwrap_or(false), Relaxed);
+            let mode = match fb.mode.as_deref() {
+                Some("potato") => FuzzboyMode::Potato,
+                Some("hiss") => FuzzboyMode::Hiss,
+                Some("sour") => FuzzboyMode::Sour,
+                _ => FuzzboyMode::Crunch,
+            };
+            params.fb_mode.store(mode as u8, Relaxed);
+            params.fb_in.store(fb.in_gain.clamp(0.0, 1.0), Relaxed);
+            params.fb_tone.store(fb.tone.clamp(0.0, 1.0), Relaxed);
+            params.fb_power.store(fb.power.clamp(0.0, 1.0), Relaxed);
+            params.fb_out.store(fb.out_gain.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.fb_enabled.store(false, Relaxed);
         }
 
         let ts = &self.tube_screamer;
