@@ -1,0 +1,98 @@
+name        = "Aurora — Clean Melodic"
+description = "A warm, glassy clean for melodic playing — singing sustain, silky top, and just a breath of breakup on hard picking."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# A clean tone has little hiss to fight, so the gate sits very low and slow — just
+# enough to mute dead-air noise between phrases without ever clipping the long
+# decays that make a clean melody sing.
+[noise_gate]
+enabled   = true
+threshold = 0.08   # barely there — clean signals have a low noise floor
+release   = 0.45   # slow — never chokes a sustaining note or its reverb tail
+
+# ── Compressor ────────────────────────────────────────────────────────────────
+# The heart of a melodic clean: gentle compression evens out note-to-note level so
+# a single-note line stays smooth and sustains, while a slow-ish attack lets the
+# pick transient through so the tone keeps its articulation and doesn't pump.
+[compressor]
+enabled = true
+sustain = 0.45   # moderate ratio — sustain and evenness without squashing dynamics
+attack  = 0.40   # lets the pick attack speak before the gain reduction clamps
+level   = 0.55   # makeup gain back to a healthy level
+
+# ── Fuzz ──────────────────────────────────────────────────────────────────────
+# No fuzz — this is a clean voicing.
+[fuzz]
+enabled = false
+fuzz = 0.50
+tone = 0.50
+level = 0.60
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Off. A TS boost would push the amp into breakup; here we want the preamp staying
+# clean so the note's fundamental rings clear. (The amp's own low gain provides the
+# only touch of warmth.)
+[tube_screamer]
+enabled = false
+drive = 0.30
+tone  = 0.55
+level = 0.70
+
+# DS-1 off — no hard clipping anywhere in a clean tone.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Marshall JCM800, the most musical of the three models at low gain: its soft
+# asymmetric triode stages stay clean and let the fundamental lead, so single notes
+# keep their pitch centre and bloom rather than fizz. Gain is set at the edge of
+# breakup — clean on light picking, a hair of harmonic warmth when you dig in.
+[amp]
+model  = "marshall"
+gain   = 0.22   # edge-of-clean — clarity first, a breath of grit on hard picking
+bass   = 0.48   # full but not boomy — keeps the low strings tight and defined
+mid    = 0.55   # mids up: melody lives here, and present mids read as musical
+treble = 0.55   # clear and open without crossing into glassy/harsh
+presence = 0.42 # gentle — air without an edge on the top end
+master = 0.62
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Marshall 4×12 with Greenbacks — the smoothest, warmest cab voicing, with a
+# softer top than the V30 cabs. Mic'd slightly off-axis and blended toward the
+# ribbon for a silky high end, with a touch of room for three-dimensional depth.
+[cabinet]
+model   = "marshall"
+mic_pos = 0.42   # slightly off-axis (edge) — rounds off any spit on the attack
+mic_blend = 0.35 # more ribbon than the default — silky, un-fatiguing top end
+mic_room  = 0.28 # a sense of air and space around the note for melodic depth
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# A light corrective touch: trim the very lows so chords stay clear, and a whisper
+# of air up top. The amp and cab already carry the voicing, so this stays subtle.
+[eq]
+enabled = true
+low  = 0.45   # gentle low trim — keeps the clean tone tight, not woolly
+mid  = 0.52   # a hair of mid presence to reinforce melodic note clarity
+high = 0.55   # a breath of air/sparkle on top, well below harsh
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# A subtle quarter-note-ish delay low in the mix — the classic melodic-lead glue
+# that adds depth and sustain to single-note lines without turning into a wash or
+# blurring faster phrases.
+[delay]
+enabled  = true
+time     = 0.38   # medium delay time — spacious but still tight to the phrase
+feedback = 0.22   # a couple of repeats, then gone — depth without clutter
+mix      = 0.16   # well under the dry signal — felt more than heard
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# A lush but controlled hall — the ambience that lets a clean melody bloom and
+# sustain. Damped enough that the tail stays warm and doesn't fizz on top.
+[reverb]
+enabled = true
+room = 0.52   # medium-large space for melodic bloom
+damp = 0.50   # warm tail — rolls the highs off the reverb so it never sizzles
+mix  = 0.26   # present but supportive, never washing out the note

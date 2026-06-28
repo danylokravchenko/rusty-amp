@@ -39,8 +39,8 @@ const TEX_L: Texture = Texture {
         (20.00, 0.015),
     ],
     modes: &[
-        (66.0, 120.0, 0.005),
-        (90.0, 100.0, 0.007),
+        (66.0, 70.0, 0.005),
+        (90.0, 62.0, 0.007),
         (2500.0, 5.0, 0.009),
     ],
 };
@@ -57,8 +57,8 @@ const TEX_R: Texture = Texture {
         (20.50, 0.014),
     ],
     modes: &[
-        (70.0, 125.0, 0.005),
-        (96.0, 105.0, 0.007),
+        (70.0, 72.0, 0.005),
+        (96.0, 64.0, 0.007),
         (2600.0, 5.0, 0.009),
     ],
 };
@@ -110,11 +110,17 @@ impl MarshallCab {
     fn voicing_sm57(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
             Biquad::highpass(sr, 80.0, 0.8),
-            Biquad::low_shelf(sr, 120.0, 2.0),
-            Biquad::peak_eq(sr, 250.0, 1.5, -3.0),
-            Biquad::peak_eq(sr, 800.0, 1.5, 4.0),
+            // More low-mid body (+2→+4) and a shallower 250 Hz dip (−3→−1.5) lift
+            // the region where mid-neck fundamentals sit, and the 800 Hz honk is
+            // pulled back (+4→+1.5): together these flatten the steep upper-mid rise
+            // that made single high notes leap out far louder than mid-neck notes.
+            Biquad::low_shelf(sr, 120.0, 4.0),
+            Biquad::peak_eq(sr, 250.0, 1.5, -1.5),
+            Biquad::peak_eq(sr, 800.0, 1.5, 1.5),
             Biquad::peak_eq(sr, 1500.0, 1.5, -2.0),
-            Biquad::peak_eq(sr, 2500.0, 1.8, 5.0),
+            // Greenback presence: broadened and trimmed (Q 1.8→1.4, +5→+4 dB) for a
+            // smoother top — Greenbacks are inherently softer up here than V30s.
+            Biquad::peak_eq(sr, 2500.0, 1.4, 4.0),
             Biquad::high_shelf(sr, 5000.0, -10.0),
             Biquad::lowpass(sr, 8000.0, 0.707),
         ];

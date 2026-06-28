@@ -164,7 +164,10 @@ mod tests {
     /// sound-quality checks below run identically against all three.
     fn each_amp() -> Vec<(&'static str, Box<dyn Amplifier>)> {
         vec![
-            ("Marshall", Box::new(Marshall::new(SR)) as Box<dyn Amplifier>),
+            (
+                "Marshall",
+                Box::new(Marshall::new(SR)) as Box<dyn Amplifier>,
+            ),
             ("Mesa", Box::new(Mesa::new(SR))),
             ("Randall", Box::new(Randall::new(SR))),
         ]
@@ -233,7 +236,10 @@ mod tests {
                     for i in 0..(SR as usize / 4) {
                         let x = (2.0 * PI * 82.41 * i as f32 / SR).sin() * 0.9;
                         let y = amp.process(x, gain, 0.7, 0.5, 0.7, 0.6, master);
-                        assert!(y.is_finite(), "{name} non-finite at gain={gain} master={master}");
+                        assert!(
+                            y.is_finite(),
+                            "{name} non-finite at gain={gain} master={master}"
+                        );
                         max_abs = max_abs.max(y.abs());
                     }
                 }
@@ -283,9 +289,14 @@ mod tests {
                 h2 + h3
             );
 
-            let harm_energy: f32 = harmonics.iter().map(|&f| goertzel(&out, f, SR).powi(2)).sum();
-            let alias_energy: f32 =
-                inharmonic.iter().map(|&f| goertzel(&out, f, SR).powi(2)).sum();
+            let harm_energy: f32 = harmonics
+                .iter()
+                .map(|&f| goertzel(&out, f, SR).powi(2))
+                .sum();
+            let alias_energy: f32 = inharmonic
+                .iter()
+                .map(|&f| goertzel(&out, f, SR).powi(2))
+                .sum();
             assert!(
                 alias_energy < 0.02 * harm_energy,
                 "{name} aliasing/hash too high: alias={alias_energy:.6} harm={harm_energy:.6}"
@@ -313,8 +324,8 @@ mod tests {
                 }
             }
             let sub = goertzel(&out, 41.0, SR) + goertzel(&out, 55.0, SR);
-            let body = goertzel(&out, 164.81, SR) + goertzel(&out, 247.0, SR)
-                + goertzel(&out, 330.0, SR);
+            let body =
+                goertzel(&out, 164.81, SR) + goertzel(&out, 247.0, SR) + goertzel(&out, 330.0, SR);
             assert!(
                 sub / body.max(1e-9) < 0.45,
                 "{name} low end is farty: sub/body = {:.2}",

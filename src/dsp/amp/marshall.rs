@@ -38,6 +38,14 @@ pub struct Marshall {
     // Presence — power-amp NFB characteristic (base rate)
     presence_shelf: Biquad,
     last_presence: f32,
+    // Structural voicing balance (base rate): a static low shelf restores low-mid
+    // body and a static high shelf tames the tone stack's treble-forward tilt, so
+    // notes stay even in level across the neck instead of the upper register
+    // blasting out (its fundamentals otherwise ride the upper-mid rise).
+    body: Biquad,
+    tilt: Biquad,
+    // Output DC blocker (the asymmetric power clip leaves a small offset).
+    out_hp: Biquad,
     // Power amp envelope follower (sag simulation)
     envelope: f32,
     // Power-amp ↔ speaker impedance interaction (dynamic low-end bloom).
@@ -55,19 +63,27 @@ impl Marshall {
             // JCM800 input coupling cap → sub-rumble cut at ~35 Hz, kept below the
             // 82 Hz low-E fundamental so the distorted bass string stays intact.
             pre_clip_hp: Biquad::highpass(sr8, 35.0, 0.707),
-            // JCM800 22 nF inter-stage coupling cap → HP at ~720 Hz
-            stage_hp: Biquad::highpass(sr8, 720.0, 0.707),
-            bloom: Bloom::new(sr, 8.0, 120.0),
+            // JCM800 inter-stage coupling → HP at ~300 Hz. The 22 nF cap with the
+            // following grid resistor actually corners well below the old 720 Hz;
+            // dropping it keeps the fundamental of mid-neck notes feeding the second
+            // stage so the note leads its overtones, while still tightening the lows.
+            stage_hp: Biquad::highpass(sr8, 300.0, 0.707),
+            bloom: Bloom::new(sr, 8.0, 55.0),
             tone: ToneStack::new(sr, Components::MARSHALL),
             last_bass: -1.0,
             last_mid: -1.0,
             last_treble: -1.0,
             presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
             last_presence: -1.0,
+            body: Biquad::low_shelf(sr, 180.0, 3.5),
+            tilt: Biquad::high_shelf(sr, 750.0, -7.0),
+            out_hp: Biquad::highpass(sr, 12.0, 0.707),
             envelope: 0.0,
-            // 8×12 resonance ~95 Hz; tube amp has moderate damping, so a healthy
-            // dynamic bloom under sag and a gentle inductive top lift.
-            speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.55, 0.8),
+            // 8×12 resonance ~95 Hz; tube amp has moderate damping. Dynamic bloom
+            // trimmed (0.55→0.30): the big sag-driven low resonance was ringing on
+            // after a palm-muted chug, smearing the percussive tightness — a real
+            // power amp blooms, but not so much the chug stops feeling muted.
+            speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.30, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);
@@ -93,7 +109,11 @@ impl Marshall {
         let coeff = if abs_x > self.envelope {
             1.0 - (-220.0 / self.sr).exp()
         } else {
-            1.0 - (-5.0 / self.sr).exp()
+            // Sag recovery sped up (~200 ms → ~60 ms): the slow release held the gain
+            // reduction long after a palm-muted chug's attack, then recovered into a
+            // swell that re-energised the note 20–40 ms in — so the chug built up
+            // instead of punching. A quicker recovery keeps the attack percussive.
+            1.0 - (-16.0 / self.sr).exp()
         };
         self.envelope += coeff * (abs_x - self.envelope);
         let sag = 1.0 / (1.0 + self.envelope * 0.6);
@@ -129,7 +149,13 @@ impl Amplifier for Marshall {
 
         let pregain = 1.0 + gain * 39.0;
         // Dynamic grid-bias offset (removed downstream by the inter-stage HP).
-        let bias = self.bloom.follow(x) * 0.12;
+        // Bias depth halved and the bloom release shortened (above): the slow,
+        // deep grid-bias follower stayed elevated between notes, so a note played
+        // right after others got a louder, more even-harmonic attack than the same
+        // note played alone — an audible note-to-note inconsistency. A lighter,
+        // faster bloom keeps the touch-sensitive give within a note but recovers
+        // between them so every note attacks the same.
+        let bias = self.bloom.follow(x) * 0.06;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
@@ -138,13 +164,16 @@ impl Amplifier for Marshall {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
             let s = self.stage_hp.process(s);
-            *o = tube_clip_asym(s * 4.0) / 2.0;
+            *o = tube_clip_asym(s * 3.2) / 3.2_f32.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
 
         // Passive FMV tone stack (base rate — no aliasing risk)
         let x = self.tone.process(x);
+        // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
+        let x = self.body.process(x);
+        let x = self.tilt.process(x);
 
         // Power amp: transformer sag + light saturation
         let x = self.power_amp(x);
@@ -154,6 +183,11 @@ impl Amplifier for Marshall {
 
         // Presence: output transformer NFB shelf
         let x = self.presence_shelf.process(x);
+
+        // Output DC block: the asymmetric power-stage clip injects a small DC offset
+        // and (unlike the Mesa/Randall) there is no power-section high-pass after it;
+        // a real output transformer passes no DC, so strip it here before the trim.
+        let x = self.out_hp.process(x);
 
         // Output trim: the tube power stage runs at a conservative level; this
         // makeup brings the JCM800 up to the same loudness as the (much hotter)

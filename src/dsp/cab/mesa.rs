@@ -43,11 +43,7 @@ const TEX_L: Texture = Texture {
         (17.50, -0.026),
         (20.50, 0.015),
     ],
-    modes: &[
-        (74.0, 110.0, 0.005),
-        (95.0, 95.0, 0.007),
-        (3400.0, 4.0, 0.1),
-    ],
+    modes: &[(74.0, 65.0, 0.005), (95.0, 58.0, 0.007), (3400.0, 4.0, 0.1)],
 };
 const TEX_R: Texture = Texture {
     predelay: 2,
@@ -62,8 +58,8 @@ const TEX_R: Texture = Texture {
         (20.50, 0.014),
     ],
     modes: &[
-        (79.0, 115.0, 0.005),
-        (102.0, 100.0, 0.007),
+        (79.0, 67.0, 0.005),
+        (102.0, 60.0, 0.007),
         (3550.0, 4.0, 0.10),
     ],
 };
@@ -116,11 +112,19 @@ impl MesaCab {
     fn voicing_sm57(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
             Biquad::highpass(sr, 80.0, 0.9),
-            Biquad::low_shelf(sr, 100.0, 3.0),
-            Biquad::peak_eq(sr, 300.0, 1.8, -4.0),
-            Biquad::peak_eq(sr, 400.0, 1.5, -5.0),
-            Biquad::peak_eq(sr, 800.0, 1.5, 2.0),
-            Biquad::peak_eq(sr, 3500.0, 2.0, 7.0),
+            Biquad::low_shelf(sr, 100.0, 5.0),
+            // V30 scoop, mostly filled (−4→−1.5 @ 300, −5→−2 @ 400) and more low
+            // shelf (+4→+5): the deep scoop hollowed the low-mid body that carries
+            // fretted notes, which — combined with the bright upper mids — left the
+            // response rising ~20 dB up the neck so single high notes blasted. A
+            // shallow scoop keeps V30 character while evening the level across notes.
+            Biquad::peak_eq(sr, 300.0, 1.8, -1.5),
+            Biquad::peak_eq(sr, 400.0, 1.5, -2.0),
+            Biquad::peak_eq(sr, 800.0, 1.5, 2.5),
+            // V30 presence: broadened (Q 2.0→1.3) and tamed (+7→+4 dB). The narrow
+            // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
+            // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
+            Biquad::peak_eq(sr, 3500.0, 1.3, 4.0),
             Biquad::high_shelf(sr, 5500.0, -14.0),
             Biquad::lowpass(sr, 9000.0, 0.707),
         ];

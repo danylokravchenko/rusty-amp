@@ -671,6 +671,318 @@ mod tests {
         );
     }
 
+    // ── Base-tone quality (amp + cab, no pedals) ──────────────────────────────
+    //
+    // These tests pin the "clean, melodic, not artificial" voicing the amp/cab
+    // were tuned for. The danger with hand-dialled DSP is that the parameters drift
+    // back into the failure modes we measured and fixed: the played note buried
+    // under its own overtones (fizz), an ice-pick presence band, or one note
+    // jumping out far louder than its neighbours. Each test is an objective bound on
+    // one of those, measured on the real amp→cab signal path at the shipped default
+    // controls, so a future tweak that re-introduces the problem fails loudly.
+
+    /// Amp model paired with the cab it is voiced against.
+    const RIGS: [(AmpModel, CabModel); 3] = [
+        (AmpModel::Marshall, CabModel::Marshall),
+        (AmpModel::Mesa, CabModel::Mesa),
+        (AmpModel::Randall, CabModel::Orange),
+    ];
+
+    /// Notes spanning the full usable range, low-E open up into the top octave —
+    /// deliberately including the high register (A5–E6), where an over-bright system
+    /// makes single notes blast out and lose their body. Lead lines live up here.
+    const NECK: [(&str, f32); 11] = [
+        ("E2", 82.41),
+        ("A2", 110.0),
+        ("D3", 146.83),
+        ("G3", 196.0),
+        ("B3", 246.94),
+        ("E4", 329.63),
+        ("A4", 440.0),
+        ("E5", 659.25),
+        ("A5", 880.0),
+        ("C6", 1046.5),
+        ("E6", 1318.5),
+    ];
+
+    /// Render one sustained note through amp+cab at the shipped default controls and
+    /// return the mono (L+R) steady-state tail (filter/envelope transients dropped).
+    fn render_note(am: AmpModel, cm: CabModel, freq: f32) -> Vec<f32> {
+        let sr = 48_000.0;
+        let mut amp = amp::AmpBank::new(sr);
+        let mut cab = cab::CabBank::new(sr);
+        let n = sr as usize;
+        let warmup = n / 3;
+        let mut out = Vec::with_capacity(n - warmup);
+        for i in 0..n {
+            // Defaults from DEFAULT_AMP_* / DEFAULT_MIC_*.
+            let x = (2.0 * PI * freq * i as f32 / sr).sin() * 0.5;
+            let a = amp.process(am, x, 0.65, 0.50, 0.45, 0.65, 0.50, 0.55);
+            let (l, r) = cab.process(cm, a, 0.5, 0.15, 0.15);
+            if i >= warmup {
+                out.push(l + r);
+            }
+        }
+        out
+    }
+
+    /// Summed Goertzel energy in [lo, hi) on a semitone grid (coarse but consistent).
+    fn band_energy(s: &[f32], lo: f32, hi: f32) -> f32 {
+        let sr = 48_000.0;
+        let mut f = lo;
+        let mut e = 0.0;
+        while f < hi {
+            let g = goertzel(s, f, sr);
+            e += g * g;
+            f *= 2.0_f32.powf(1.0 / 12.0);
+        }
+        e
+    }
+
+    /// Spectral centroid (Hz) on a quarter-tone grid 50 Hz–10 kHz — a single number
+    /// for "how bright": a guitar-amp tone lives in the low hundreds–low thousands,
+    /// and a note whose centroid runs into the multi-kHz range reads as ice-pick.
+    fn centroid(s: &[f32]) -> f32 {
+        let sr = 48_000.0;
+        let mut f = 50.0f32;
+        let (mut num, mut den) = (0.0f32, 0.0f32);
+        while f < 10_000.0 {
+            let g = goertzel(s, f, sr);
+            num += f * g;
+            den += g;
+            f *= 2.0_f32.powf(1.0 / 24.0);
+        }
+        num / den.max(1e-12)
+    }
+
+    /// The played note must lead its own overtones. Driving the amp adds harmonics
+    /// (that is the point), but if the 5th–10th harmonic ends up *louder than the
+    /// fundamental* the note loses its pitch centre and the tone turns to fizz —
+    /// the exact failure (fundamental 30–100× below an upper harmonic) the
+    /// inter-stage coupling high-passes were re-tuned to cure. We require the
+    /// fundamental to stay within ~5× of the loudest partial across the neck.
+    #[test]
+    fn fundamental_is_not_buried_under_overtones() {
+        let sr = 48_000.0;
+        for (am, cm) in RIGS {
+            for (name, f) in NECK {
+                let out = render_note(am, cm, f);
+                let h: Vec<f32> = (1..=10).map(|k| goertzel(&out, f * k as f32, sr)).collect();
+                let peak = h.iter().cloned().fold(0.0f32, f32::max).max(1e-9);
+                let fund_dom = h[0] / peak;
+                assert!(
+                    fund_dom >= 0.20,
+                    "{} {name}: fundamental buried under overtones (funDom {fund_dom:.3})",
+                    am.name()
+                );
+            }
+        }
+    }
+
+    /// No single note may sit in the harsh / ice-pick zone. Two complementary
+    /// bounds: the 2–5 kHz "presence" energy must stay a fraction of the 200 Hz–2
+    /// kHz body (so the cab presence spike + upper harmonics don't dominate), and
+    /// the overall brightness (centroid) must stay in the musical guitar band. This
+    /// guards the cab presence-peak gains and the amp's harmonic generation.
+    #[test]
+    fn no_note_is_harsh_or_ice_picky() {
+        for (am, cm) in RIGS {
+            for (name, f) in NECK {
+                let out = render_note(am, cm, f);
+                let harsh = band_energy(&out, 2000.0, 5000.0);
+                let body = band_energy(&out, 200.0, 2000.0).max(1e-12);
+                assert!(
+                    harsh / body < 0.6,
+                    "{} {name}: harsh/ice-pick (2-5k / body = {:.3})",
+                    am.name(),
+                    harsh / body
+                );
+                let c = centroid(&out);
+                assert!(
+                    c < 2500.0,
+                    "{} {name}: too bright (centroid {c:.0} Hz)",
+                    am.name()
+                );
+            }
+        }
+    }
+
+    /// Almost no energy should survive above the speaker's rolloff. A real cab is a
+    /// steep low-pass; audible content above ~6 kHz is aliasing/fizz, the "digital"
+    /// artefact the 8× oversampling and cab IR exist to suppress. We require the
+    /// 6–12 kHz band to be a tiny fraction of the total — a direct guard on the
+    /// oversampling and the cab's top-end voicing.
+    #[test]
+    fn no_audible_fizz_above_the_cab_rolloff() {
+        for (am, cm) in RIGS {
+            for (name, f) in NECK {
+                let out = render_note(am, cm, f);
+                let fizz = band_energy(&out, 6000.0, 12_000.0);
+                let total = band_energy(&out, 50.0, 12_000.0).max(1e-12);
+                assert!(
+                    fizz / total < 0.01,
+                    "{} {name}: fizz above cab rolloff ({:.2}% of total)",
+                    am.name(),
+                    100.0 * fizz / total
+                );
+            }
+        }
+    }
+
+    /// High notes must not blast out over the mid neck. The original voicing had a
+    /// steep rising frequency tilt — a note at 880 Hz ran +17 dB louder than one at
+    /// 220 Hz — so single notes high up the neck leapt out and, with their harmonics
+    /// past the cab rolloff, collapsed to thin, piercing fundamentals (the "strange
+    /// high notes"). At high gain, clipping compression hides this; at clean settings
+    /// it is laid bare.
+    ///
+    /// We compare the top octave (E5–E6) against the mid neck (G3–A4) rather than the
+    /// raw min/max across all notes: the deep low E is *intentionally* a touch
+    /// quieter on the tight-voiced metal amps (the low-mid cut that makes palm mutes
+    /// chug), and penalising that would conflate two different things. What must stay
+    /// bounded is the high register relative to the body of the neck.
+    #[test]
+    fn high_notes_dont_blast_over_the_mid_neck() {
+        let level = |am, cm, f: f32| {
+            let out = render_note(am, cm, f);
+            (out.iter().map(|&x| x * x).sum::<f32>() / out.len() as f32).sqrt()
+        };
+        for (am, cm) in RIGS {
+            let mid = [196.0, 246.94, 329.63, 440.0] // G3 B3 E4 A4
+                .iter()
+                .map(|&f| level(am, cm, f))
+                .sum::<f32>()
+                / 4.0;
+            let high = [659.25, 880.0, 1046.5, 1318.5] // E5 A5 C6 E6
+                .iter()
+                .map(|&f| level(am, cm, f))
+                .sum::<f32>()
+                / 4.0;
+            assert!(
+                high / mid.max(1e-9) < 2.5,
+                "{}: high register blasts over the mid neck (high/mid {:.2}x)",
+                am.name(),
+                high / mid.max(1e-9)
+            );
+        }
+    }
+
+    /// Power chords (root + fifth + octave) up the neck must stay even and tight —
+    /// the rhythm-playing counterpart to the single-note evenness test. No chord
+    /// should jump out far louder than its neighbours, and the inaudible
+    /// difference-tone "fart" an octave below the root must stay well under the
+    /// chord's musical body at every position.
+    #[test]
+    fn power_chords_are_even_and_tight_across_the_neck() {
+        // (root, fifth, octave) for chords rooted up the low strings.
+        let chords: [(f32, f32, f32); 6] = [
+            (82.41, 123.47, 164.81),  // E2
+            (98.0, 146.83, 196.0),    // G2
+            (110.0, 164.81, 220.0),   // A2
+            (130.81, 196.0, 261.63),  // C3
+            (164.81, 246.94, 329.63), // E3
+            (220.0, 329.63, 440.0),   // A3
+        ];
+        let sr = 48_000.0;
+        for (am, cm) in RIGS {
+            let mut levels = Vec::new();
+            for &(r, fifth, oct) in &chords {
+                let mut amp = amp::AmpBank::new(sr);
+                let mut cab = cab::CabBank::new(sr);
+                let n = sr as usize;
+                let warmup = n / 3;
+                let mut out = Vec::with_capacity(n - warmup);
+                for i in 0..n {
+                    let t = i as f32 / sr;
+                    let x = ((2.0 * PI * r * t).sin()
+                        + (2.0 * PI * fifth * t).sin()
+                        + (2.0 * PI * oct * t).sin())
+                        * 0.3;
+                    let a = amp.process(am, x, 0.65, 0.50, 0.45, 0.65, 0.50, 0.55);
+                    let (l, rr) = cab.process(cm, a, 0.5, 0.15, 0.15);
+                    if i >= warmup {
+                        out.push(l + rr);
+                    }
+                }
+                let sub = goertzel(&out, r * 0.5, sr) + goertzel(&out, r * 0.66, sr);
+                let body =
+                    goertzel(&out, r, sr) + goertzel(&out, fifth, sr) + goertzel(&out, oct, sr);
+                assert!(
+                    sub / body.max(1e-9) < 0.5,
+                    "{}: power chord at {r:.0} Hz is farty (sub/body {:.2})",
+                    am.name(),
+                    sub / body.max(1e-9)
+                );
+                levels.push((out.iter().map(|&x| x * x).sum::<f32>() / out.len() as f32).sqrt());
+            }
+            let lo = levels.iter().cloned().fold(f32::INFINITY, f32::min);
+            let hi = levels.iter().cloned().fold(0.0, f32::max);
+            assert!(
+                hi / lo < 4.0,
+                "{}: power chords uneven across neck (spread {:.1}x)",
+                am.name(),
+                hi / lo
+            );
+        }
+    }
+
+    /// A note must sound the same whether played on its own or right after other
+    /// notes. The dynamic grid-bias "bloom" follower deliberately adds even-harmonic
+    /// warmth that grows with how hard you play — touch sensitivity — but if it
+    /// releases too slowly it stays loaded from the previous notes and over-warms the
+    /// *next* note's attack, so the same note picks up a different timbre depending on
+    /// what preceded it (an audible note-to-note inconsistency). We render a note's
+    /// attack cold (from silence) and again right after a loud lick, and require the
+    /// even-harmonic content of its attack to barely move. This guards the bloom
+    /// depth/release: within-note give stays, cross-note bleed does not.
+    #[test]
+    fn a_note_attacks_the_same_regardless_of_what_preceded_it() {
+        let sr = 48_000.0;
+        let note = 164.81; // E3 — absent from the preceding lick below
+        // Attack-window 2nd-harmonic ratio of `note`, optionally after a loud lick.
+        let attack_h2_ratio = |am: AmpModel, cm: CabModel, preceded: bool| -> f32 {
+            let mut amp = amp::AmpBank::new(sr);
+            let mut cab = cab::CabBank::new(sr);
+            let run =
+                |amp: &mut amp::AmpBank, cab: &mut cab::CabBank, f: f32, n: usize, amp_in: f32| {
+                    let mut last = 0.0;
+                    for i in 0..n {
+                        let x = (2.0 * PI * f * i as f32 / sr).sin() * amp_in;
+                        let a = amp.process(am, x, 0.7, 0.5, 0.45, 0.65, 0.5, 0.6);
+                        let (l, r) = cab.process(cm, a, 0.5, 0.15, 0.15);
+                        last = l + r;
+                    }
+                    last
+                };
+            // Settle filters from rest.
+            run(&mut amp, &mut cab, 0.0, sr as usize / 20, 0.0);
+            if preceded {
+                for &f in &[196.0f32, 261.63, 329.63, 220.0] {
+                    run(&mut amp, &mut cab, f, sr as usize * 90 / 1000, 0.6);
+                }
+            }
+            // Capture the note's attack (first 80 ms).
+            let n = sr as usize * 80 / 1000;
+            let mut out = Vec::with_capacity(n);
+            for i in 0..n {
+                let x = (2.0 * PI * note * i as f32 / sr).sin() * 0.5;
+                let a = amp.process(am, x, 0.7, 0.5, 0.45, 0.65, 0.5, 0.6);
+                let (l, r) = cab.process(cm, a, 0.5, 0.15, 0.15);
+                out.push(l + r);
+            }
+            goertzel(&out, note * 2.0, sr) / goertzel(&out, note, sr).max(1e-9)
+        };
+        for (am, cm) in RIGS {
+            let fresh = attack_h2_ratio(am, cm, false);
+            let after = attack_h2_ratio(am, cm, true);
+            assert!(
+                (after - fresh).abs() < 0.10,
+                "{}: note attack changes after other notes (h2/h1 {fresh:.3} → {after:.3})",
+                am.name()
+            );
+        }
+    }
+
     /// A low-E power chord through a high-gain, bass-heavy, mid-scooped rig (the
     /// "Pantera rhythm" worst case) must not turn into sub-bass mush: the inaudible
     /// difference-tone / rumble energy below the low-E fundamental must stay a small
