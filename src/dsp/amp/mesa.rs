@@ -40,6 +40,16 @@ pub struct Mesa {
     // Presence (base rate)
     presence_shelf: Biquad,
     last_presence: f32,
+    // Structural voicing balance (base rate): the FENDER tone stack is treble-heavy
+    // and peak-normalised, so the upper mids/treble end up sitting ~12 dB above the
+    // low mids. Left alone, single notes higher up the neck (whose fundamentals land
+    // in that boosted region) blast out far louder than mid-neck notes. A static low
+    // shelf restores body and a static high shelf tames the tilt, flattening the
+    // across-the-neck response without touching the player's tone controls. The body
+    // shelf's corner is matched to the upper inter-stage HP so the low-mid level it
+    // restores has no gap (which would leave a mid note quieter than its neighbours).
+    body: Biquad,
+    tilt: Biquad,
     // Silicon-rectifier sag envelope
     envelope: f32,
     // Power-amp ↔ speaker impedance interaction.
@@ -58,19 +68,22 @@ impl Mesa {
             // stages so they don't generate difference-tone mud, while preserving
             // the 82 Hz low-E fundamental.
             pre_clip_hp: Biquad::highpass(sr8, 70.0, 0.707),
-            // Between stage 1 and 2: ~180 Hz. A real grid-coupling cap corners far
-            // below the note, not above it; the previous 680 Hz stripped the
+            // Between stage 1 and 2: ~225 Hz. The original 680 Hz stripped the
             // fundamental of every note under ~1 kHz before the next clipper, so the
-            // later stages only had upper harmonics to multiply (the note's body
-            // vanished under a 10th-harmonic fizz). 180 Hz still tightens flub on a
-            // low chord while keeping the fundamental intact.
-            stage_hp_1: Biquad::highpass(sr8, 180.0, 0.707),
-            // Between stage 2 and 3: ~260 Hz (silicon stage compresses harder, so a
-            // slightly tighter corner) — still well below the lowest fundamentals.
-            stage_hp_2: Biquad::highpass(sr8, 260.0, 0.707),
-            // Subsonic cut at 70 Hz, cascaded → 24 dB/oct.
-            power_hp: Biquad::highpass(sr, 70.0, 0.707),
-            power_hp2: Biquad::highpass(sr, 70.0, 0.707),
+            // note's body vanished under a 10th-harmonic fizz. This corner keeps the
+            // fundamental intact while still cutting enough low-mid in the cascade
+            // that a palm-muted chug decays fast and stays percussive (the post-stack
+            // `body` shelf restores the steady low-mid level for sustained notes).
+            stage_hp_1: Biquad::highpass(sr8, 225.0, 0.707),
+            // Between stage 2 and 3: ~320 Hz (silicon stage compresses harder, so a
+            // tighter corner) — the chug-tightening cut, still below the fundamentals.
+            stage_hp_2: Biquad::highpass(sr8, 320.0, 0.707),
+            // Subsonic cut at 55 Hz, cascaded → 24 dB/oct. Lowered from 70 Hz so the
+            // 82 Hz low-E fundamental passes with full weight (it was ~6 dB down),
+            // while the 24 dB/oct slope still kills the inaudible difference-tone
+            // fart well below it.
+            power_hp: Biquad::highpass(sr, 55.0, 0.707),
+            power_hp2: Biquad::highpass(sr, 55.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
             tone: ToneStack::new(sr, Components::FENDER),
             last_bass: -1.0,
@@ -78,10 +91,13 @@ impl Mesa {
             last_treble: -1.0,
             presence_shelf: Biquad::high_shelf(sr, 4000.0, 0.0),
             last_presence: -1.0,
+            body: Biquad::low_shelf(sr, 320.0, 7.0),
+            tilt: Biquad::high_shelf(sr, 600.0, -9.5),
             envelope: 0.0,
             // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
-            // rectifier, so a slightly tighter dynamic bloom than the JCM800.
-            speaker: SpeakerLoad::new(sr, 100.0, 1.0, 0.06, 0.45, 0.8),
+            // rectifier, so a tight dynamic bloom. Trimmed (0.45→0.22) so palm-muted
+            // chugs stay percussive instead of blooming on after the attack.
+            speaker: SpeakerLoad::new(sr, 100.0, 1.0, 0.06, 0.22, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);
@@ -164,6 +180,9 @@ impl Amplifier for Mesa {
         // ── end oversampled section ───────────────────────────────────────────
 
         let x = self.tone.process(x);
+        // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
+        let x = self.body.process(x);
+        let x = self.tilt.process(x);
 
         // Subsonic cut before the power stage so the silicon clipper can't fold
         // sub-bass into difference-tone mud.
@@ -177,7 +196,7 @@ impl Amplifier for Mesa {
 
         // Output trim: level-match the Recto to the hotter solid-state Randall so
         // switching amp models doesn't produce a volume jump.
-        x * master * 5.1
+        x * master * 7.2
     }
 }
 

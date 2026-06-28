@@ -5,8 +5,6 @@ pub mod conv;
 pub mod effects;
 pub mod oversample;
 pub mod tonestack;
-#[cfg(test)]
-mod tone_probe;
 
 use atomic_float::AtomicF32;
 use std::sync::Arc;
@@ -690,8 +688,10 @@ mod tests {
         (AmpModel::Randall, CabModel::Orange),
     ];
 
-    /// Notes spanning the usable range, low-E open to high E (12th fret, 1st string).
-    const NECK: [(&str, f32); 8] = [
+    /// Notes spanning the full usable range, low-E open up into the top octave —
+    /// deliberately including the high register (A5–E6), where an over-bright system
+    /// makes single notes blast out and lose their body. Lead lines live up here.
+    const NECK: [(&str, f32); 11] = [
         ("E2", 82.41),
         ("A2", 110.0),
         ("D3", 146.83),
@@ -700,6 +700,9 @@ mod tests {
         ("E4", 329.63),
         ("A4", 440.0),
         ("E5", 659.25),
+        ("A5", 880.0),
+        ("C6", 1046.5),
+        ("E6", 1318.5),
     ];
 
     /// Render one sustained note through amp+cab at the shipped default controls and
@@ -826,26 +829,97 @@ mod tests {
         }
     }
 
-    /// The tone must stay reasonably even across the neck: no note should leap out
-    /// dramatically louder than its neighbours at fixed pick energy, or melodic
-    /// lines turn lumpy. A loose bound (a real amp/speaker does emphasise some
-    /// bands), but it catches a runaway resonance or a wildly scooped voicing that
-    /// guts whole regions of the fretboard.
+    /// High notes must not blast out over the mid neck. The original voicing had a
+    /// steep rising frequency tilt — a note at 880 Hz ran +17 dB louder than one at
+    /// 220 Hz — so single notes high up the neck leapt out and, with their harmonics
+    /// past the cab rolloff, collapsed to thin, piercing fundamentals (the "strange
+    /// high notes"). At high gain, clipping compression hides this; at clean settings
+    /// it is laid bare.
+    ///
+    /// We compare the top octave (E5–E6) against the mid neck (G3–A4) rather than the
+    /// raw min/max across all notes: the deep low E is *intentionally* a touch
+    /// quieter on the tight-voiced metal amps (the low-mid cut that makes palm mutes
+    /// chug), and penalising that would conflate two different things. What must stay
+    /// bounded is the high register relative to the body of the neck.
     #[test]
-    fn tone_is_even_across_the_neck() {
+    fn high_notes_dont_blast_over_the_mid_neck() {
+        let level = |am, cm, f: f32| {
+            let out = render_note(am, cm, f);
+            (out.iter().map(|&x| x * x).sum::<f32>() / out.len() as f32).sqrt()
+        };
         for (am, cm) in RIGS {
-            let levels: Vec<f32> = NECK
+            let mid = [196.0, 246.94, 329.63, 440.0] // G3 B3 E4 A4
                 .iter()
-                .map(|&(_, f)| {
-                    let out = render_note(am, cm, f);
-                    (out.iter().map(|&x| x * x).sum::<f32>() / out.len() as f32).sqrt()
-                })
-                .collect();
+                .map(|&f| level(am, cm, f))
+                .sum::<f32>()
+                / 4.0;
+            let high = [659.25, 880.0, 1046.5, 1318.5] // E5 A5 C6 E6
+                .iter()
+                .map(|&f| level(am, cm, f))
+                .sum::<f32>()
+                / 4.0;
+            assert!(
+                high / mid.max(1e-9) < 2.5,
+                "{}: high register blasts over the mid neck (high/mid {:.2}x)",
+                am.name(),
+                high / mid.max(1e-9)
+            );
+        }
+    }
+
+    /// Power chords (root + fifth + octave) up the neck must stay even and tight —
+    /// the rhythm-playing counterpart to the single-note evenness test. No chord
+    /// should jump out far louder than its neighbours, and the inaudible
+    /// difference-tone "fart" an octave below the root must stay well under the
+    /// chord's musical body at every position.
+    #[test]
+    fn power_chords_are_even_and_tight_across_the_neck() {
+        // (root, fifth, octave) for chords rooted up the low strings.
+        let chords: [(f32, f32, f32); 6] = [
+            (82.41, 123.47, 164.81),  // E2
+            (98.0, 146.83, 196.0),    // G2
+            (110.0, 164.81, 220.0),   // A2
+            (130.81, 196.0, 261.63),  // C3
+            (164.81, 246.94, 329.63), // E3
+            (220.0, 329.63, 440.0),   // A3
+        ];
+        let sr = 48_000.0;
+        for (am, cm) in RIGS {
+            let mut levels = Vec::new();
+            for &(r, fifth, oct) in &chords {
+                let mut amp = amp::AmpBank::new(sr);
+                let mut cab = cab::CabBank::new(sr);
+                let n = sr as usize;
+                let warmup = n / 3;
+                let mut out = Vec::with_capacity(n - warmup);
+                for i in 0..n {
+                    let t = i as f32 / sr;
+                    let x = ((2.0 * PI * r * t).sin()
+                        + (2.0 * PI * fifth * t).sin()
+                        + (2.0 * PI * oct * t).sin())
+                        * 0.3;
+                    let a = amp.process(am, x, 0.65, 0.50, 0.45, 0.65, 0.50, 0.55);
+                    let (l, rr) = cab.process(cm, a, 0.5, 0.15, 0.15);
+                    if i >= warmup {
+                        out.push(l + rr);
+                    }
+                }
+                let sub = goertzel(&out, r * 0.5, sr) + goertzel(&out, r * 0.66, sr);
+                let body =
+                    goertzel(&out, r, sr) + goertzel(&out, fifth, sr) + goertzel(&out, oct, sr);
+                assert!(
+                    sub / body.max(1e-9) < 0.5,
+                    "{}: power chord at {r:.0} Hz is farty (sub/body {:.2})",
+                    am.name(),
+                    sub / body.max(1e-9)
+                );
+                levels.push((out.iter().map(|&x| x * x).sum::<f32>() / out.len() as f32).sqrt());
+            }
             let lo = levels.iter().cloned().fold(f32::INFINITY, f32::min);
             let hi = levels.iter().cloned().fold(0.0, f32::max);
             assert!(
-                hi / lo < 10.0,
-                "{}: uneven across neck (loudness spread {:.1}x)",
+                hi / lo < 4.0,
+                "{}: power chords uneven across neck (spread {:.1}x)",
                 am.name(),
                 hi / lo
             );

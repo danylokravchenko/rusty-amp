@@ -38,6 +38,14 @@ pub struct Marshall {
     // Presence — power-amp NFB characteristic (base rate)
     presence_shelf: Biquad,
     last_presence: f32,
+    // Structural voicing balance (base rate): a static low shelf restores low-mid
+    // body and a static high shelf tames the tone stack's treble-forward tilt, so
+    // notes stay even in level across the neck instead of the upper register
+    // blasting out (its fundamentals otherwise ride the upper-mid rise).
+    body: Biquad,
+    tilt: Biquad,
+    // Output DC blocker (the asymmetric power clip leaves a small offset).
+    out_hp: Biquad,
     // Power amp envelope follower (sag simulation)
     envelope: f32,
     // Power-amp ↔ speaker impedance interaction (dynamic low-end bloom).
@@ -67,10 +75,15 @@ impl Marshall {
             last_treble: -1.0,
             presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
             last_presence: -1.0,
+            body: Biquad::low_shelf(sr, 180.0, 3.5),
+            tilt: Biquad::high_shelf(sr, 750.0, -7.0),
+            out_hp: Biquad::highpass(sr, 12.0, 0.707),
             envelope: 0.0,
-            // 8×12 resonance ~95 Hz; tube amp has moderate damping, so a healthy
-            // dynamic bloom under sag and a gentle inductive top lift.
-            speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.55, 0.8),
+            // 8×12 resonance ~95 Hz; tube amp has moderate damping. Dynamic bloom
+            // trimmed (0.55→0.30): the big sag-driven low resonance was ringing on
+            // after a palm-muted chug, smearing the percussive tightness — a real
+            // power amp blooms, but not so much the chug stops feeling muted.
+            speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.30, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
         m.update_presence(0.5);
@@ -96,7 +109,11 @@ impl Marshall {
         let coeff = if abs_x > self.envelope {
             1.0 - (-220.0 / self.sr).exp()
         } else {
-            1.0 - (-5.0 / self.sr).exp()
+            // Sag recovery sped up (~200 ms → ~60 ms): the slow release held the gain
+            // reduction long after a palm-muted chug's attack, then recovered into a
+            // swell that re-energised the note 20–40 ms in — so the chug built up
+            // instead of punching. A quicker recovery keeps the attack percussive.
+            1.0 - (-16.0 / self.sr).exp()
         };
         self.envelope += coeff * (abs_x - self.envelope);
         let sag = 1.0 / (1.0 + self.envelope * 0.6);
@@ -148,6 +165,9 @@ impl Amplifier for Marshall {
 
         // Passive FMV tone stack (base rate — no aliasing risk)
         let x = self.tone.process(x);
+        // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
+        let x = self.body.process(x);
+        let x = self.tilt.process(x);
 
         // Power amp: transformer sag + light saturation
         let x = self.power_amp(x);
@@ -158,10 +178,15 @@ impl Amplifier for Marshall {
         // Presence: output transformer NFB shelf
         let x = self.presence_shelf.process(x);
 
+        // Output DC block: the asymmetric power-stage clip injects a small DC offset
+        // and (unlike the Mesa/Randall) there is no power-section high-pass after it;
+        // a real output transformer passes no DC, so strip it here before the trim.
+        let x = self.out_hp.process(x);
+
         // Output trim: the tube power stage runs at a conservative level; this
         // makeup brings the JCM800 up to the same loudness as the (much hotter)
         // solid-state Randall so switching models doesn't jump in volume.
-        x * master * 3.9
+        x * master * 3.6
     }
 }
 
