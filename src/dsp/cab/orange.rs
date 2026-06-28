@@ -113,11 +113,17 @@ impl OrangeCab {
     fn voicing_sm57(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
             Biquad::highpass(sr, 85.0, 0.9),
-            Biquad::low_shelf(sr, 110.0, 4.0),
-            Biquad::peak_eq(sr, 300.0, 1.5, -2.0),
-            Biquad::peak_eq(sr, 600.0, 1.2, 5.0),
-            Biquad::peak_eq(sr, 1200.0, 1.2, 3.0),
-            Biquad::peak_eq(sr, 3200.0, 2.0, 5.0),
+            // The Orange "wall of mids" was so forward (+5 @ 600, +3 @ 1200) that the
+            // upper-mid single notes rode far louder than the low-mids. Pulled back
+            // (+5→+2.5 @ 600, +3→+1.5 @ 1200) with a shallower 300 dip and more low
+            // shelf so the cab stays thick and chunky but level across the neck.
+            Biquad::low_shelf(sr, 110.0, 4.5),
+            Biquad::peak_eq(sr, 300.0, 1.5, -1.0),
+            Biquad::peak_eq(sr, 600.0, 1.2, 2.5),
+            Biquad::peak_eq(sr, 1200.0, 1.2, 1.5),
+            // V30 presence, broadened and tamed (Q 2.0→1.4, +5→+3.5 dB) so the
+            // forward Orange mid grind stays but the top loses its ice-pick edge.
+            Biquad::peak_eq(sr, 3200.0, 1.4, 3.5),
             Biquad::high_shelf(sr, 5200.0, -13.0),
             Biquad::lowpass(sr, 8500.0, 0.707),
         ];

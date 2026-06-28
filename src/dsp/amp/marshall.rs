@@ -55,8 +55,11 @@ impl Marshall {
             // JCM800 input coupling cap → sub-rumble cut at ~35 Hz, kept below the
             // 82 Hz low-E fundamental so the distorted bass string stays intact.
             pre_clip_hp: Biquad::highpass(sr8, 35.0, 0.707),
-            // JCM800 22 nF inter-stage coupling cap → HP at ~720 Hz
-            stage_hp: Biquad::highpass(sr8, 720.0, 0.707),
+            // JCM800 inter-stage coupling → HP at ~300 Hz. The 22 nF cap with the
+            // following grid resistor actually corners well below the old 720 Hz;
+            // dropping it keeps the fundamental of mid-neck notes feeding the second
+            // stage so the note leads its overtones, while still tightening the lows.
+            stage_hp: Biquad::highpass(sr8, 300.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 120.0),
             tone: ToneStack::new(sr, Components::MARSHALL),
             last_bass: -1.0,
@@ -138,7 +141,7 @@ impl Amplifier for Marshall {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
             let s = self.stage_hp.process(s);
-            *o = tube_clip_asym(s * 4.0) / 2.0;
+            *o = tube_clip_asym(s * 3.2) / 3.2_f32.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
@@ -158,7 +161,7 @@ impl Amplifier for Marshall {
         // Output trim: the tube power stage runs at a conservative level; this
         // makeup brings the JCM800 up to the same loudness as the (much hotter)
         // solid-state Randall so switching models doesn't jump in volume.
-        x * master * 3.6
+        x * master * 3.9
     }
 }
 

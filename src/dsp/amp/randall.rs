@@ -55,10 +55,14 @@ impl Randall {
             os: Oversampler8::new(sr),
             // Warhead pre-clip HP: 55 Hz — tighter than Marshall/Mesa but below 82 Hz
             pre_clip_hp: Biquad::highpass(sr8, 55.0, 0.707),
-            // After FET stage: 500 Hz (Warhead input coupling)
-            stage_hp_1: Biquad::highpass(sr8, 500.0, 0.707),
-            // After BJT stage: 800 Hz (driver stage coupling)
-            stage_hp_2: Biquad::highpass(sr8, 800.0, 0.707),
+            // After FET stage: 160 Hz. The old 500 Hz corner sat above the
+            // fundamental of most fretted notes and let the BJT/rail stages clip a
+            // signal that had lost its body, burying the note under high harmonics.
+            // 160 Hz keeps the solid-state response tight without gutting the note.
+            stage_hp_1: Biquad::highpass(sr8, 160.0, 0.707),
+            // After BJT stage: 240 Hz (driver-stage coupling) — tighter than stage 1
+            // but still below the played fundamentals.
+            stage_hp_2: Biquad::highpass(sr8, 240.0, 0.707),
             // Output stage HP at 70 Hz, cascaded → 24 dB/oct. Lets the 82 Hz
             // fundamental through while hard-killing the sub-bass fart below it.
             power_hp: Biquad::highpass(sr, 70.0, 0.707),
@@ -123,19 +127,22 @@ impl Amplifier for Randall {
         let x = self.dc_block.process(sample);
         let x = self.input_hp.process(x);
 
-        let pregain = 1.0 + gain * 45.0;
+        let pregain = 1.0 + gain * 34.0;
         let bias = self.bloom.follow(x) * 0.08;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
+        // Drives trimmed (BJT ×6→×3.6, rail ×3→×2.2): the hard BJT/rail clippers are
+        // strong odd-harmonic generators, and at the old drives the 3rd–7th
+        // harmonics overran the fundamental, giving the buzzy, square-ish edge.
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before FET stage
             let s = fet_clip_asym((u + bias) * pregain) / pregain.sqrt();
             let s = self.stage_hp_1.process(s);
-            let s = bjt_clip(s * 6.0) / 6.0_f32.sqrt();
+            let s = bjt_clip(s * 3.6) / 3.6_f32.sqrt();
             let s = self.stage_hp_2.process(s);
-            *o = rail_clip(s * 3.0) / 3.0_f32.sqrt();
+            *o = rail_clip(s * 2.2) / 2.2_f32.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
@@ -154,7 +161,7 @@ impl Amplifier for Randall {
         // difference-tone "fart" from the chord's intervals; strip it here.
         let x = self.power_hp2.process(x);
 
-        x * master * 0.8
+        x * master * 0.66
     }
 }
 

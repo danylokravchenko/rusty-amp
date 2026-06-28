@@ -58,10 +58,16 @@ impl Mesa {
             // stages so they don't generate difference-tone mud, while preserving
             // the 82 Hz low-E fundamental.
             pre_clip_hp: Biquad::highpass(sr8, 70.0, 0.707),
-            // Between stage 1 and 2: ~680 Hz (Recto coupling cap characteristic)
-            stage_hp_1: Biquad::highpass(sr8, 680.0, 0.707),
-            // Between stage 2 and 3: ~1 kHz (silicon stage compresses harder so HP is tighter)
-            stage_hp_2: Biquad::highpass(sr8, 1000.0, 0.707),
+            // Between stage 1 and 2: ~180 Hz. A real grid-coupling cap corners far
+            // below the note, not above it; the previous 680 Hz stripped the
+            // fundamental of every note under ~1 kHz before the next clipper, so the
+            // later stages only had upper harmonics to multiply (the note's body
+            // vanished under a 10th-harmonic fizz). 180 Hz still tightens flub on a
+            // low chord while keeping the fundamental intact.
+            stage_hp_1: Biquad::highpass(sr8, 180.0, 0.707),
+            // Between stage 2 and 3: ~260 Hz (silicon stage compresses harder, so a
+            // slightly tighter corner) — still well below the lowest fundamentals.
+            stage_hp_2: Biquad::highpass(sr8, 260.0, 0.707),
             // Subsonic cut at 70 Hz, cascaded → 24 dB/oct.
             power_hp: Biquad::highpass(sr, 70.0, 0.707),
             power_hp2: Biquad::highpass(sr, 70.0, 0.707),
@@ -136,19 +142,23 @@ impl Amplifier for Mesa {
         let x = self.dc_block.process(sample);
         let x = self.input_hp.process(x);
 
-        let pregain = 1.0 + gain * 35.0;
+        let pregain = 1.0 + gain * 30.0;
         let bias = self.bloom.follow(x) * 0.12;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
+        // Per-stage drives kept moderate: three cascaded clippers multiply harmonic
+        // content fast, and the old ×5/×3 inter-stage gains pushed the spectrum so
+        // high that the played note was buried under its own overtones. ×2.6/×2.0
+        // still saturates hard at high gain but lets the fundamental lead.
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
             let s = self.stage_hp_1.process(s);
-            let s = tube_clip_asym(s * 5.0) / 5.0_f32.sqrt();
+            let s = tube_clip_asym(s * 2.6) / 2.6_f32.sqrt();
             let s = self.stage_hp_2.process(s);
-            *o = silicon_clip_asym(s * 3.0) / 3.0_f32.sqrt();
+            *o = silicon_clip_asym(s * 2.0) / 2.0_f32.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
@@ -167,7 +177,7 @@ impl Amplifier for Mesa {
 
         // Output trim: level-match the Recto to the hotter solid-state Randall so
         // switching amp models doesn't produce a volume jump.
-        x * master * 2.6
+        x * master * 5.1
     }
 }
 
