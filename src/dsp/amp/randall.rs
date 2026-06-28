@@ -73,7 +73,7 @@ impl Randall {
             // fundamental through while hard-killing the sub-bass fart below it.
             power_hp: Biquad::highpass(sr, 55.0, 0.707),
             power_hp2: Biquad::highpass(sr, 55.0, 0.707),
-            bloom: Bloom::new(sr, 8.0, 100.0),
+            bloom: Bloom::new(sr, 8.0, 50.0),
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 500.0, 0.4, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 4500.0, 0.0),
@@ -136,7 +136,10 @@ impl Amplifier for Randall {
         let x = self.input_hp.process(x);
 
         let pregain = 1.0 + gain * 34.0;
-        let bias = self.bloom.follow(x) * 0.08;
+        // Bias depth more than halved and bloom release shortened (above): the
+        // Randall showed the most attack carryover note-to-note; a lighter, faster
+        // bloom makes every note attack the same — see marshall.rs.
+        let bias = self.bloom.follow(x) * 0.022;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
         // Drives trimmed (BJT ×6→×3.6, rail ×3→×2.2): the hard BJT/rail clippers are

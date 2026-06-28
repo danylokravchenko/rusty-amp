@@ -84,7 +84,7 @@ impl Mesa {
             // fart well below it.
             power_hp: Biquad::highpass(sr, 55.0, 0.707),
             power_hp2: Biquad::highpass(sr, 55.0, 0.707),
-            bloom: Bloom::new(sr, 8.0, 120.0),
+            bloom: Bloom::new(sr, 8.0, 55.0),
             tone: ToneStack::new(sr, Components::FENDER),
             last_bass: -1.0,
             last_mid: -1.0,
@@ -159,7 +159,9 @@ impl Amplifier for Mesa {
         let x = self.input_hp.process(x);
 
         let pregain = 1.0 + gain * 30.0;
-        let bias = self.bloom.follow(x) * 0.12;
+        // Bias depth halved and bloom release shortened (above) so a note attacks
+        // the same whether played alone or right after others — see marshall.rs.
+        let bias = self.bloom.follow(x) * 0.06;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
         // Per-stage drives kept moderate: three cascaded clippers multiply harmonic

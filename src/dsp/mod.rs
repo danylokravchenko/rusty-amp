@@ -926,6 +926,63 @@ mod tests {
         }
     }
 
+    /// A note must sound the same whether played on its own or right after other
+    /// notes. The dynamic grid-bias "bloom" follower deliberately adds even-harmonic
+    /// warmth that grows with how hard you play — touch sensitivity — but if it
+    /// releases too slowly it stays loaded from the previous notes and over-warms the
+    /// *next* note's attack, so the same note picks up a different timbre depending on
+    /// what preceded it (an audible note-to-note inconsistency). We render a note's
+    /// attack cold (from silence) and again right after a loud lick, and require the
+    /// even-harmonic content of its attack to barely move. This guards the bloom
+    /// depth/release: within-note give stays, cross-note bleed does not.
+    #[test]
+    fn a_note_attacks_the_same_regardless_of_what_preceded_it() {
+        let sr = 48_000.0;
+        let note = 164.81; // E3 — absent from the preceding lick below
+        // Attack-window 2nd-harmonic ratio of `note`, optionally after a loud lick.
+        let attack_h2_ratio = |am: AmpModel, cm: CabModel, preceded: bool| -> f32 {
+            let mut amp = amp::AmpBank::new(sr);
+            let mut cab = cab::CabBank::new(sr);
+            let run =
+                |amp: &mut amp::AmpBank, cab: &mut cab::CabBank, f: f32, n: usize, amp_in: f32| {
+                    let mut last = 0.0;
+                    for i in 0..n {
+                        let x = (2.0 * PI * f * i as f32 / sr).sin() * amp_in;
+                        let a = amp.process(am, x, 0.7, 0.5, 0.45, 0.65, 0.5, 0.6);
+                        let (l, r) = cab.process(cm, a, 0.5, 0.15, 0.15);
+                        last = l + r;
+                    }
+                    last
+                };
+            // Settle filters from rest.
+            run(&mut amp, &mut cab, 0.0, sr as usize / 20, 0.0);
+            if preceded {
+                for &f in &[196.0f32, 261.63, 329.63, 220.0] {
+                    run(&mut amp, &mut cab, f, sr as usize * 90 / 1000, 0.6);
+                }
+            }
+            // Capture the note's attack (first 80 ms).
+            let n = sr as usize * 80 / 1000;
+            let mut out = Vec::with_capacity(n);
+            for i in 0..n {
+                let x = (2.0 * PI * note * i as f32 / sr).sin() * 0.5;
+                let a = amp.process(am, x, 0.7, 0.5, 0.45, 0.65, 0.5, 0.6);
+                let (l, r) = cab.process(cm, a, 0.5, 0.15, 0.15);
+                out.push(l + r);
+            }
+            goertzel(&out, note * 2.0, sr) / goertzel(&out, note, sr).max(1e-9)
+        };
+        for (am, cm) in RIGS {
+            let fresh = attack_h2_ratio(am, cm, false);
+            let after = attack_h2_ratio(am, cm, true);
+            assert!(
+                (after - fresh).abs() < 0.10,
+                "{}: note attack changes after other notes (h2/h1 {fresh:.3} → {after:.3})",
+                am.name()
+            );
+        }
+    }
+
     /// A low-E power chord through a high-gain, bass-heavy, mid-scooped rig (the
     /// "Pantera rhythm" worst case) must not turn into sub-bass mush: the inaudible
     /// difference-tone / rumble energy below the low-E fundamental must stay a small

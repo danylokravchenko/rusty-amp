@@ -68,7 +68,7 @@ impl Marshall {
             // dropping it keeps the fundamental of mid-neck notes feeding the second
             // stage so the note leads its overtones, while still tightening the lows.
             stage_hp: Biquad::highpass(sr8, 300.0, 0.707),
-            bloom: Bloom::new(sr, 8.0, 120.0),
+            bloom: Bloom::new(sr, 8.0, 55.0),
             tone: ToneStack::new(sr, Components::MARSHALL),
             last_bass: -1.0,
             last_mid: -1.0,
@@ -149,7 +149,13 @@ impl Amplifier for Marshall {
 
         let pregain = 1.0 + gain * 39.0;
         // Dynamic grid-bias offset (removed downstream by the inter-stage HP).
-        let bias = self.bloom.follow(x) * 0.12;
+        // Bias depth halved and the bloom release shortened (above): the slow,
+        // deep grid-bias follower stayed elevated between notes, so a note played
+        // right after others got a louder, more even-harmonic attack than the same
+        // note played alone — an audible note-to-note inconsistency. A lighter,
+        // faster bloom keeps the touch-sensitive give within a note but recovers
+        // between them so every note attacks the same.
+        let bias = self.bloom.follow(x) * 0.06;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
         let up = self.os.upsample(x);
