@@ -139,8 +139,6 @@ fn ir_len_ms(sr: f32) -> f32 {
 /// after it are progressively attenuated, so authored detail should land before.
 pub const FADE_START_FRAC: f32 = 0.75;
 
-// ── Test analysis ───────────────────────────────────────────────────────────
-//
 // Objective measurements that let the cabinet textures be *justified* rather than
 // eyeballed: every shipped cab IR is synthesised and checked against the physical
 // claims its parameters encode (modes appear at the stated frequency and decay,
