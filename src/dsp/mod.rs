@@ -783,6 +783,7 @@ mod tests {
     /// relies on this to ship the old plugin off the audio thread for disposal.
     #[test]
     fn replace_insert_returns_the_displaced_insert() {
+        #[allow(dead_code)]
         struct Tagged(u32);
         impl StereoInsert for Tagged {
             fn process_block(&mut self, _l: &mut [f32], _r: &mut [f32]) {}

@@ -18,9 +18,16 @@ type InsertCommand = Option<Box<dyn StereoInsert>>;
 /// are rare (a user loading/clearing a plugin), so a small buffer is plenty.
 const INSERT_QUEUE_CAP: usize = 8;
 
+/// Largest block (in frames) the audio thread will ever process at once. Scratch
+/// buffers are pre-sized to this, and plugin inserts are activated with it as
+/// their maximum block size.
+pub const MAX_BLOCK: usize = 4096;
+
 pub struct AudioEngine {
     _input_stream: Stream,
     _output_stream: Stream,
+    /// Negotiated sample rate of the running streams (Hz).
+    sample_rate: f32,
     /// Sends insert swaps to the audio thread (consumed at the top of its callback).
     insert_tx: Producer<InsertCommand>,
     /// Receives inserts the audio thread displaced, so they are dropped here on a
@@ -29,6 +36,11 @@ pub struct AudioEngine {
 }
 
 impl AudioEngine {
+    /// The sample rate (Hz) the engine negotiated and is running at.
+    pub fn sample_rate(&self) -> f32 {
+        self.sample_rate
+    }
+
     /// Install (`Some`) or clear (`None`) the third-party plugin insert.
     ///
     /// Call this from the UI/control thread, never the audio thread. The actual
@@ -185,7 +197,6 @@ fn build_engine(
     // Reusable scratch buffers for block processing. Pre-sized generously so the
     // audio thread never reallocates for normal device buffer sizes; the `resize`
     // below only grows them on the rare callback that asks for a larger block.
-    const MAX_BLOCK: usize = 4096;
     let mut in_buf: Vec<f32> = Vec::with_capacity(MAX_BLOCK);
     let mut out_l: Vec<f32> = vec![0.0; MAX_BLOCK];
     let mut out_r: Vec<f32> = vec![0.0; MAX_BLOCK];
@@ -273,6 +284,7 @@ fn build_engine(
     Ok(AudioEngine {
         _input_stream: input_stream,
         _output_stream: output_stream,
+        sample_rate: sr,
         insert_tx,
         dropped_rx,
     })

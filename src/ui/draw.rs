@@ -790,7 +790,7 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
             Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
         )])
     } else {
-        Line::from(vec![
+        let mut spans = vec![
             Span::styled(" Tab ", Style::default().fg(AMBER)),
             Span::styled("section  ", Style::default().fg(DIM)),
             Span::styled("←/→", Style::default().fg(AMBER)),
@@ -805,11 +805,19 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
             Span::styled(" cab  ", Style::default().fg(DIM)),
             Span::styled("P", Style::default().fg(AMBER)),
             Span::styled(" presets  ", Style::default().fg(DIM)),
+        ];
+        #[cfg(feature = "clap")]
+        {
+            spans.push(Span::styled("V", Style::default().fg(AMBER)));
+            spans.push(Span::styled(" plugins  ", Style::default().fg(DIM)));
+        }
+        spans.extend([
             Span::styled("R", Style::default().fg(AMBER)),
             Span::styled(" record  ", Style::default().fg(DIM)),
             Span::styled("Q", Style::default().fg(AMBER)),
             Span::styled(" quit", Style::default().fg(DIM)),
-        ])
+        ]);
+        Line::from(spans)
     };
     let help = Paragraph::new(line)
         .alignment(Alignment::Center)
