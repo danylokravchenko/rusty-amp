@@ -611,7 +611,11 @@ fn render_pedal_tile(
     } else {
         shade(pedal.color, 0.35)
     };
-    let name_color = if on { pedal.color } else { shade(pedal.color, 0.5) };
+    let name_color = if on {
+        pedal.color
+    } else {
+        shade(pedal.color, 0.5)
+    };
 
     let led = if on {
         Span::styled(
@@ -756,7 +760,11 @@ fn render_pedal_detail(f: &mut Frame, area: Rect, params: &Params, focus: Option
     } else {
         shade(pedal.color, 0.3)
     };
-    let foot = if on { "▐ ON ▌  ▗▄▄▄▄▄▄▄▖" } else { "○ OFF   ▗▄▄▄▄▄▄▄▖" };
+    let foot = if on {
+        "▐ ON ▌  ▗▄▄▄▄▄▄▄▖"
+    } else {
+        "○ OFF   ▗▄▄▄▄▄▄▄▖"
+    };
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
             foot,
@@ -937,7 +945,10 @@ pub(super) fn render_add_pedal_modal(f: &mut Frame, available: &[usize], cursor:
                     ("  ", Style::default().fg(p.color))
                 };
                 Line::from(vec![
-                    Span::styled(prefix, Style::default().fg(if selected { ORANGE } else { DIM })),
+                    Span::styled(
+                        prefix,
+                        Style::default().fg(if selected { ORANGE } else { DIM }),
+                    ),
                     Span::styled(p.name, style),
                 ])
             })

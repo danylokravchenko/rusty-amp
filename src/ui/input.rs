@@ -2,9 +2,7 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{AmpModel, CabModel, Params};
 
-use super::config::{
-    ADD_TILE, AMP_END, AMP_START, KNOBS, MIC_END, MIC_START, PEDALS, pedal_of,
-};
+use super::config::{ADD_TILE, AMP_END, AMP_START, KNOBS, MIC_END, MIC_START, PEDALS, pedal_of};
 
 /// A knob is reachable only if it belongs to the amp/mic (always present) or to
 /// a pedal currently on the board.
@@ -42,7 +40,11 @@ fn section_stops(board: &[bool]) -> Vec<Option<usize>> {
 /// Per-knob stops for ←/→: selectors → every visible knob → +ADD tile.
 fn knob_stops(board: &[bool]) -> Vec<Option<usize>> {
     let mut v = vec![None];
-    v.extend((0..KNOBS.len()).filter(|&k| knob_visible(k, board)).map(Some));
+    v.extend(
+        (0..KNOBS.len())
+            .filter(|&k| knob_visible(k, board))
+            .map(Some),
+    );
     v.push(Some(ADD_TILE));
     v
 }
