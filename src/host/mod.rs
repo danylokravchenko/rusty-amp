@@ -180,7 +180,12 @@ fn standard_clap_paths() -> Vec<PathBuf> {
 
     if let Ok(env_path) = std::env::var("CLAP_PATH") {
         let sep = if cfg!(windows) { ';' } else { ':' };
-        paths.extend(env_path.split(sep).filter(|s| !s.is_empty()).map(PathBuf::from));
+        paths.extend(
+            env_path
+                .split(sep)
+                .filter(|s| !s.is_empty())
+                .map(PathBuf::from),
+        );
     }
 
     #[cfg(target_os = "macos")]
@@ -266,7 +271,10 @@ impl LoadedPlugin {
         };
         let value = value.clamp(param.min, param.max);
         param.value = value;
-        let _ = self.param_tx.push(ParamChange { id: param.id, value });
+        let _ = self.param_tx.push(ParamChange {
+            id: param.id,
+            value,
+        });
     }
 }
 

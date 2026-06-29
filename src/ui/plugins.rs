@@ -239,9 +239,7 @@ impl PluginBrowser {
                 Span::styled("active: ", Style::default().fg(DIM)),
                 Span::styled(name.to_owned(), Style::default().fg(CHROME)),
             ]),
-            (None, None) => {
-                Line::from(Span::styled("no plugin loaded", Style::default().fg(DIM)))
-            }
+            (None, None) => Line::from(Span::styled("no plugin loaded", Style::default().fg(DIM))),
         };
         f.render_widget(
             Paragraph::new(status_line).alignment(Alignment::Center),
@@ -322,7 +320,10 @@ fn param_row(p: &crate::host::PluginParam, selected: bool) -> Line<'static> {
     };
 
     Line::from(vec![
-        Span::styled(prefix, Style::default().fg(if selected { ORANGE } else { DIM })),
+        Span::styled(
+            prefix,
+            Style::default().fg(if selected { ORANGE } else { DIM }),
+        ),
         Span::styled(format!("{:<22}", truncate(&p.name, 22)), name_style),
         Span::styled(bar, Style::default().fg(bar_color)),
         Span::styled(format!("  {:.3}", p.value), Style::default().fg(AMBER)),
@@ -358,7 +359,10 @@ fn entry(name: &str, detail: &str, selected: bool) -> Line<'static> {
         Span::styled(name.to_owned(), name_style),
     ];
     if !detail.is_empty() {
-        spans.push(Span::styled(format!("  {detail}"), Style::default().fg(DIM)));
+        spans.push(Span::styled(
+            format!("  {detail}"),
+            Style::default().fg(DIM),
+        ));
     }
     Line::from(spans)
 }
