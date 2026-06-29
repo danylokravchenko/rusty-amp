@@ -35,7 +35,10 @@ clack-extensions = { version = "0.1.0", features = [
 ], optional = true }
 
 [features]
-default = []
+# Plugin hosting is on by default so it works out of the box (and ships in the
+# release binaries). Build with `--no-default-features` for a minimal amp with no
+# CLAP dependencies / no plugin-loading FFI.
+default = ["clap"]
 # Host third-party CLAP effect plugins as a stereo insert in the signal chain.
 clap = ["dep:clack-host", "dep:clack-extensions"]
 

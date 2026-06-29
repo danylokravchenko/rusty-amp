@@ -13,7 +13,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 - 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, ping-pong delay, and stereo reverb, each independently bypassable
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
-- 🔌 **CLAP plugin host** _(optional)_ — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
+- 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
 - ⏺️ **One-key recording** straight to a stereo WAV file
 - 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
 
@@ -81,7 +81,7 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `C` | Cycle cabinet model (Mesa V30 → Marshall Greenback → Orange PPC412) |
 | `Space` | Toggle the focused pedal / effect on / off |
 | `P` | Open the preset browser overlay |
-| `V` | Open the CLAP plugin browser — _only when built with the `clap` feature ([see below](#clap-plugins-optional))_ |
+| `V` | Open the CLAP plugin browser ([see below](#clap-plugins)) |
 | `S` | Save the current state as a new user preset |
 | `R` | Start / stop recording — saves a WAV file to your home directory when stopped |
 | `Q` / `Ctrl-C` | Quit |
@@ -436,17 +436,15 @@ Press **`R`** to start recording. The header switches from `○ OFF AIR` to a bl
 
 Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full multi-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
 
-## CLAP plugins (optional)
+## CLAP plugins
 
 rusty-amp can host a third-party **[CLAP](https://cleveraudio.org/) effect plugin** as a stereo insert in the signal chain — placed after the cabinet/effects rack, just before the master bus. This lets you drop in an external reverb, saturator, flanger, or anything else and dial it in without leaving the terminal.
 
-This is an **opt-in feature** that pulls in the [`clack`](https://github.com/prokopyl/clack) CLAP host bindings, so it is **off by default**. Build with the `clap` feature to enable it:
+Plugin hosting is **enabled by default** (it's in the pre-built binaries too), powered by the [`clack`](https://github.com/prokopyl/clack) CLAP host bindings. If you want a minimal amp with no plugin dependencies or plugin-loading FFI, build with the feature turned off:
 
 ```bash
-cargo run --release --features clap
+cargo run --release --no-default-features
 ```
-
-> The pre-built release binaries are built **without** this feature. To use plugins, build from source with `--features clap`.
 
 ### Installing plugins
 
