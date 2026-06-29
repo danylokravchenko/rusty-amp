@@ -1,11 +1,11 @@
 use std::sync::atomic::Ordering::Relaxed;
 
-use crate::dsp::{AmpModel, CabModel, Params};
+use crate::dsp::{AmpModel, CabModel, FuzzboyMode, Params};
 
 use super::config::{
     AMP_END, AMP_START, CMP_END, CMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END,
-    EQ_START, FUZZ_END, FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START, PEQ_END,
-    PEQ_START, REV_END, REV_START, SECTION_STARTS, TS_END, TS_START,
+    EQ_START, FB_END, FB_START, FUZZ_END, FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START,
+    PEQ_END, PEQ_START, REV_END, REV_START, SECTION_STARTS, TS_END, TS_START,
 };
 
 pub(super) fn next_section(focus: Option<usize>) -> Option<usize> {
@@ -35,6 +35,14 @@ pub(super) fn cycle_amp(params: &Params, dir: i8) {
     params.amp_model.store(next as u8, Relaxed);
 }
 
+pub(super) fn cycle_fuzzboy_mode(params: &Params) {
+    let next =
+        FuzzboyMode::from_u8(params.fb_mode.load(std::sync::atomic::Ordering::Relaxed)).next();
+    params
+        .fb_mode
+        .store(next as u8, std::sync::atomic::Ordering::Relaxed);
+}
+
 pub(super) fn cycle_cab(params: &Params) {
     let current = CabModel::from_u8(params.cab_model.load(Relaxed));
     params.cab_model.store(current.toggle() as u8, Relaxed);
@@ -60,6 +68,8 @@ pub(super) fn toggle_pedal(params: &Params, knob_idx: usize) {
         &params.cmp_enabled
     } else if (PEQ_START..PEQ_END).contains(&knob_idx) {
         &params.peq_enabled
+    } else if (FB_START..FB_END).contains(&knob_idx) {
+        &params.fb_enabled
     } else {
         return;
     };
@@ -69,19 +79,20 @@ pub(super) fn toggle_pedal(params: &Params, knob_idx: usize) {
 
 fn section_of(focus: Option<usize>) -> usize {
     // Matches SECTION_STARTS order:
-    // None, Amp, Mic, TS, DS, Rev, Delay, Comp, Fuzz, NG, Pre-EQ, EQ
+    // None, Amp, Mic, TS, DS, Fuzzboy, Rev, Delay, Comp, Fuzz, NG, Pre-EQ, EQ
     match focus {
         None => 0,
         Some(i) if (AMP_START..AMP_END).contains(&i) => 1,
         Some(i) if (MIC_START..MIC_END).contains(&i) => 2,
         Some(i) if (TS_START..TS_END).contains(&i) => 3,
         Some(i) if (DS_START..DS_END).contains(&i) => 4,
-        Some(i) if (REV_START..REV_END).contains(&i) => 5,
-        Some(i) if (DELAY_START..DELAY_END).contains(&i) => 6,
-        Some(i) if (CMP_START..CMP_END).contains(&i) => 7,
-        Some(i) if (FUZZ_START..FUZZ_END).contains(&i) => 8,
-        Some(i) if (NG_START..NG_END).contains(&i) => 9,
-        Some(i) if (PEQ_START..PEQ_END).contains(&i) => 10,
-        _ => 11,
+        Some(i) if (FB_START..FB_END).contains(&i) => 5,
+        Some(i) if (REV_START..REV_END).contains(&i) => 6,
+        Some(i) if (DELAY_START..DELAY_END).contains(&i) => 7,
+        Some(i) if (CMP_START..CMP_END).contains(&i) => 8,
+        Some(i) if (FUZZ_START..FUZZ_END).contains(&i) => 9,
+        Some(i) if (NG_START..NG_END).contains(&i) => 10,
+        Some(i) if (PEQ_START..PEQ_END).contains(&i) => 11,
+        _ => 12,
     }
 }

@@ -38,6 +38,8 @@ pub(super) const PEQ_START: usize = 29;
 pub(super) const PEQ_END: usize = 32;
 pub(super) const EQ_START: usize = 32;
 pub(super) const EQ_END: usize = 35;
+pub(super) const FB_START: usize = 35;
+pub(super) const FB_END: usize = 39;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -191,6 +193,23 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "HIGH",
         param: |p| &p.eq_high,
     },
+    // 35–38: Fuzzboy
+    Knob {
+        label: "IN",
+        param: |p| &p.fb_in,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.fb_tone,
+    },
+    Knob {
+        label: "PWR",
+        param: |p| &p.fb_power,
+    },
+    Knob {
+        label: "OUT",
+        param: |p| &p.fb_out,
+    },
 ];
 
 // Tab order follows the layout: selectors → Amp → Mic → rig pedals
@@ -201,6 +220,7 @@ pub(super) const SECTION_STARTS: &[Option<usize>] = &[
     Some(MIC_START),
     Some(TS_START),
     Some(DS_START),
+    Some(FB_START),
     Some(REV_START),
     Some(DELAY_START),
     Some(CMP_START),

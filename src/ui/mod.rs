@@ -20,7 +20,9 @@ use crate::preset::Preset;
 use crate::recording::RecordingState;
 
 use draw::draw;
-use input::{cycle_amp, cycle_cab, next_section, nudge, prev_section, toggle_pedal};
+use input::{
+    cycle_amp, cycle_cab, cycle_fuzzboy_mode, next_section, nudge, prev_section, toggle_pedal,
+};
 use presets::{render_preset_modal, render_save_dialog};
 
 pub fn run(
@@ -231,6 +233,9 @@ pub fn run(
                     }
                     KeyCode::Char('c') | KeyCode::Char('C') => {
                         cycle_cab(&params);
+                    }
+                    KeyCode::Char('m') | KeyCode::Char('M') => {
+                        cycle_fuzzboy_mode(&params);
                     }
                     KeyCode::Tab => focus = next_section(focus),
                     KeyCode::BackTab => focus = prev_section(focus),

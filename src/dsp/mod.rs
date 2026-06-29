@@ -12,8 +12,10 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 
 use amp::AmpBank;
 use cab::CabBank;
+pub use effects::fuzzboy::FuzzboyMode;
 use effects::{
-    Compressor, Delay, Distortion, Fuzz, NoiseGate, ParametricEq, PreampEq, Reverb, TubeScreamer,
+    Compressor, Delay, Distortion, Fuzz, Fuzzboy, NoiseGate, ParametricEq, PreampEq, Reverb,
+    TubeScreamer,
 };
 
 // ── Amp model ─────────────────────────────────────────────────────────────────
@@ -140,6 +142,13 @@ const DEFAULT_FZ_FUZZ: f32 = 0.70;
 const DEFAULT_FZ_TONE: f32 = 0.50;
 const DEFAULT_FZ_LEVEL: f32 = 0.60;
 
+const DEFAULT_FB_ENABLED: bool = false;
+const DEFAULT_FB_MODE: u8 = 0; // Crunch
+const DEFAULT_FB_IN: f32 = 0.20;
+const DEFAULT_FB_TONE: f32 = 0.50;
+const DEFAULT_FB_POWER: f32 = 0.50;
+const DEFAULT_FB_OUT: f32 = 0.50;
+
 const DEFAULT_TS_ENABLED: bool = true;
 const DEFAULT_TS_DRIVE: f32 = 0.45;
 const DEFAULT_TS_TONE: f32 = 0.60;
@@ -208,6 +217,14 @@ pub struct Params {
     pub fz_fuzz: Arc<AtomicF32>,
     pub fz_tone: Arc<AtomicF32>,
     pub fz_level: Arc<AtomicF32>,
+
+    // Fuzzboy (4-mode distortion)
+    pub fb_enabled: Arc<AtomicBool>,
+    pub fb_mode: Arc<AtomicU8>,
+    pub fb_in: Arc<AtomicF32>,
+    pub fb_tone: Arc<AtomicF32>,
+    pub fb_power: Arc<AtomicF32>,
+    pub fb_out: Arc<AtomicF32>,
 
     // TS-808
     pub ts_enabled: Arc<AtomicBool>,
@@ -292,6 +309,13 @@ impl Params {
             fz_tone: p!(DEFAULT_FZ_TONE),
             fz_level: p!(DEFAULT_FZ_LEVEL),
 
+            fb_enabled: b!(DEFAULT_FB_ENABLED),
+            fb_mode: Arc::new(AtomicU8::new(DEFAULT_FB_MODE)),
+            fb_in: p!(DEFAULT_FB_IN),
+            fb_tone: p!(DEFAULT_FB_TONE),
+            fb_power: p!(DEFAULT_FB_POWER),
+            fb_out: p!(DEFAULT_FB_OUT),
+
             ts_enabled: b!(DEFAULT_TS_ENABLED),
             ts_drive: p!(DEFAULT_TS_DRIVE),
             ts_tone: p!(DEFAULT_TS_TONE),
@@ -352,6 +376,13 @@ impl Params {
         self.fz_tone.store(DEFAULT_FZ_TONE, Relaxed);
         self.fz_level.store(DEFAULT_FZ_LEVEL, Relaxed);
 
+        self.fb_enabled.store(DEFAULT_FB_ENABLED, Relaxed);
+        self.fb_mode.store(DEFAULT_FB_MODE, Relaxed);
+        self.fb_in.store(DEFAULT_FB_IN, Relaxed);
+        self.fb_tone.store(DEFAULT_FB_TONE, Relaxed);
+        self.fb_power.store(DEFAULT_FB_POWER, Relaxed);
+        self.fb_out.store(DEFAULT_FB_OUT, Relaxed);
+
         self.ts_enabled.store(DEFAULT_TS_ENABLED, Relaxed);
         self.ts_drive.store(DEFAULT_TS_DRIVE, Relaxed);
         self.ts_tone.store(DEFAULT_TS_TONE, Relaxed);
@@ -391,6 +422,10 @@ impl Params {
 
     pub fn cab_model(&self) -> CabModel {
         CabModel::from_u8(self.cab_model.load(Relaxed))
+    }
+
+    pub fn fb_mode(&self) -> FuzzboyMode {
+        FuzzboyMode::from_u8(self.fb_mode.load(Relaxed))
     }
 }
 
@@ -452,6 +487,7 @@ pub struct DspChain {
     fz: Fuzz,
     ts: TubeScreamer,
     ds: Distortion,
+    fb: Fuzzboy,
     peq: PreampEq,
     amp: AmpBank,
     cab: CabBank,
@@ -469,6 +505,7 @@ impl DspChain {
             fz: Fuzz::new(sr),
             ts: TubeScreamer::new(sr),
             ds: Distortion::new(sr),
+            fb: Fuzzboy::new(sr),
             peq: PreampEq::new(sr),
             amp: AmpBank::new(sr),
             cab: CabBank::new(sr),
@@ -506,6 +543,19 @@ impl DspChain {
         let x = mono_stage!(self, p, x, fz_enabled, fz, fz_fuzz, fz_tone, fz_level);
         let x = mono_stage!(self, p, x, ts_enabled, ts, ts_drive, ts_tone, ts_level);
         let x = mono_stage!(self, p, x, ds_enabled, ds, ds_drive, ds_tone, ds_level);
+        // Fuzzboy: explicit bypass since mode is u8, not compatible with mono_stage!
+        let x = if p.fb_enabled.load(Relaxed) {
+            self.fb.process(
+                x,
+                p.fb_mode.load(Relaxed),
+                p.fb_in.load(Relaxed),
+                p.fb_tone.load(Relaxed),
+                p.fb_power.load(Relaxed),
+                p.fb_out.load(Relaxed),
+            )
+        } else {
+            x
+        };
         let x = mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high);
 
         // Amp
