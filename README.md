@@ -10,7 +10,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 
 - 🔊 **3 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, and Randall Warhead, switchable while you play
 - 📦 **3 cabinets** — Mesa, Marshall, and Orange 4×12s, each captured with three mics you can blend
-- 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, ping-pong delay, and stereo reverb, each independently bypassable
+- 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, ping-pong delay, and stereo reverb. Add, remove, and bypass pedals on the fly; the board shows only what you're using
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
@@ -79,12 +79,26 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `↓` / `-` | Decrease focused knob by 5 % — or cycle amp model backward when on the selector row |
 | `A` | Cycle amp model forward (works from any section) |
 | `C` | Cycle cabinet model (Mesa V30 → Marshall Greenback → Orange PPC412) |
-| `Space` | Toggle the focused pedal / effect on / off |
+| `Space` | Toggle (bypass) the focused pedal — or open the **Add pedal** picker when on the `+ ADD` tile |
+| `Enter` | Open the **Add pedal** picker when the `+ ADD` tile is focused |
+| `D` | Remove the focused pedal from the board (it is bypassed and hidden — re-add it any time from `+ ADD`) |
 | `P` | Open the preset browser overlay |
 | `V` | Open the CLAP plugin browser ([see below](#clap-plugins)) |
 | `S` | Save the current state as a new user preset |
 | `R` | Start / stop recording — saves a WAV file to your home directory when stopped |
 | `Q` / `Ctrl-C` | Quit |
+
+### Pedalboard (`Add` / `D`)
+
+The **Guitar Rig** shows one compact tile per pedal that's on the board, followed by a `+ ADD` tile. Tab or `←`/`→` to a tile to load it into the full-size editor below — the editor takes on the pedal's livery colour. Only **enabled** pedals are on the board at startup; everything else lives in the picker.
+
+| Key | Action |
+| ----- | -------- |
+| `Enter` / `Space` (on `+ ADD`) | Open the picker listing pedals not on the board |
+| `↑` / `↓` | Navigate the picker |
+| `Enter` (in picker) | Add the selected pedal and jump focus to it |
+| `Esc` | Close the picker |
+| `D` (on a pedal) | Remove it from the board |
 
 ### Preset browser (`P`)
 
@@ -108,11 +122,11 @@ User presets are marked with a `[user]` tag in the list. The `D` hint appears in
 
 The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears in the browser immediately — no restart required.
 
-Focus starts on the **selector row** (amp + cabinet). Tab moves into the pedals row and cycles through sections.
+Focus starts on the **selector row** (amp + cabinet). Tab moves down through the amp, cabinet mics, each pedal on the board, and finally the `+ ADD` tile.
 
 ## Knob sections
 
-### Pedals row  _(Compressor | Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate | Pre-amp EQ — each independently bypassable with Space)_
+### Pedals  _(Compressor | Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate | Pre-amp EQ | Parametric EQ — each can be added, removed, and bypassed independently)_
 
 #### Noise Gate
 
@@ -177,26 +191,6 @@ Stereo ping-pong: feedback cross-feeds the two channels so repeats bounce left �
 | Feedback | 0–10 | Repeat level. Capped at 85% internally to prevent runaway |
 | Mix | 0–10 | Dry/wet blend |
 
-### Amp / FX row  _(Amp | Parametric EQ | Cabinet mics)_
-
-#### Amp  _(model selected with `↑`/`↓` or `A` on the selector row)_
-
-| Knob | Range | Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead |
-| ------ | ------- | ---------------- | -------------------- | --------------- |
-| Gain | 0–10 | Preamp gain 1×–40× into dual 12AX7 | Preamp gain 1×–36× into three stages | Preamp gain 1×–46× into FET+BJT stages |
-| Bass | 0–10 | Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall component values) | Passive FMV tone stack (Fender-type values: fuller lows, gentler scoop) | Active tone stack — low shelf at 80 Hz |
-| Mid | 0–10 | …the mid pot sets the depth of the stack's inherent scoop | …gentler scoop than the Marshall | Peak EQ at 500 Hz |
-| Treble | 0–10 | …treble interacts with mid/bass, lossy & peak-normalised | …same interacting network | High shelf at 4.5 kHz |
-| Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
-| Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
-
-The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC
-network where the three controls interact and the mids inherently scoop, exactly
-like a real amp — followed by a **power-amp ↔ speaker interaction** model: the
-speaker's impedance resonance blooms the low end dynamically as the supply sags
-under hard playing. The Randall keeps an active (independent-band) stack and a
-small static speaker resonance, true to its stiff solid-state design.
-
 #### Pre-amp EQ  _(bypassable with Space)_
 
 Sits **before the amp**, so it shapes the signal that the gain stage actually clips — a different job from the post-cab Parametric EQ below, which colours the final mix. Scoop the mids going in for a tighter chug, or push them for lead sustain. All three bands map 0–10 to −12 dB → 0 dB → +12 dB. Centre (5.0) is flat.
@@ -216,6 +210,26 @@ Post-cabinet — shapes the final stereo tone after distortion. All three bands 
 | Low | 120 Hz | Low shelf |
 | Mid | 800 Hz | Peak (Q 1.5) |
 | High | 5 kHz | High shelf |
+
+### Amp &amp; cabinet  _(Amp | Cabinet mics)_
+
+#### Amp  _(model selected with `↑`/`↓` or `A` on the selector row)_
+
+| Knob | Range | Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead |
+| ------ | ------- | ---------------- | -------------------- | --------------- |
+| Gain | 0–10 | Preamp gain 1×–40× into dual 12AX7 | Preamp gain 1×–36× into three stages | Preamp gain 1×–46× into FET+BJT stages |
+| Bass | 0–10 | Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall component values) | Passive FMV tone stack (Fender-type values: fuller lows, gentler scoop) | Active tone stack — low shelf at 80 Hz |
+| Mid | 0–10 | …the mid pot sets the depth of the stack's inherent scoop | …gentler scoop than the Marshall | Peak EQ at 500 Hz |
+| Treble | 0–10 | …treble interacts with mid/bass, lossy & peak-normalised | …same interacting network | High shelf at 4.5 kHz |
+| Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
+| Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
+
+The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC
+network where the three controls interact and the mids inherently scoop, exactly
+like a real amp — followed by a **power-amp ↔ speaker interaction** model: the
+speaker's impedance resonance blooms the low end dynamically as the supply sags
+under hard playing. The Randall keeps an active (independent-band) stack and a
+small static speaker resonance, true to its stiff solid-state design.
 
 #### Cabinet mics  _(labeled with the active cabinet model)_
 

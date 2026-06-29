@@ -21,9 +21,21 @@ use crate::dsp::{Levels, Params};
 use crate::preset::Preset;
 use crate::recording::RecordingState;
 
-use draw::draw;
-use input::{cycle_amp, cycle_cab, next_section, nudge, prev_section, toggle_pedal};
+use config::{ADD_TILE, PEDALS, pedal_of};
+use draw::{draw, render_add_pedal_modal};
+use input::{
+    add_pedal, cycle_amp, cycle_cab, nav_knob, next_section, nudge, prev_section, remove_pedal,
+    toggle_pedal,
+};
 use presets::{render_preset_modal, render_save_dialog};
+
+/// Board membership derived from the live enabled flags (one entry per pedal).
+fn sync_board(params: &Params) -> Vec<bool> {
+    PEDALS
+        .iter()
+        .map(|p| (p.enabled)(params).load(std::sync::atomic::Ordering::Relaxed))
+        .collect()
+}
 
 pub fn run(
     params: Arc<Params>,
@@ -69,6 +81,12 @@ pub fn run(
 
     // ── Main UI loop ──────────────────────────────────────────────────────────
     let mut focus: Option<usize> = None;
+    // Board membership: a pedal is on the board iff it is enabled. Off-board
+    // pedals are bypassed in the DSP and hidden from the rig. Rebuilt with
+    // `sync_board` whenever a preset rewrites the enabled flags.
+    let mut board: Vec<bool> = sync_board(&params);
+    let mut add_open = false;
+    let mut add_cursor = 0usize;
     let mut preset_open = false;
     let mut preset_cursor = 0usize;
     let mut presets = presets;
@@ -106,11 +124,16 @@ pub fn run(
                 &params,
                 &levels,
                 focus,
+                &board,
                 rec_active,
                 blink,
                 status,
                 plugin_name,
             );
+            if add_open {
+                let available: Vec<usize> = (0..PEDALS.len()).filter(|&i| !board[i]).collect();
+                render_add_pedal_modal(f, &available, add_cursor);
+            }
             if preset_open {
                 render_preset_modal(f, &presets, preset_cursor);
             }
@@ -201,6 +224,15 @@ pub fn run(
                         } else {
                             presets[preset_cursor - 1].apply(&params);
                         }
+                        // The preset rewrote the enabled flags, so rebuild the
+                        // board and drop focus if it landed on a removed pedal.
+                        board = sync_board(&params);
+                        if let Some(i) = focus
+                            && let Some(pi) = pedal_of(i)
+                            && !board[pi]
+                        {
+                            focus = None;
+                        }
                         preset_open = false;
                     }
                     KeyCode::Char('s') | KeyCode::Char('S') => {
@@ -222,6 +254,23 @@ pub fn run(
                     KeyCode::Esc | KeyCode::Char('p') | KeyCode::Char('P') => {
                         preset_open = false;
                     }
+                    _ => {}
+                }
+            } else if add_open {
+                let available: Vec<usize> = (0..PEDALS.len()).filter(|&i| !board[i]).collect();
+                match key.code {
+                    KeyCode::Up => add_cursor = add_cursor.saturating_sub(1),
+                    KeyCode::Down if !available.is_empty() => {
+                        add_cursor = (add_cursor + 1).min(available.len() - 1);
+                    }
+                    KeyCode::Enter => {
+                        if let Some(&pi) = available.get(add_cursor) {
+                            add_pedal(&params, &mut board, pi);
+                            focus = Some(PEDALS[pi].start);
+                        }
+                        add_open = false;
+                    }
+                    KeyCode::Esc => add_open = false,
                     _ => {}
                 }
             } else {
@@ -267,34 +316,40 @@ pub fn run(
                     KeyCode::Char('c') | KeyCode::Char('C') => {
                         cycle_cab(&params);
                     }
-                    KeyCode::Tab => focus = next_section(focus),
-                    KeyCode::BackTab => focus = prev_section(focus),
-                    KeyCode::Right => {
-                        focus = match focus {
-                            None => Some(0),
-                            Some(i) => Some((i + 1) % config::KNOBS.len()),
-                        };
-                    }
-                    KeyCode::Left => {
-                        focus = match focus {
-                            None => Some(config::KNOBS.len() - 1),
-                            Some(0) => None,
-                            Some(i) => Some(i - 1),
-                        };
-                    }
+                    KeyCode::Tab => focus = next_section(focus, &board),
+                    KeyCode::BackTab => focus = prev_section(focus, &board),
+                    KeyCode::Right => focus = nav_knob(focus, &board, 1),
+                    KeyCode::Left => focus = nav_knob(focus, &board, -1),
                     KeyCode::Up | KeyCode::Char('+') | KeyCode::Char('=') => match focus {
                         None => cycle_amp(&params, 1),
+                        Some(ADD_TILE) => {}
                         Some(i) => nudge(&params, i, 0.05),
                     },
                     KeyCode::Down | KeyCode::Char('-') => match focus {
                         None => cycle_amp(&params, -1),
+                        Some(ADD_TILE) => {}
                         Some(i) => nudge(&params, i, -0.05),
                     },
-                    KeyCode::Char(' ') => {
-                        if let Some(i) = focus {
-                            toggle_pedal(&params, i);
+                    KeyCode::Enter if focus == Some(ADD_TILE) => {
+                        add_open = true;
+                        add_cursor = 0;
+                    }
+                    KeyCode::Char('d') | KeyCode::Char('D') => {
+                        if let Some(i) = focus
+                            && let Some(pi) = pedal_of(i)
+                        {
+                            remove_pedal(&params, &mut board, pi);
+                            focus = Some(ADD_TILE);
                         }
                     }
+                    KeyCode::Char(' ') => match focus {
+                        Some(ADD_TILE) => {
+                            add_open = true;
+                            add_cursor = 0;
+                        }
+                        Some(i) => toggle_pedal(&params, i),
+                        None => {}
+                    },
                     _ => {}
                 }
             }

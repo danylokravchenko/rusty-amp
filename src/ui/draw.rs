@@ -3,17 +3,13 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
-use super::config::{
-    AMP_END, AMP_START, CMP_END, CMP_START, DELAY_END, DELAY_START, DS_END, DS_START, EQ_END,
-    EQ_START, FUZZ_END, FUZZ_START, KNOBS, MIC_END, MIC_START, NG_END, NG_START, PEQ_END,
-    PEQ_START, REV_END, REV_START, TS_END, TS_START,
-};
+use super::config::{ADD_TILE, AMP_END, AMP_START, KNOBS, MIC_END, MIC_START, PEDALS, Pedal};
 use super::styles::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -22,6 +18,7 @@ pub(super) fn draw(
     params: &Params,
     levels: &Levels,
     focus: Option<usize>,
+    board: &[bool],
     recording: bool,
     blink: bool,
     status: Option<&str>,
@@ -53,7 +50,7 @@ pub(super) fn draw(
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
     render_amp(f, rows[3], params, focus);
-    render_rig(f, rows[4], params, focus);
+    render_rig(f, rows[4], params, board, focus);
     render_help(f, rows[5], status);
 }
 
@@ -85,6 +82,10 @@ fn render_header(
         Span::styled(
             "  R U S T Y  A M P  ",
             Style::default().fg(ORANGE).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            concat!("v", env!("CARGO_PKG_VERSION"), "  "),
+            Style::default().fg(DIM),
         ),
         Span::styled("▐", Style::default().fg(WARM)),
         Span::styled(
@@ -495,7 +496,10 @@ fn render_grille(f: &mut Frame, area: Rect, color: Color) {
 }
 
 // ── Guitar rig (pedalboard) ───────────────────────────────────────────────────
-fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) {
+// Master–detail layout: a compact tile per pedal (name + LED + values) across
+// the top, and a full-size dial editor for the focused pedal below. Screen cost
+// is flat in pedal count — adding pedals grows the tile grid, not the editor.
+fn render_rig(f: &mut Frame, area: Rect, params: &Params, board: &[bool], focus: Option<usize>) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Plain)
@@ -508,165 +512,110 @@ fn render_rig(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     let inner = block.inner(area);
     f.render_widget(block, area);
 
-    // Split into two equal-height pedal rows so the second row (noise gate /
-    // parametric EQ) gets dials the same size as the first. Any odd leftover
-    // row is absorbed as a thin gap at the bottom rather than inflating row 1.
-    let half = inner.height / 2;
-    let rows = Layout::default()
+    // Only on-board pedals get tiles; the last tile is always "+ ADD". `board`
+    // may be shorter than PEDALS (e.g. the device-setup screen passes an empty
+    // slice), so treat missing entries as off-board.
+    let on_board: Vec<usize> = (0..PEDALS.len())
+        .filter(|&i| board.get(i).copied().unwrap_or(false))
+        .collect();
+    let tile_count = on_board.len() + 1;
+
+    // Tiles up top (fixed height), full-size editor below (takes the rest).
+    const TILE_H: u16 = 4;
+    let cols = ((inner.width / 16).max(1) as usize).min(tile_count);
+    let tile_rows = tile_count.div_ceil(cols);
+    let parts = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(half),
-            Constraint::Length(half),
+            Constraint::Length(tile_rows as u16 * TILE_H),
             Constraint::Min(0),
         ])
         .split(inner);
 
-    // Row 1: TS-808, DS-1, Reverb, Delay.
-    let row1 = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-            Constraint::Ratio(1, 4),
-        ])
-        .split(rows[0]);
+    let grid_rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(vec![Constraint::Length(TILE_H); tile_rows])
+        .split(parts[0]);
 
-    render_pedal(
-        f,
-        row1[0],
-        "TS-808",
-        PEDAL_GREEN,
-        TS_START,
-        TS_END,
-        params.ts_enabled.load(Relaxed),
-        focus,
-        params,
-    );
-    render_pedal(
-        f,
-        row1[1],
-        "DS-1",
-        PEDAL_ORANGE,
-        DS_START,
-        DS_END,
-        params.ds_enabled.load(Relaxed),
-        focus,
-        params,
-    );
-    render_pedal(
-        f,
-        row1[2],
-        "SPRING REVERB",
-        PEDAL_BLUE,
-        REV_START,
-        REV_END,
-        params.rev_enabled.load(Relaxed),
-        focus,
-        params,
-    );
-    render_pedal(
-        f,
-        row1[3],
-        "DELAY",
-        PEDAL_PURPLE,
-        DELAY_START,
-        DELAY_END,
-        params.delay_enabled.load(Relaxed),
-        focus,
-        params,
-    );
+    for r in 0..tile_rows {
+        let base = r * cols;
+        let n = cols.min(tile_count - base);
+        let cells = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints(vec![Constraint::Ratio(1, cols as u32); cols])
+            .split(grid_rows[r]);
+        for (c, cell) in cells.iter().take(n).enumerate() {
+            match on_board.get(base + c) {
+                Some(&pi) => render_pedal_tile(f, *cell, &PEDALS[pi], focus, params),
+                None => render_add_tile(f, *cell, focus == Some(ADD_TILE)),
+            }
+        }
+    }
 
-    // Row 2: Compressor, Fuzz, Noise Gate, Pre-amp EQ, Parametric EQ.
-    let row2 = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Ratio(3, 14),
-            Constraint::Ratio(3, 14),
-            Constraint::Ratio(2, 14),
-            Constraint::Ratio(3, 14),
-            Constraint::Ratio(3, 14),
-        ])
-        .split(rows[1]);
+    render_pedal_detail(f, parts[1], params, focus);
+}
 
-    render_pedal(
-        f,
-        row2[0],
-        "COMP",
-        PEDAL_GOLD,
-        CMP_START,
-        CMP_END,
-        params.cmp_enabled.load(Relaxed),
-        focus,
-        params,
+/// The "+ ADD" tile: an empty slot inviting the user to add a pedal.
+fn render_add_tile(f: &mut Frame, area: Rect, focused: bool) {
+    let color = if focused { AMBER } else { DIM };
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(color))
+        .title(Line::from(Span::styled(
+            " + ADD ",
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        )))
+        .style(Style::default().bg(Color::Black));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(inner);
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "＋",
+            Style::default().fg(color).add_modifier(Modifier::BOLD),
+        )))
+        .alignment(Alignment::Center),
+        parts[0],
     );
-    render_pedal(
-        f,
-        row2[1],
-        "FUZZ",
-        PEDAL_RED,
-        FUZZ_START,
-        FUZZ_END,
-        params.fz_enabled.load(Relaxed),
-        focus,
-        params,
-    );
-    render_pedal(
-        f,
-        row2[2],
-        "NOISE GATE",
-        PEDAL_SILVER,
-        NG_START,
-        NG_END,
-        params.ng_enabled.load(Relaxed),
-        focus,
-        params,
-    );
-    render_pedal(
-        f,
-        row2[3],
-        "PRE-AMP EQ",
-        PEDAL_LIME,
-        PEQ_START,
-        PEQ_END,
-        params.peq_enabled.load(Relaxed),
-        focus,
-        params,
-    );
-    render_pedal(
-        f,
-        row2[4],
-        "PARAMETRIC EQ",
-        PEDAL_TEAL,
-        EQ_START,
-        EQ_END,
-        params.eq_enabled.load(Relaxed),
-        focus,
-        params,
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            if focused { "Enter" } else { "" },
+            Style::default().fg(DIM),
+        )))
+        .alignment(Alignment::Center),
+        parts[1],
     );
 }
 
-#[allow(clippy::too_many_arguments)]
-fn render_pedal(
+/// A compact pedal tile: name + LED in the title, all knob values on one line,
+/// and a footswitch. The focused pedal's tile lights up to its full livery; the
+/// rest dim by on/off state.
+fn render_pedal_tile(
     f: &mut Frame,
     area: Rect,
-    name: &str,
-    color: Color,
-    start: usize,
-    end: usize,
-    on: bool,
+    pedal: &Pedal,
     focus: Option<usize>,
     params: &Params,
 ) {
-    let active = focus.is_some_and(|i| (start..end).contains(&i));
+    let on = (pedal.enabled)(params).load(Relaxed);
+    let active = focus.is_some_and(|i| (pedal.start..pedal.end).contains(&i));
     let body = if active {
-        color
+        pedal.color
     } else if on {
-        shade(color, 0.8)
+        shade(pedal.color, 0.8)
     } else {
-        shade(color, 0.35)
+        shade(pedal.color, 0.35)
     };
-    let name_color = if on { color } else { shade(color, 0.5) };
+    let name_color = if on {
+        pedal.color
+    } else {
+        shade(pedal.color, 0.5)
+    };
 
     let led = if on {
         Span::styled(
@@ -681,7 +630,7 @@ fn render_pedal(
 
     let title = Line::from(vec![
         Span::styled(
-            format!(" {name} "),
+            format!(" {} ", pedal.name),
             Style::default().fg(name_color).add_modifier(Modifier::BOLD),
         ),
         led,
@@ -699,20 +648,101 @@ fn render_pedal(
 
     let parts = Layout::default()
         .direction(Direction::Vertical)
+        .constraints([Constraint::Length(1), Constraint::Length(1)])
+        .split(inner);
+
+    let values: String = (pedal.start..pedal.end)
+        .map(|ki| format!("{:.1}", (KNOBS[ki].param)(params).load(Relaxed) * 10.0))
+        .collect::<Vec<_>>()
+        .join("  ");
+    let value_color = if active || on { pedal.color } else { OFF };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            values,
+            Style::default()
+                .fg(value_color)
+                .add_modifier(Modifier::BOLD),
+        )))
+        .alignment(Alignment::Center),
+        parts[0],
+    );
+
+    let foot_color = if on { body } else { shade(pedal.color, 0.3) };
+    f.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "▗▄▄▄▄▄▄▄▖",
+            Style::default().fg(foot_color),
+        )))
+        .alignment(Alignment::Center),
+        parts[1],
+    );
+}
+
+/// The detail editor: full-size dials for whichever pedal currently has focus.
+/// When focus is elsewhere (amp/mic/selectors) it shows a hint instead.
+fn render_pedal_detail(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) {
+    let pedal = PEDALS
+        .iter()
+        .find(|p| focus.is_some_and(|i| (p.start..p.end).contains(&i)));
+
+    // The editor takes on the focused pedal's livery; otherwise it stays dim.
+    let border_color = pedal.map_or(DIM, |p| p.color);
+    let adding = focus == Some(ADD_TILE);
+    let title = match pedal {
+        Some(p) => Line::from(vec![
+            Span::styled("┤ EDITING: ", Style::default().fg(border_color)),
+            Span::styled(
+                p.name,
+                Style::default().fg(p.color).add_modifier(Modifier::BOLD),
+            ),
+            Span::styled(" ├", Style::default().fg(border_color)),
+        ]),
+        None if adding => Line::from(Span::styled(
+            "┤ ADD A PEDAL — Enter ├",
+            Style::default().fg(AMBER),
+        )),
+        None => Line::from(Span::styled(
+            "┤ SELECT A PEDAL — Tab / ←→ ├",
+            Style::default().fg(DIM),
+        )),
+    };
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Thick)
+        .border_style(Style::default().fg(border_color))
+        .title(title)
+        .style(Style::default().bg(Color::Black));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let Some(pedal) = pedal else {
+        let hint = if adding {
+            "Press Enter to add a pedal to the board."
+        } else {
+            "Tab to a pedal to edit its controls."
+        };
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(hint, Style::default().fg(DIM))))
+                .alignment(Alignment::Center),
+            inner,
+        );
+        return;
+    };
+
+    let on = (pedal.enabled)(params).load(Relaxed);
+    let parts = Layout::default()
+        .direction(Direction::Vertical)
         .constraints([Constraint::Min(3), Constraint::Length(1)])
         .split(inner);
 
-    let count = end - start;
+    let count = pedal.end - pedal.start;
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints(
-            (0..count)
-                .map(|_| Constraint::Ratio(1, count as u32))
-                .collect::<Vec<_>>(),
-        )
+        .constraints(vec![Constraint::Ratio(1, count as u32); count])
         .split(parts[0]);
 
-    for (i, ki) in (start..end).enumerate() {
+    for (i, ki) in (pedal.start..pedal.end).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
         render_compact_knob(
             f,
@@ -721,15 +751,23 @@ fn render_pedal(
             val,
             focus == Some(ki),
             on,
-            color,
+            pedal.color,
         );
     }
 
-    // Footswitch (stomp pad).
-    let foot_color = if on { body } else { shade(color, 0.3) };
+    let foot_color = if on {
+        pedal.color
+    } else {
+        shade(pedal.color, 0.3)
+    };
+    let foot = if on {
+        "▐ ON ▌  ▗▄▄▄▄▄▄▄▖"
+    } else {
+        "○ OFF   ▗▄▄▄▄▄▄▄▖"
+    };
     f.render_widget(
         Paragraph::new(Line::from(Span::styled(
-            "▗▄▄▄▄▄▄▄▖",
+            foot,
             Style::default().fg(foot_color),
         )))
         .alignment(Alignment::Center),
@@ -819,6 +857,8 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
             Span::styled(" adjust  ", Style::default().fg(DIM)),
             Span::styled("Space", Style::default().fg(AMBER)),
             Span::styled(" toggle  ", Style::default().fg(DIM)),
+            Span::styled("D", Style::default().fg(AMBER)),
+            Span::styled(" remove  ", Style::default().fg(DIM)),
             Span::styled("A", Style::default().fg(AMBER)),
             Span::styled(" amp  ", Style::default().fg(DIM)),
             Span::styled("C", Style::default().fg(AMBER)),
@@ -843,6 +883,91 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
         .alignment(Alignment::Center)
         .style(Style::default().bg(Color::Black));
     f.render_widget(help, area);
+}
+
+/// Modal listing the pedals not currently on the board. `available` holds their
+/// `PEDALS` indices; `cursor` is the highlighted row.
+pub(super) fn render_add_pedal_modal(f: &mut Frame, available: &[usize], cursor: usize) {
+    let area = {
+        let a = f.area();
+        let width = (a.width * 45 / 100).max(24);
+        let height = ((available.len() as u16 + 4).min(a.height)).max(6);
+        Rect {
+            x: a.x + (a.width - width) / 2,
+            y: a.y + (a.height - height) / 2,
+            width,
+            height,
+        }
+    };
+    f.render_widget(Clear, area);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Double)
+        .border_style(Style::default().fg(ORANGE))
+        .title(Span::styled(
+            " A D D   P E D A L ",
+            Style::default().fg(AMBER).add_modifier(Modifier::BOLD),
+        ))
+        .style(Style::default().bg(Color::Black));
+    let inner = block.inner(area);
+    f.render_widget(block, area);
+
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(1)])
+        .split(inner);
+
+    if available.is_empty() {
+        f.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "All pedals are on the board.",
+                Style::default().fg(DIM),
+            )))
+            .alignment(Alignment::Center),
+            rows[0],
+        );
+    } else {
+        let lines: Vec<Line> = available
+            .iter()
+            .enumerate()
+            .map(|(i, &pi)| {
+                let p = &PEDALS[pi];
+                let selected = i == cursor;
+                let (prefix, style) = if selected {
+                    (
+                        "▶ ",
+                        Style::default()
+                            .fg(p.color)
+                            .add_modifier(Modifier::BOLD | Modifier::REVERSED),
+                    )
+                } else {
+                    ("  ", Style::default().fg(p.color))
+                };
+                Line::from(vec![
+                    Span::styled(
+                        prefix,
+                        Style::default().fg(if selected { ORANGE } else { DIM }),
+                    ),
+                    Span::styled(p.name, style),
+                ])
+            })
+            .collect();
+        f.render_widget(Paragraph::new(lines), rows[0]);
+    }
+
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("↑/↓", Style::default().fg(AMBER)),
+            Span::styled(" navigate  ", Style::default().fg(DIM)),
+            Span::styled("Enter", Style::default().fg(AMBER)),
+            Span::styled(" add  ", Style::default().fg(DIM)),
+            Span::styled("Esc", Style::default().fg(AMBER)),
+            Span::styled(" close", Style::default().fg(DIM)),
+        ]))
+        .alignment(Alignment::Center),
+        rows[1],
+    );
 }
 
 /// Builds an ASCII rotary knob `rows` lines tall: a hub, a dotted rim, and a
