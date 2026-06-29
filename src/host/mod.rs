@@ -114,8 +114,6 @@ fn host_info() -> Result<HostInfo> {
     .map_err(|e| anyhow!("invalid host info: {e}"))
 }
 
-// ── Discovery ─────────────────────────────────────────────────────────────────
-
 /// A CLAP plugin found on disk, before it is loaded.
 #[derive(Clone, Debug)]
 pub struct DiscoveredPlugin {
@@ -234,8 +232,6 @@ fn find_clap_files(dir: &Path, out: &mut Vec<PathBuf>) {
         }
     }
 }
-
-// ── Loading ───────────────────────────────────────────────────────────────────
 
 /// A loaded plugin's main-thread handle, kept alive for as long as the plugin is
 /// in use. Holding this keeps the underlying entry/instance loaded; dropping it
@@ -392,8 +388,6 @@ fn main_port_channels(instance: &mut PluginInstance<RaHost>, is_input: bool) -> 
     }
     2
 }
-
-// ── The insert itself (audio thread) ──────────────────────────────────────────
 
 /// Bridges a started CLAP audio processor to the chain's [`StereoInsert`] slot.
 ///
