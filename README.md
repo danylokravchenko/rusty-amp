@@ -126,7 +126,7 @@ Focus starts on the **selector row** (amp + cabinet). Tab moves down through the
 
 ## Knob sections
 
-### Pedals  _(Compressor | Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate | Pre-amp EQ — each can be added, removed, and bypassed independently)_
+### Pedals  _(Compressor | Fuzz | TS-808 | DS-1 | Stereo Reverb | Delay | Noise Gate | Pre-amp EQ | Parametric EQ — each can be added, removed, and bypassed independently)_
 
 #### Noise Gate
 
@@ -191,26 +191,6 @@ Stereo ping-pong: feedback cross-feeds the two channels so repeats bounce left �
 | Feedback | 0–10 | Repeat level. Capped at 85% internally to prevent runaway |
 | Mix | 0–10 | Dry/wet blend |
 
-### Amp &amp; cabinet  _(Amp | Parametric EQ | Cabinet mics)_
-
-#### Amp  _(model selected with `↑`/`↓` or `A` on the selector row)_
-
-| Knob | Range | Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead |
-| ------ | ------- | ---------------- | -------------------- | --------------- |
-| Gain | 0–10 | Preamp gain 1×–40× into dual 12AX7 | Preamp gain 1×–36× into three stages | Preamp gain 1×–46× into FET+BJT stages |
-| Bass | 0–10 | Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall component values) | Passive FMV tone stack (Fender-type values: fuller lows, gentler scoop) | Active tone stack — low shelf at 80 Hz |
-| Mid | 0–10 | …the mid pot sets the depth of the stack's inherent scoop | …gentler scoop than the Marshall | Peak EQ at 500 Hz |
-| Treble | 0–10 | …treble interacts with mid/bass, lossy & peak-normalised | …same interacting network | High shelf at 4.5 kHz |
-| Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
-| Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
-
-The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC
-network where the three controls interact and the mids inherently scoop, exactly
-like a real amp — followed by a **power-amp ↔ speaker interaction** model: the
-speaker's impedance resonance blooms the low end dynamically as the supply sags
-under hard playing. The Randall keeps an active (independent-band) stack and a
-small static speaker resonance, true to its stiff solid-state design.
-
 #### Pre-amp EQ  _(bypassable with Space)_
 
 Sits **before the amp**, so it shapes the signal that the gain stage actually clips — a different job from the post-cab Parametric EQ below, which colours the final mix. Scoop the mids going in for a tighter chug, or push them for lead sustain. All three bands map 0–10 to −12 dB → 0 dB → +12 dB. Centre (5.0) is flat.
@@ -230,6 +210,26 @@ Post-cabinet — shapes the final stereo tone after distortion. All three bands 
 | Low | 120 Hz | Low shelf |
 | Mid | 800 Hz | Peak (Q 1.5) |
 | High | 5 kHz | High shelf |
+
+### Amp &amp; cabinet  _(Amp | Cabinet mics)_
+
+#### Amp  _(model selected with `↑`/`↓` or `A` on the selector row)_
+
+| Knob | Range | Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead |
+| ------ | ------- | ---------------- | -------------------- | --------------- |
+| Gain | 0–10 | Preamp gain 1×–40× into dual 12AX7 | Preamp gain 1×–36× into three stages | Preamp gain 1×–46× into FET+BJT stages |
+| Bass | 0–10 | Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall component values) | Passive FMV tone stack (Fender-type values: fuller lows, gentler scoop) | Active tone stack — low shelf at 80 Hz |
+| Mid | 0–10 | …the mid pot sets the depth of the stack's inherent scoop | …gentler scoop than the Marshall | Peak EQ at 500 Hz |
+| Treble | 0–10 | …treble interacts with mid/bass, lossy & peak-normalised | …same interacting network | High shelf at 4.5 kHz |
+| Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
+| Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
+
+The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC
+network where the three controls interact and the mids inherently scoop, exactly
+like a real amp — followed by a **power-amp ↔ speaker interaction** model: the
+speaker's impedance resonance blooms the low end dynamically as the supply sags
+under hard playing. The Randall keeps an active (independent-band) stack and a
+small static speaker resonance, true to its stiff solid-state design.
 
 #### Cabinet mics  _(labeled with the active cabinet model)_
 
