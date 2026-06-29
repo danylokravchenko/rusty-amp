@@ -319,7 +319,14 @@ pub fn load(
 
     let (param_tx, param_rx) = RingBuffer::<ParamChange>::new(PARAM_QUEUE_CAP);
 
-    let insert = ClapInsert::new(processor, in_ch, out_ch, max_block as usize, param_rx);
+    let insert = ClapInsert::new(
+        processor,
+        in_ch,
+        out_ch,
+        max_block as usize,
+        param_rx,
+        params.len(),
+    );
 
     let loaded = LoadedPlugin {
         name: plugin.name.clone(),
@@ -409,6 +416,9 @@ struct ClapInsert {
     param_rx: Consumer<ParamChange>,
     /// Reused buffer the drained param changes are turned into for `process`.
     events: EventBuffer,
+    /// Scratch used to coalesce queued changes to one (latest) value per param,
+    /// pre-sized to the parameter count so it never allocates on the audio thread.
+    coalesced: Vec<ParamChange>,
 }
 
 impl ClapInsert {
@@ -418,6 +428,7 @@ impl ClapInsert {
         out_ch: usize,
         max_block: usize,
         param_rx: Consumer<ParamChange>,
+        n_params: usize,
     ) -> Self {
         Self {
             processor,
@@ -431,6 +442,7 @@ impl ClapInsert {
             steady: 0,
             param_rx,
             events: EventBuffer::with_capacity(PARAM_QUEUE_CAP),
+            coalesced: Vec::with_capacity(n_params),
         }
     }
 
@@ -453,10 +465,19 @@ impl ClapInsert {
             }
         }
 
-        // Turn any pending parameter changes into automation events for this block.
-        // Draining empties the queue, so later chunks in the same block see none.
-        self.events.clear();
+        // Drain pending parameter changes, coalescing to the latest value per param
+        // so the plugin recomputes each parameter at most once this block (a fast
+        // knob sweep that queued many changes can't pile up N recomputes here).
+        self.coalesced.clear();
         while let Ok(change) = self.param_rx.pop() {
+            if let Some(slot) = self.coalesced.iter_mut().find(|c| c.id == change.id) {
+                slot.value = change.value;
+            } else {
+                self.coalesced.push(change);
+            }
+        }
+        self.events.clear();
+        for change in &self.coalesced {
             self.events.push(&ParamValueEvent::new(
                 0,
                 change.id,
