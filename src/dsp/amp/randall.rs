@@ -1,4 +1,4 @@
-use super::{Amplifier, Bloom, SpeakerLoad};
+use super::{Amplifier, Bloom, Cached, FrontEnd, SpeakerLoad, ToneCache, VoiceBalance};
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
 
@@ -15,8 +15,7 @@ use crate::dsp::oversample::Oversampler8;
 ///   • Presence knob (user-adjustable shelf at 5 kHz)
 pub struct Randall {
     sr: f32,
-    dc_block: Biquad,
-    input_hp: Biquad,
+    front: FrontEnd,
     os: Oversampler8,
     // Pre-clip HP at 8× rate — the Warhead's tight solid-state input coupling
     pre_clip_hp: Biquad,
@@ -34,17 +33,14 @@ pub struct Randall {
     bass_shelf: Biquad,
     mid_peak: Biquad,
     treble_shelf: Biquad,
-    last_bass: f32,
-    last_mid: f32,
-    last_treble: f32,
+    tone_cache: ToneCache,
     // Presence (base rate)
     presence_shelf: Biquad,
-    last_presence: f32,
+    presence_cache: Cached,
     // Structural voicing balance (base rate): restore low-mid body (the tight
     // solid-state input + power high-passes gut the low E) and tame the upper-mid
     // tilt, so notes stay even in level across the neck.
-    body: Biquad,
-    tilt: Biquad,
+    voice: VoiceBalance,
     // Speaker impedance interaction (static — stiff rails, high damping factor).
     speaker: SpeakerLoad,
 }
@@ -54,9 +50,8 @@ impl Randall {
         let sr8 = sr * 8.0;
         let mut r = Self {
             sr,
-            dc_block: Biquad::highpass(sr, 10.0, 0.707),
-            // 75 Hz: tighter than tube amps (60 Hz) but doesn't cut the 82 Hz low-E
-            input_hp: Biquad::highpass(sr, 75.0, 0.707),
+            // 75 Hz input HP: tighter than tube amps (60 Hz) but doesn't cut 82 Hz low-E
+            front: FrontEnd::new(sr, 75.0),
             os: Oversampler8::new(sr),
             // Warhead pre-clip HP: 55 Hz — tighter than Marshall/Mesa but below 82 Hz
             pre_clip_hp: Biquad::highpass(sr8, 55.0, 0.707),
@@ -77,13 +72,10 @@ impl Randall {
             bass_shelf: Biquad::low_shelf(sr, 80.0, 0.0),
             mid_peak: Biquad::peak_eq(sr, 500.0, 0.4, 0.0),
             treble_shelf: Biquad::high_shelf(sr, 4500.0, 0.0),
+            tone_cache: ToneCache::new(),
             presence_shelf: Biquad::high_shelf(sr, 5000.0, 3.0),
-            body: Biquad::low_shelf(sr, 260.0, 7.0),
-            tilt: Biquad::high_shelf(sr, 800.0, -4.0),
-            last_bass: -1.0,
-            last_mid: -1.0,
-            last_treble: -1.0,
-            last_presence: -1.0,
+            presence_cache: Cached::new(),
+            voice: VoiceBalance::new(sr, 260.0, 7.0, 800.0, -4.0),
             // Tight 8×12 resonance ~90 Hz, modest and static (no rectifier sag).
             speaker: SpeakerLoad::new(sr, 90.0, 1.0, 0.05, 0.0, 0.8),
         };
@@ -96,16 +88,12 @@ impl Randall {
         self.bass_shelf = Biquad::low_shelf(self.sr, 80.0, (bass - 0.5) * 30.0);
         self.mid_peak = Biquad::peak_eq(self.sr, 500.0, 0.4, (mid - 0.5) * 24.0);
         self.treble_shelf = Biquad::high_shelf(self.sr, 4500.0, (treble - 0.5) * 30.0);
-        self.last_bass = bass;
-        self.last_mid = mid;
-        self.last_treble = treble;
     }
 
     fn update_presence(&mut self, presence: f32) {
         // Randall presence at 5 kHz (glassy solid-state top end), +3 dB at noon → ±6 dB range
         let gain_db = 3.0 + (presence - 0.5) * 12.0;
         self.presence_shelf = Biquad::high_shelf(self.sr, 5000.0, gain_db);
-        self.last_presence = presence;
     }
 }
 
@@ -122,18 +110,14 @@ impl Amplifier for Randall {
         presence: f32,
         master: f32,
     ) -> f32 {
-        if (bass - self.last_bass).abs() > 0.001
-            || (mid - self.last_mid).abs() > 0.001
-            || (treble - self.last_treble).abs() > 0.001
-        {
+        if self.tone_cache.changed(bass, mid, treble) {
             self.update_tone_stack(bass, mid, treble);
         }
-        if (presence - self.last_presence).abs() > 0.001 {
+        if self.presence_cache.changed(presence) {
             self.update_presence(presence);
         }
 
-        let x = self.dc_block.process(sample);
-        let x = self.input_hp.process(x);
+        let x = self.front.process(sample);
 
         let pregain = 1.0 + gain * 34.0;
         // Bias depth more than halved and bloom release shortened (above): the
@@ -163,8 +147,7 @@ impl Amplifier for Randall {
         let x = self.treble_shelf.process(x);
         let x = self.presence_shelf.process(x);
         // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
-        let x = self.body.process(x);
-        let x = self.tilt.process(x);
+        let x = self.voice.process(x);
 
         // Solid-state power section — stiff rails, no sag.
         // HP before tanh: prevents the output stage from distorting sub-bass.

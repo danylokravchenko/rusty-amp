@@ -1,4 +1,7 @@
-use super::{Amplifier, Bloom, BrightCap, CathodeBias, OutputTransformer, SpeakerLoad};
+use super::{
+    Amplifier, Bloom, BrightCap, Cached, CathodeBias, FrontEnd, OutputTransformer, SpeakerLoad,
+    ToneCache, VoiceBalance,
+};
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
 use crate::dsp::tonestack::{Components, ToneStack};
@@ -16,8 +19,7 @@ use crate::dsp::tonestack::{Components, ToneStack};
 ///   • Presence shelf at 4 kHz — Recto's presence is brighter/tighter than the JCM800
 pub struct Mesa {
     sr: f32,
-    dc_block: Biquad,
-    input_hp: Biquad,
+    front: FrontEnd,
     os: Oversampler8,
     // Pre-clip HP at 8× rate — cuts sub-bass before the first gain stage
     pre_clip_hp: Biquad,
@@ -40,22 +42,17 @@ pub struct Mesa {
     // Passive FMV tone stack (base rate) — Fender-type values for the Recto's
     // thicker low end and gentler scoop.
     tone: ToneStack,
-    last_bass: f32,
-    last_mid: f32,
-    last_treble: f32,
+    tone_cache: ToneCache,
     // Presence (base rate)
     presence_shelf: Biquad,
-    last_presence: f32,
+    presence_cache: Cached,
     // Structural voicing balance (base rate): the FENDER tone stack is treble-heavy
-    // and peak-normalised, so the upper mids/treble end up sitting ~12 dB above the
-    // low mids. Left alone, single notes higher up the neck (whose fundamentals land
-    // in that boosted region) blast out far louder than mid-neck notes. A static low
-    // shelf restores body and a static high shelf tames the tilt, flattening the
-    // across-the-neck response without touching the player's tone controls. The body
-    // shelf's corner is matched to the upper inter-stage HP so the low-mid level it
-    // restores has no gap (which would leave a mid note quieter than its neighbours).
-    body: Biquad,
-    tilt: Biquad,
+    // and peak-normalised, so the upper mids/treble sit well above the low mids;
+    // left alone, notes higher up the neck blast out. The low shelf restores body
+    // and the high shelf tames the tilt, flattening the across-the-neck response.
+    // The body shelf's corner is matched to the upper inter-stage HP so the low-mid
+    // level it restores has no gap.
+    voice: VoiceBalance,
     // Silicon-rectifier sag envelope
     envelope: f32,
     // Power-amp ↔ speaker impedance interaction.
@@ -67,8 +64,7 @@ impl Mesa {
         let sr8 = sr * 8.0;
         let mut m = Self {
             sr,
-            dc_block: Biquad::highpass(sr, 10.0, 0.707),
-            input_hp: Biquad::highpass(sr, 60.0, 0.707),
+            front: FrontEnd::new(sr, 60.0),
             os: Oversampler8::new(sr),
             // Recto input coupling HP at ~70 Hz — keeps sub-bass out of the gain
             // stages so they don't generate difference-tone mud, while preserving
@@ -101,13 +97,10 @@ impl Mesa {
             // ~140 Hz, gentle drive and a trace of crossover.
             xfmr: OutputTransformer::new(sr, 140.0, 1.5, 0.04),
             tone: ToneStack::new(sr, Components::FENDER),
-            last_bass: -1.0,
-            last_mid: -1.0,
-            last_treble: -1.0,
+            tone_cache: ToneCache::new(),
             presence_shelf: Biquad::high_shelf(sr, 4000.0, 0.0),
-            last_presence: -1.0,
-            body: Biquad::low_shelf(sr, 320.0, 7.0),
-            tilt: Biquad::high_shelf(sr, 600.0, -9.5),
+            presence_cache: Cached::new(),
+            voice: VoiceBalance::new(sr, 320.0, 7.0, 600.0, -9.5),
             envelope: 0.0,
             // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
             // rectifier, so a tight dynamic bloom. Trimmed (0.45→0.22) so palm-muted
@@ -121,15 +114,11 @@ impl Mesa {
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
         self.tone.update(bass, mid, treble);
-        self.last_bass = bass;
-        self.last_mid = mid;
-        self.last_treble = treble;
     }
 
     fn update_presence(&mut self, presence: f32) {
         // Recto presence: 4 kHz (brighter/tighter than JCM800 3.5 kHz), ±6 dB
         self.presence_shelf = Biquad::high_shelf(self.sr, 4000.0, (presence - 0.5) * 12.0);
-        self.last_presence = presence;
     }
 
     /// Silicon rectifier sag: tight attack (0.5 ms), moderate release (80 ms).
@@ -160,18 +149,14 @@ impl Amplifier for Mesa {
         presence: f32,
         master: f32,
     ) -> f32 {
-        if (bass - self.last_bass).abs() > 0.001
-            || (mid - self.last_mid).abs() > 0.001
-            || (treble - self.last_treble).abs() > 0.001
-        {
+        if self.tone_cache.changed(bass, mid, treble) {
             self.update_tone_stack(bass, mid, treble);
         }
-        if (presence - self.last_presence).abs() > 0.001 {
+        if self.presence_cache.changed(presence) {
             self.update_presence(presence);
         }
 
-        let x = self.dc_block.process(sample);
-        let x = self.input_hp.process(x);
+        let x = self.front.process(sample);
         // Bright cap across the gain pot (see BrightCap).
         let x = self.bright.process(x, gain);
 
@@ -202,8 +187,7 @@ impl Amplifier for Mesa {
 
         let x = self.tone.process(x);
         // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
-        let x = self.body.process(x);
-        let x = self.tilt.process(x);
+        let x = self.voice.process(x);
 
         // Subsonic cut before the power stage so the silicon clipper can't fold
         // sub-bass into difference-tone mud.

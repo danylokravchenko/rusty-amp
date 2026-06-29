@@ -219,6 +219,116 @@ impl BrightCap {
     }
 }
 
+/// Shared preamp front end: a fixed DC blocker followed by the model's input
+/// high-pass.
+///
+/// Every model opens the same way — strip any DC at ~10 Hz, then a model-specific
+/// subsonic/rumble high-pass before the gain stages. Only the input-HP corner
+/// differs (tube amps sit lower, the solid-state Randall tighter), so that is the
+/// one knob the constructor takes.
+pub(crate) struct FrontEnd {
+    dc_block: Biquad,
+    input_hp: Biquad,
+}
+
+impl FrontEnd {
+    pub fn new(sr: f32, input_hp_hz: f32) -> Self {
+        Self {
+            dc_block: Biquad::highpass(sr, 10.0, 0.707),
+            input_hp: Biquad::highpass(sr, input_hp_hz, 0.707),
+        }
+    }
+
+    #[inline]
+    pub fn process(&mut self, x: f32) -> f32 {
+        self.input_hp.process(self.dc_block.process(x))
+    }
+}
+
+/// Structural voicing balance applied after the tone stack: a low shelf that
+/// restores low-mid body and a high shelf that tames the tone stack's treble-
+/// forward tilt, so notes stay even in level across the neck.
+///
+/// All three models need this same body-up / tilt-down pair (the gain-stage
+/// high-passes and peak-normalised tone stacks otherwise leave the upper register
+/// blasting out); only the corner frequencies and depths are voiced per model.
+pub(crate) struct VoiceBalance {
+    body: Biquad,
+    tilt: Biquad,
+}
+
+impl VoiceBalance {
+    pub fn new(sr: f32, body_hz: f32, body_db: f32, tilt_hz: f32, tilt_db: f32) -> Self {
+        Self {
+            body: Biquad::low_shelf(sr, body_hz, body_db),
+            tilt: Biquad::high_shelf(sr, tilt_hz, tilt_db),
+        }
+    }
+
+    #[inline]
+    pub fn process(&mut self, x: f32) -> f32 {
+        self.tilt.process(self.body.process(x))
+    }
+}
+
+/// Tracks the value a control was last at so an expensive coefficient recompute
+/// only fires when the knob actually moves. Starts "dirty" (NaN), so the first
+/// real call always recomputes.
+pub(crate) struct Cached {
+    last: f32,
+}
+
+impl Cached {
+    pub fn new() -> Self {
+        Self { last: f32::NAN }
+    }
+
+    /// Returns `true` (and latches the new value) when `v` has moved beyond the
+    /// smoothing epsilon since the last latched value. The initial NaN forces the
+    /// first call to report changed, syncing coefficients to the real control value.
+    #[inline]
+    pub fn changed(&mut self, v: f32) -> bool {
+        if self.last.is_nan() || (v - self.last).abs() > 0.001 {
+            self.last = v;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// The three-knob counterpart of [`Cached`] for the bass/mid/treble tone stack,
+/// whose coefficients are recomputed as a set whenever *any* of the three moves.
+pub(crate) struct ToneCache {
+    bass: f32,
+    mid: f32,
+    treble: f32,
+}
+
+impl ToneCache {
+    pub fn new() -> Self {
+        Self {
+            bass: f32::NAN,
+            mid: f32::NAN,
+            treble: f32::NAN,
+        }
+    }
+
+    #[inline]
+    pub fn changed(&mut self, bass: f32, mid: f32, treble: f32) -> bool {
+        let moved = self.bass.is_nan()
+            || (bass - self.bass).abs() > 0.001
+            || (mid - self.mid).abs() > 0.001
+            || (treble - self.treble).abs() > 0.001;
+        if moved {
+            self.bass = bass;
+            self.mid = mid;
+            self.treble = treble;
+        }
+        moved
+    }
+}
+
 /// Common interface every amp model must satisfy.
 /// All knobs are normalised 0–1.
 pub trait Amplifier {
