@@ -23,6 +23,22 @@ toml = "1.1"
 dirs = "6.0.0"
 hound = "3.5.1"
 
+# CLAP plugin hosting — only pulled in with the `clap` feature so the base amp
+# builds with no extra dependencies. `clack` is a pure-Rust, safe wrapper over the
+# CLAP ABI (no C toolchain required).
+clack-host = { version = "0.1.0", optional = true }
+clack-extensions = { version = "0.1.0", features = [
+    "clack-host",
+    "audio-ports",
+    "params",
+    "log",
+], optional = true }
+
+[features]
+default = []
+# Host third-party CLAP effect plugins as a stereo insert in the signal chain.
+clap = ["dep:clack-host", "dep:clack-extensions"]
+
 [profile.release]
 opt-level = 3
 lto = "thin"
