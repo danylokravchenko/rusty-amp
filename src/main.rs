@@ -1,11 +1,7 @@
-mod audio;
-mod dsp;
-mod preset;
-mod recording;
-mod ui;
-
 use anyhow::Result;
 use std::sync::Arc;
+
+use rusty_amp::{dsp, preset, recording, ui};
 
 fn main() -> Result<()> {
     let params = Arc::new(dsp::Params::new());
