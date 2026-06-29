@@ -1,6 +1,8 @@
 mod config;
 mod draw;
 mod input;
+#[cfg(feature = "clap")]
+mod plugins;
 mod presets;
 mod setup;
 mod styles;
@@ -50,7 +52,8 @@ pub fn run(
     };
 
     // ── Start audio engine ────────────────────────────────────────────────────
-    let _engine = crate::audio::start(
+    #[cfg_attr(not(feature = "clap"), allow(unused_mut, unused_variables))]
+    let mut engine = crate::audio::start(
         selection.input_idx,
         selection.guitar_ch,
         selection.output_idx,
@@ -58,6 +61,11 @@ pub fn run(
         Arc::clone(&levels),
         Arc::clone(&recording),
     )?;
+
+    // ── Plugin browser (CLAP insert) ──────────────────────────────────────────
+    #[cfg(feature = "clap")]
+    let mut browser =
+        plugins::PluginBrowser::new(engine.sample_rate(), crate::audio::MAX_BLOCK as u32);
 
     // ── Main UI loop ──────────────────────────────────────────────────────────
     let mut focus: Option<usize> = None;
@@ -85,20 +93,45 @@ pub fn run(
         }
 
         let status = save_msg.as_ref().map(|(msg, _)| msg.as_str());
+        // The loaded plugin (if any) is shown in the header, not the status line, so
+        // the help/status footer stays intact while a plugin is active.
+        #[cfg(feature = "clap")]
+        let plugin_name = browser.loaded_name();
+        #[cfg(not(feature = "clap"))]
+        let plugin_name: Option<&str> = None;
 
         terminal.draw(|f| {
-            draw(f, &params, &levels, focus, rec_active, blink, status);
+            draw(
+                f,
+                &params,
+                &levels,
+                focus,
+                rec_active,
+                blink,
+                status,
+                plugin_name,
+            );
             if preset_open {
                 render_preset_modal(f, &presets, preset_cursor);
             }
             if save_open {
                 render_save_dialog(f, &save_name, &save_desc, save_field, save_error.as_deref());
             }
+            #[cfg(feature = "clap")]
+            if browser.open {
+                browser.render(f);
+            }
         })?;
 
         if event::poll(Duration::from_millis(30))?
             && let Event::Key(key) = event::read()?
         {
+            #[cfg(feature = "clap")]
+            if browser.open {
+                browser.handle_key(key.code, &mut engine);
+                continue;
+            }
+
             if save_open {
                 match key.code {
                     KeyCode::Esc => {
@@ -219,6 +252,8 @@ pub fn run(
                         preset_open = true;
                         preset_cursor = 0;
                     }
+                    #[cfg(feature = "clap")]
+                    KeyCode::Char('v') | KeyCode::Char('V') => browser.open(),
                     KeyCode::Char('s') | KeyCode::Char('S') => {
                         save_open = true;
                         save_name.clear();

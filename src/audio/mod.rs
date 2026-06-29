@@ -3,19 +3,59 @@ use cpal::{
     Device, Stream, StreamConfig,
     traits::{DeviceTrait, HostTrait, StreamTrait},
 };
-use rtrb::RingBuffer;
+use rtrb::{Consumer, Producer, RingBuffer};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
-use crate::dsp::{DspChain, Levels, Params};
+use crate::dsp::{DspChain, Levels, Params, StereoInsert};
 use crate::recording::RecordingState;
+
+/// A swappable plugin insert handed to the audio thread (`Some` to install, `None`
+/// to clear). Boxed so the audio thread only ever moves a pointer.
+type InsertCommand = Option<Box<dyn StereoInsert>>;
+
+/// How many pending insert swaps / disposals the lock-free rings can hold. Swaps
+/// are rare (a user loading/clearing a plugin), so a small buffer is plenty.
+const INSERT_QUEUE_CAP: usize = 8;
+
+/// Largest block (in frames) the audio thread will ever process at once. Scratch
+/// buffers are pre-sized to this, and plugin inserts are activated with it as
+/// their maximum block size.
+pub const MAX_BLOCK: usize = 4096;
 
 pub struct AudioEngine {
     _input_stream: Stream,
     _output_stream: Stream,
+    /// Negotiated sample rate of the running streams (Hz).
+    sample_rate: f32,
+    /// Sends insert swaps to the audio thread (consumed at the top of its callback).
+    insert_tx: Producer<InsertCommand>,
+    /// Receives inserts the audio thread displaced, so they are dropped here on a
+    /// non-audio thread rather than freed in the realtime callback.
+    dropped_rx: Consumer<Box<dyn StereoInsert>>,
 }
 
-// ── Device discovery ──────────────────────────────────────────────────────────
+impl AudioEngine {
+    /// The sample rate (Hz) the engine negotiated and is running at.
+    pub fn sample_rate(&self) -> f32 {
+        self.sample_rate
+    }
+
+    /// Install (`Some`) or clear (`None`) the third-party plugin insert.
+    ///
+    /// Call this from the UI/control thread, never the audio thread. The actual
+    /// swap happens lock-free inside the audio callback; any previously installed
+    /// insert is disposed of here, on the caller's thread.
+    pub fn set_plugin_insert(&mut self, insert: InsertCommand) -> Result<()> {
+        // Dispose of anything the audio thread has handed back since last time.
+        while let Ok(old) = self.dropped_rx.pop() {
+            drop(old);
+        }
+        self.insert_tx
+            .push(insert)
+            .map_err(|_| anyhow!("plugin-insert command queue is full"))
+    }
+}
 
 pub struct InputInfo {
     pub name: String,
@@ -143,21 +183,55 @@ fn build_engine(
 
     let mut chain = DspChain::new(sr, Arc::clone(&params));
 
+    // Lock-free handoff for swapping the plugin insert in/out without touching the
+    // running stream: commands flow UI → audio, displaced inserts flow back to be
+    // dropped off the audio thread.
+    let (insert_tx, mut insert_rx) = RingBuffer::<InsertCommand>::new(INSERT_QUEUE_CAP);
+    let (mut dropped_tx, dropped_rx) = RingBuffer::<Box<dyn StereoInsert>>::new(INSERT_QUEUE_CAP);
+
     let attack = 1.0 - (-1.0 / (0.001 * sr)).exp();
     let release = 1.0 - (-1.0 / (0.300 * sr)).exp();
     let mut in_env = 0.0f32;
     let mut out_env = 0.0f32;
 
+    // Reusable scratch buffers for block processing. Pre-sized generously so the
+    // audio thread never reallocates for normal device buffer sizes; the `resize`
+    // below only grows them on the rare callback that asks for a larger block.
+    let mut in_buf: Vec<f32> = Vec::with_capacity(MAX_BLOCK);
+    let mut out_l: Vec<f32> = vec![0.0; MAX_BLOCK];
+    let mut out_r: Vec<f32> = vec![0.0; MAX_BLOCK];
+
     let input_stream = input_device.build_input_stream(
         input_cfg,
         move |data: &[f32], _| {
-            for frame in data.chunks(in_channels) {
-                let sample = frame.get(guitar_ch).copied().unwrap_or(0.0);
+            // Apply any pending insert swaps before processing this block. The old
+            // insert is shipped back to the control thread for disposal; if that
+            // queue is somehow full we drop it here as a last resort.
+            while let Ok(cmd) = insert_rx.pop() {
+                if let Some(old) = chain.replace_insert(cmd) {
+                    let _ = dropped_tx.push(old);
+                }
+            }
 
+            let frames = data.len() / in_channels;
+            if out_l.len() < frames {
+                out_l.resize(frames, 0.0);
+                out_r.resize(frames, 0.0);
+            }
+
+            // Deinterleave the guitar channel into the mono input block.
+            in_buf.clear();
+            in_buf.extend(
+                data.chunks(in_channels)
+                    .map(|frame| frame.get(guitar_ch).copied().unwrap_or(0.0)),
+            );
+
+            chain.process_block(&in_buf, &mut out_l, &mut out_r);
+
+            for ((&sample, &l), &r) in in_buf.iter().zip(out_l.iter()).zip(out_r.iter()) {
                 let a = sample.abs();
                 in_env += if a > in_env { attack } else { release } * (a - in_env);
 
-                let (l, r) = chain.process(sample);
                 let mono = 0.5 * (l + r);
 
                 let a = mono.abs();
@@ -210,5 +284,8 @@ fn build_engine(
     Ok(AudioEngine {
         _input_stream: input_stream,
         _output_stream: output_stream,
+        sample_rate: sr,
+        insert_tx,
+        dropped_rx,
     })
 }

@@ -13,6 +13,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 - 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, ping-pong delay, and stereo reverb, each independently bypassable
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
+- 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
 - ⏺️ **One-key recording** straight to a stereo WAV file
 - 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
 
@@ -80,6 +81,7 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `C` | Cycle cabinet model (Mesa V30 → Marshall Greenback → Orange PPC412) |
 | `Space` | Toggle the focused pedal / effect on / off |
 | `P` | Open the preset browser overlay |
+| `V` | Open the CLAP plugin browser ([see below](#clap-plugins)) |
 | `S` | Save the current state as a new user preset |
 | `R` | Start / stop recording — saves a WAV file to your home directory when stopped |
 | `Q` / `Ctrl-C` | Quit |
@@ -433,6 +435,57 @@ Drop the file in `~/.config/rusty-amp/presets/` and it will appear in the preset
 Press **`R`** to start recording. The header switches from `○ OFF AIR` to a blinking `● ON AIR` indicator next to `POWER ON`. Press **`R`** again to stop — the file is written immediately and the saved path is shown briefly in the footer.
 
 Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full multi-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
+
+## CLAP plugins
+
+rusty-amp can host a third-party **[CLAP](https://cleveraudio.org/) effect plugin** as a stereo insert in the signal chain — placed after the cabinet/effects rack, just before the master bus. This lets you drop in an external reverb, saturator, flanger, or anything else and dial it in without leaving the terminal.
+
+Plugin hosting is **enabled by default** (it's in the pre-built binaries too), powered by the [`clack`](https://github.com/prokopyl/clack) CLAP host bindings. If you want a minimal amp with no plugin dependencies or plugin-loading FFI, build with the feature turned off:
+
+```bash
+cargo run --release --no-default-features
+```
+
+### Installing plugins
+
+Put the plugin's `.clap` file (on macOS a `.clap` is a bundle directory) into one of the locations rusty-amp scans on startup:
+
+| Platform | Scanned locations |
+| -------- | ----------------- |
+| macOS | `~/Library/Audio/Plug-Ins/CLAP/`, `/Library/Audio/Plug-Ins/CLAP/` |
+| Linux | `~/.clap/`, `/usr/lib/clap/`, `/usr/local/lib/clap/` |
+| Windows | `%COMMONPROGRAMFILES%\CLAP\`, `%LOCALAPPDATA%\Programs\Common\CLAP\` |
+
+Any directory listed in the **`CLAP_PATH`** environment variable is also searched (subdirectories included). Most plugin installers place the `.clap` in the right folder automatically.
+
+### Loading and configuring a plugin
+
+Press **`V`** to open the plugin browser, which (re)scans the locations above.
+
+| Key | Action |
+| ----- | -------- |
+| `↑` / `↓` | Navigate the plugin list |
+| `Enter` | Load the selected plugin (or **None — bypass insert** to clear it) |
+| `Tab` | Switch to the parameter editor for the loaded plugin |
+| `Esc` / `V` | Close the browser |
+
+When a plugin with parameters is loaded you drop straight into the **parameter editor**:
+
+| Key | Action |
+| ----- | -------- |
+| `↑` / `↓` | Select a parameter |
+| `←` / `→` | Adjust the selected parameter (by 1/20 of its range) |
+| `Tab` | Return to the plugin list |
+| `Esc` / `V` | Close |
+
+The loaded plugin's name appears in the header (🔌) next to the amp and cabinet. Loading, clearing, and parameter edits all take effect live — the audio stream is never interrupted (swaps happen on a lock-free handoff, and the displaced plugin is freed off the audio thread).
+
+### Limitations
+
+- **Headless** — plugin GUIs are not opened; parameters are edited in the TUI (shown as raw numeric values).
+- **Effects only** — instrument/synth plugins are not driven (there's no MIDI input).
+- **One insert slot**, using the plugin's main mono/stereo audio ports (no sidechain or multi-out routing).
+- Plugin state is **not saved** in rusty-amp presets, and is not recalled across restarts.
 
 ## Contributing
 

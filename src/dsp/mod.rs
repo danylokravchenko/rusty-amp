@@ -416,6 +416,20 @@ impl Levels {
     }
 }
 
+// ── Plugin insert extension point ─────────────────────────────────────────────
+
+/// A stereo insert effect processed one block at a time, in place.
+///
+/// The built-in [`DspChain`] is hardwired, but this is the single extension point
+/// third-party plugins hang off: a stereo slot after the cab/rack, before the
+/// master bus. CLAP plugins are bridged to this trait by the `host` module. Must
+/// be `Send` so an instance built on the UI thread can be handed to the audio
+/// thread for processing.
+pub trait StereoInsert: Send {
+    /// Process one block in place. `left` and `right` always have equal length.
+    fn process_block(&mut self, left: &mut [f32], right: &mut [f32]);
+}
+
 // ── DSP chain (owned by audio thread, never shared) ───────────────────────────
 
 /// Run a mono effect when its enable flag is set, otherwise pass `$x` through.
@@ -459,6 +473,9 @@ pub struct DspChain {
     delay: Delay,
     reverb: Reverb,
     params: Arc<Params>,
+    /// Optional third-party stereo insert (e.g. a hosted CLAP plugin), placed
+    /// after the stereo rack and before the master bus. `None` = passthrough.
+    insert: Option<Box<dyn StereoInsert>>,
 }
 
 impl DspChain {
@@ -476,16 +493,41 @@ impl DspChain {
             delay: Delay::new(sr),
             reverb: Reverb::new(sr),
             params,
+            insert: None,
         }
     }
 
-    /// Process one mono input sample, returning a stereo (L, R) pair.
+    /// Install (or clear, with `None`) the stereo plugin insert.
+    pub fn set_insert(&mut self, insert: Option<Box<dyn StereoInsert>>) {
+        self.insert = insert;
+    }
+
+    /// Swap the stereo plugin insert, returning the displaced one (if any).
+    ///
+    /// The swap itself is just a pointer move, so it is safe to call on the audio
+    /// thread. The returned box must be **dropped elsewhere**: freeing a plugin
+    /// (and the allocations it owns) on the audio thread would block it. The engine
+    /// hands the old insert back to a non-audio thread for disposal.
+    #[must_use = "the displaced insert must be dropped off the audio thread"]
+    pub fn replace_insert(
+        &mut self,
+        insert: Option<Box<dyn StereoInsert>>,
+    ) -> Option<Box<dyn StereoInsert>> {
+        std::mem::replace(&mut self.insert, insert)
+    }
+
+    /// The built-in signal path up to (but not including) the master bus:
+    /// pedals → amp → cab → stereo rack, returning a stereo (L, R) pair.
     ///
     /// The pre-amp signal path (gate → pedals → amp) is mono; the signal becomes
     /// stereo at the cabinet (multi-mic blend convolution) and stays stereo through
     /// the EQ, ping-pong delay and stereo reverb for studio-grade width and depth.
+    ///
+    /// The plugin insert and the master-bus widen + soft-limit run *after* this; in
+    /// the live block path they run in [`process_block`], while the per-sample
+    /// [`process`](Self::process) wrapper applies the master bus directly.
     #[inline]
-    pub fn process(&mut self, sample: f32) -> (f32, f32) {
+    fn process_core(&mut self, sample: f32) -> (f32, f32) {
         let p = &self.params;
 
         // Mono pedal chain (gate → compressor → fuzz → TS → DS → pre-amp EQ).
@@ -554,12 +596,65 @@ impl DspChain {
             rev_mix
         );
 
-        // Master-bus stereo widening — push the cab/reverb decorrelation out for a
-        // wider, deeper image without losing mono punch (the mid is untouched).
-        let (l, r) = widen(l, r, 1.3);
-
-        (soft_limit(l), soft_limit(r))
+        (l, r)
     }
+
+    /// Process one mono input sample, returning a stereo (L, R) pair.
+    ///
+    /// The plugin-free path: [`process_core`](Self::process_core) followed by the
+    /// master bus. The live engine uses [`process_block`] instead, which also runs
+    /// the optional plugin insert between the two.
+    #[inline]
+    pub fn process(&mut self, sample: f32) -> (f32, f32) {
+        let (l, r) = self.process_core(sample);
+        master_bus(l, r)
+    }
+
+    /// Process a block of mono input samples into stereo output buffers.
+    ///
+    /// Per sample: the core chain (pedals → amp → cab → stereo rack). Then, once
+    /// per block, the optional plugin insert runs across the whole buffer in the
+    /// stereo domain. Finally the master bus (widen + soft-limit) is applied per
+    /// sample. The master bus is stateless, so splitting it out of the core loop is
+    /// exact — and with no insert loaded the whole block is bit-identical to calling
+    /// [`process`](Self::process) on each sample.
+    ///
+    /// `out_l`/`out_r` must each be at least `input.len()` long; processing stops at
+    /// the shortest of the three slices.
+    pub fn process_block(&mut self, input: &[f32], out_l: &mut [f32], out_r: &mut [f32]) {
+        let n = input.len().min(out_l.len()).min(out_r.len());
+        let out_l = &mut out_l[..n];
+        let out_r = &mut out_r[..n];
+
+        // Core chain, per sample (mono → stereo internally).
+        for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
+            let (lv, rv) = self.process_core(x);
+            *l = lv;
+            *r = rv;
+        }
+
+        // Optional third-party stereo insert, one block at a time.
+        if let Some(insert) = self.insert.as_mut() {
+            insert.process_block(out_l, out_r);
+        }
+
+        // Master bus, per sample.
+        for (l, r) in out_l.iter_mut().zip(out_r.iter_mut()) {
+            let (wl, wr) = master_bus(*l, *r);
+            *l = wl;
+            *r = wr;
+        }
+    }
+}
+
+/// Master bus: stereo-widen then soft-limit. Pushes the cab/reverb decorrelation
+/// out for a wider, deeper image without losing mono punch (the mid is untouched),
+/// then catches peaks. Stateless, so it can run per-sample inside the core loop or
+/// as a separate pass over a block with identical results.
+#[inline]
+fn master_bus(l: f32, r: f32) -> (f32, f32) {
+    let (l, r) = widen(l, r, 1.3);
+    (soft_limit(l), soft_limit(r))
 }
 
 /// Mid/side stereo widener. `width` 1.0 = unchanged, > 1.0 spreads the sides.
@@ -620,6 +715,96 @@ mod tests {
             channel_diff > 1.0,
             "output is effectively mono: {channel_diff}"
         );
+    }
+
+    /// `process_block` must be bit-identical to running `process` per sample:
+    /// the block form is purely a buffering convenience and changes no DSP math.
+    /// The whole CLAP-insert plan relies on this equivalence holding.
+    #[test]
+    fn process_block_matches_per_sample() {
+        let sr = 48_000.0;
+        let input: Vec<f32> = (0..2000)
+            .map(|n| (2.0 * PI * 110.0 * n as f32 / sr).sin() * 0.7)
+            .collect();
+
+        let mut per_sample = DspChain::new(sr, Arc::new(Params::new()));
+        let mut block = DspChain::new(sr, Arc::new(Params::new()));
+
+        let mut out_l = vec![0.0f32; input.len()];
+        let mut out_r = vec![0.0f32; input.len()];
+        block.process_block(&input, &mut out_l, &mut out_r);
+
+        for ((&x, &bl), &br) in input.iter().zip(out_l.iter()).zip(out_r.iter()) {
+            let (l, r) = per_sample.process(x);
+            assert_eq!(l, bl, "L diverged from per-sample path");
+            assert_eq!(r, br, "R diverged from per-sample path");
+        }
+    }
+
+    /// A loaded stereo insert must actually run on the block, between the core
+    /// chain and the master bus. A trivial gain insert lets us verify the slot is
+    /// wired (output differs from the no-insert path) without depending on a plugin.
+    #[test]
+    fn loaded_insert_is_applied_to_the_block() {
+        struct HalfGain;
+        impl StereoInsert for HalfGain {
+            fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
+                for (l, r) in left.iter_mut().zip(right.iter_mut()) {
+                    *l *= 0.5;
+                    *r *= 0.5;
+                }
+            }
+        }
+
+        let sr = 48_000.0;
+        let input: Vec<f32> = (0..1000)
+            .map(|n| (2.0 * PI * 220.0 * n as f32 / sr).sin() * 0.6)
+            .collect();
+
+        // Fresh chains so internal state (reverb/delay) doesn't bleed between runs.
+        let mut bare = DspChain::new(sr, Arc::new(Params::new()));
+        let (mut bare_l, mut bare_r) = (vec![0.0; input.len()], vec![0.0; input.len()]);
+        bare.process_block(&input, &mut bare_l, &mut bare_r);
+
+        let mut with_insert = DspChain::new(sr, Arc::new(Params::new()));
+        with_insert.set_insert(Some(Box::new(HalfGain)));
+        let (mut ins_l, mut ins_r) = (vec![0.0; input.len()], vec![0.0; input.len()]);
+        with_insert.process_block(&input, &mut ins_l, &mut ins_r);
+
+        // The insert must have changed the output somewhere in the block.
+        assert!(
+            bare_l.iter().zip(&ins_l).any(|(a, b)| a != b)
+                || bare_r.iter().zip(&ins_r).any(|(a, b)| a != b),
+            "insert had no effect on the output"
+        );
+    }
+
+    /// `replace_insert` must hand back exactly the insert it displaced — the engine
+    /// relies on this to ship the old plugin off the audio thread for disposal.
+    #[test]
+    fn replace_insert_returns_the_displaced_insert() {
+        #[allow(dead_code)]
+        struct Tagged(u32);
+        impl StereoInsert for Tagged {
+            fn process_block(&mut self, _l: &mut [f32], _r: &mut [f32]) {}
+        }
+
+        let mut chain = DspChain::new(48_000.0, Arc::new(Params::new()));
+
+        // First install: nothing displaced.
+        assert!(chain.replace_insert(Some(Box::new(Tagged(1)))).is_none());
+
+        // Second install: the first one comes back.
+        let old = chain
+            .replace_insert(Some(Box::new(Tagged(2))))
+            .expect("expected the previously installed insert");
+        // (Downcasting through dyn isn't available without Any; the round-trip and
+        // the None-on-first-install above are enough to prove the swap semantics.)
+        drop(old);
+
+        // Clearing returns the live one.
+        assert!(chain.replace_insert(None).is_some());
+        assert!(chain.replace_insert(None).is_none());
     }
 
     fn goertzel(samples: &[f32], f: f32, sr: f32) -> f32 {
