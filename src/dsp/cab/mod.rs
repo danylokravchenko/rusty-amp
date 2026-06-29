@@ -102,26 +102,53 @@ impl Comb {
     }
 }
 
-/// A studio "mic'd cab" rendered from three mic captures per channel, blended:
-///   • a close dynamic (SM57) — bright, present, the backbone of the tone;
-///   • a close ribbon (R121) — darker, smoother top, fuller low-mids;
-///   • a room mic — distant, ambient, adds depth and air.
-///
-/// Each capture is a full impulse response (its own voicing + reflection texture,
-/// with the room mic carrying extra pre-delay and denser late reflections). Because
-/// convolution is linear, blending the mics is just a weighted **sum of their IRs**:
-/// we precompute the three IRs once and, whenever a blend knob moves, recombine
-/// them into the live convolver's taps. The per-sample cost is therefore exactly
-/// two convolutions regardless of how many mics are in the blend, and swapping the
-/// taps preserves the delay-line history so it never clicks.
-///
-/// Around the linear convolution sit the parts of a real cab a fixed IR can't hold:
-/// the speaker's [`cone_breakup`] saturation and thermal power compression on the
-/// mono drive, and a physical mic-position model (proximity low-shelf + axis
-/// brightness shelf + off-axis comb) on each captured channel — so `mic_pos` feels
-/// like sliding a mic across the cone, not tilting an EQ.
-pub struct BlendedCab {
-    sr: f32,
+// ── Stage 1: speaker drive (mono, pre-mic) ──────────────────────────────────────
+
+/// The two driver nonlinearities a fixed IR can't hold, applied to the mono drive
+/// before the mic picks the sound up: stateless [`cone_breakup`] saturation
+/// followed by stateful voice-coil thermal power compression.
+struct SpeakerDrive {
+    env: f32,
+    atk: f32,
+    rel: f32,
+}
+
+impl SpeakerDrive {
+    fn new(sr: f32) -> Self {
+        let coeff = |ms: f32| 1.0 - (-1.0 / (sr * ms / 1000.0)).exp();
+        Self {
+            env: 0.0,
+            atk: coeff(PC_ATK_MS),
+            rel: coeff(PC_REL_MS),
+        }
+    }
+
+    /// Cone breakup, then voice-coil thermal power compression. The envelope tracks
+    /// the signal with a fast-ish attack and slow release (so transients pass and
+    /// only sustained level compresses), and the gain rolls off smoothly above the
+    /// threshold.
+    #[inline]
+    fn process(&mut self, x: f32) -> f32 {
+        let x = cone_breakup(x);
+        let a = x.abs();
+        let coeff = if a > self.env { self.atk } else { self.rel };
+        self.env += (a - self.env) * coeff;
+        let over = (self.env - PC_THRESHOLD).max(0.0);
+        x / (1.0 + PC_RATIO_K * over)
+    }
+}
+
+// ── Stage 2: multi-mic blend convolution ────────────────────────────────────────
+
+/// The three-mic blend rendered as a single pair of convolvers. Each capture is a
+/// full impulse response (its own voicing + reflection texture, with the room mic
+/// carrying extra pre-delay and denser late reflections). Because convolution is
+/// linear, blending the mics is just a weighted **sum of their IRs**: the three IRs
+/// are precomputed once and, whenever a blend knob moves, recombined into the live
+/// convolver taps. The per-sample cost is therefore exactly two convolutions
+/// regardless of how many mics are in the blend, and swapping the taps preserves the
+/// delay-line history so it never clicks.
+struct MicBlend {
     conv_l: FftConvolver,
     conv_r: FftConvolver,
     // Per-mic impulse responses (close / ribbon / room), per channel.
@@ -131,36 +158,18 @@ pub struct BlendedCab {
     ribbon_r: Vec<f32>,
     room_l: Vec<f32>,
     room_r: Vec<f32>,
-    // Preallocated combine buffers so `process` never allocates.
+    // Preallocated combine buffers so the hot path never allocates.
     scratch_l: Vec<f32>,
     scratch_r: Vec<f32>,
-    // Mic-position model (edge↔centre): proximity lows + axis brightness + off-axis comb.
-    prox_l: Biquad,
-    prox_r: Biquad,
-    mic_l: Biquad,
-    mic_r: Biquad,
-    comb_l: Comb,
-    comb_r: Comb,
-    comb_g: f32,
-    comb_d: usize,
-    // Speaker power compression (voice-coil thermal) envelope + smoothing coeffs.
-    pc_env: f32,
-    pc_atk: f32,
-    pc_rel: f32,
-    last_mic_pos: f32,
     last_blend: f32,
     last_room: f32,
 }
 
-impl BlendedCab {
-    /// Build from the six prebuilt IRs: `[close_l, close_r, ribbon_l, ribbon_r,
-    /// room_l, room_r]`.
-    pub fn new(sr: f32, irs: [Vec<f32>; 6]) -> Self {
+impl MicBlend {
+    fn new(irs: [Vec<f32>; 6]) -> Self {
         let [close_l, close_r, ribbon_l, ribbon_r, room_l, room_r] = irs;
         let cap = close_l.len() + 1;
-        let coeff = |ms: f32| 1.0 - (-1.0 / (sr * ms / 1000.0)).exp();
-        let mut cab = Self {
-            sr,
+        let mut blend = Self {
             conv_l: FftConvolver::new(cap),
             conv_r: FftConvolver::new(cap),
             scratch_l: vec![0.0; close_l.len()],
@@ -171,27 +180,21 @@ impl BlendedCab {
             ribbon_r,
             room_l,
             room_r,
-            prox_l: Biquad::low_shelf(sr, PROX_FREQ, 0.0),
-            prox_r: Biquad::low_shelf(sr, PROX_FREQ, 0.0),
-            mic_l: Biquad::high_shelf(sr, SHELF_FREQ, 0.0),
-            mic_r: Biquad::high_shelf(sr, SHELF_FREQ, 0.0),
-            comb_l: Comb::new(sr, COMB_MS),
-            comb_r: Comb::new(sr, COMB_MS),
-            comb_g: 0.0,
-            comb_d: ((sr * COMB_MS / 1000.0) as usize).max(1),
-            pc_env: 0.0,
-            pc_atk: coeff(PC_ATK_MS),
-            pc_rel: coeff(PC_REL_MS),
-            last_mic_pos: -1.0,
             last_blend: -1.0,
             last_room: -1.0,
         };
-        cab.recombine(0.0, 0.0);
-        cab
+        blend.recombine(0.0, 0.0);
+        blend
     }
 
-    /// Mix the three mic IRs into the convolver taps for a given blend.
-    /// `blend` 0 = close dynamic … 1 = ribbon; `room` 0–1 = ambient room amount.
+    /// Reload the convolver taps if the blend changed. `blend` 0 = close dynamic …
+    /// 1 = ribbon; `room` 0–1 = ambient room amount.
+    fn set(&mut self, blend: f32, room: f32) {
+        if (blend - self.last_blend).abs() > 0.001 || (room - self.last_room).abs() > 0.001 {
+            self.recombine(blend, room);
+        }
+    }
+
     fn recombine(&mut self, blend: f32, room: f32) {
         let wc = 1.0 - blend; // close dynamic weight
         let wr = blend; // ribbon weight
@@ -208,61 +211,133 @@ impl BlendedCab {
         self.last_room = room;
     }
 
-    /// Voice-coil thermal power compression on the mono drive. The envelope tracks
-    /// the signal with a fast-ish attack and slow release (so transients pass and
-    /// only sustained level compresses), and the gain rolls off smoothly above the
-    /// threshold.
     #[inline]
-    fn power_compress(&mut self, x: f32) -> f32 {
-        let a = x.abs();
-        let coeff = if a > self.pc_env {
-            self.pc_atk
-        } else {
-            self.pc_rel
-        };
-        self.pc_env += (a - self.pc_env) * coeff;
-        let over = (self.pc_env - PC_THRESHOLD).max(0.0);
-        x / (1.0 + PC_RATIO_K * over)
+    fn process(&mut self, drive: f32) -> (f32, f32) {
+        (self.conv_l.process(drive), self.conv_r.process(drive))
+    }
+}
+
+// ── Stage 3: physical mic-position colouration (per channel) ────────────────────
+
+/// One captured channel's mic-position colouration, applied in physical order:
+/// proximity low-shelf → axis-brightness high-shelf → off-axis comb.
+struct MicChannel {
+    prox: Biquad,
+    shelf: Biquad,
+    comb: Comb,
+}
+
+impl MicChannel {
+    fn new(sr: f32) -> Self {
+        Self {
+            prox: Biquad::low_shelf(sr, PROX_FREQ, 0.0),
+            shelf: Biquad::high_shelf(sr, SHELF_FREQ, 0.0),
+            comb: Comb::new(sr, COMB_MS),
+        }
+    }
+
+    /// Re-dial the two shelves for a new mic position. The comb gain/delay are shared
+    /// across channels and passed into [`MicChannel::process`].
+    fn retune(&mut self, sr: f32, prox_db: f32, bright_db: f32) {
+        self.prox = Biquad::low_shelf(sr, PROX_FREQ, prox_db);
+        self.shelf = Biquad::high_shelf(sr, SHELF_FREQ, bright_db);
+    }
+
+    #[inline]
+    fn process(&mut self, x: f32, comb_g: f32, comb_d: usize) -> f32 {
+        let x = self.prox.process(x);
+        let x = self.shelf.process(x);
+        self.comb.process(x, comb_g, comb_d)
+    }
+}
+
+/// The mic-position model across both channels: maps the edge↔centre knob to
+/// proximity lows, axis brightness, and an off-axis comb, so the knob feels like
+/// sliding a mic across the cone rather than tilting an EQ.
+struct MicPosition {
+    sr: f32,
+    l: MicChannel,
+    r: MicChannel,
+    comb_g: f32,
+    comb_d: usize,
+    last_pos: f32,
+}
+
+impl MicPosition {
+    fn new(sr: f32) -> Self {
+        Self {
+            sr,
+            l: MicChannel::new(sr),
+            r: MicChannel::new(sr),
+            comb_g: 0.0,
+            comb_d: ((sr * COMB_MS / 1000.0) as usize).max(1),
+            last_pos: -1.0,
+        }
+    }
+
+    /// Re-dial the per-channel filters and comb if the position changed.
+    fn set(&mut self, pos: f32) {
+        if (pos - self.last_pos).abs() <= 0.001 {
+            return;
+        }
+        // 0 = edge (off-axis, dark), 1 = centre (on-axis, bright); 0.5 = neutral.
+        let bright = (pos - 0.5) * SHELF_RANGE_DB;
+        // Proximity: lows rise on-axis/closer (toward centre), fall toward edge.
+        let prox = (pos - 0.5) * PROX_RANGE_DB;
+        self.l.retune(self.sr, prox, bright);
+        self.r.retune(self.sr, prox, bright);
+        // Off-axis comb: only when moving past centre toward the edge.
+        let off_axis = (0.5 - pos).max(0.0) * 2.0; // 0 at centre, 1 at the edge
+        self.comb_g = -off_axis * COMB_MAX_DEPTH;
+        self.last_pos = pos;
+    }
+
+    #[inline]
+    fn process(&mut self, l: f32, r: f32) -> (f32, f32) {
+        (
+            self.l.process(l, self.comb_g, self.comb_d),
+            self.r.process(r, self.comb_g, self.comb_d),
+        )
+    }
+}
+
+// ── Composed cabinet ────────────────────────────────────────────────────────────
+
+/// A studio "mic'd cab" assembled from three stages, in signal order:
+///   1. [`SpeakerDrive`] — the speaker's cone-breakup saturation and thermal power
+///      compression on the mono drive (the parts of a real cab a fixed IR can't hold);
+///   2. [`MicBlend`] — the linear capture: a blend of three mic IRs (close SM57
+///      dynamic, close R121 ribbon, ambient room) convolved per channel;
+///   3. [`MicPosition`] — the physical edge↔centre mic-position colouration on each
+///      captured channel (proximity low-shelf + axis brightness + off-axis comb).
+///
+/// Each stage owns its own state, parameter-change caching, and coefficient updates;
+/// `process` just threads a sample through them.
+pub struct BlendedCab {
+    speaker: SpeakerDrive,
+    blend: MicBlend,
+    mic: MicPosition,
+}
+
+impl BlendedCab {
+    /// Build from the six prebuilt IRs: `[close_l, close_r, ribbon_l, ribbon_r,
+    /// room_l, room_r]`.
+    pub fn new(sr: f32, irs: [Vec<f32>; 6]) -> Self {
+        Self {
+            speaker: SpeakerDrive::new(sr),
+            blend: MicBlend::new(irs),
+            mic: MicPosition::new(sr),
+        }
     }
 
     #[inline]
     pub fn process(&mut self, sample: f32, mic_pos: f32, blend: f32, room: f32) -> (f32, f32) {
-        if (blend - self.last_blend).abs() > 0.001 || (room - self.last_room).abs() > 0.001 {
-            self.recombine(blend, room);
-        }
-        if (mic_pos - self.last_mic_pos).abs() > 0.001 {
-            // 0 = edge (off-axis, dark), 1 = centre (on-axis, bright); 0.5 = neutral.
-            let bright = (mic_pos - 0.5) * SHELF_RANGE_DB;
-            self.mic_l = Biquad::high_shelf(self.sr, SHELF_FREQ, bright);
-            self.mic_r = Biquad::high_shelf(self.sr, SHELF_FREQ, bright);
-            // Proximity: lows rise on-axis/closer (toward centre), fall toward edge.
-            let prox = (mic_pos - 0.5) * PROX_RANGE_DB;
-            self.prox_l = Biquad::low_shelf(self.sr, PROX_FREQ, prox);
-            self.prox_r = Biquad::low_shelf(self.sr, PROX_FREQ, prox);
-            // Off-axis comb: only when moving past centre toward the edge.
-            let off_axis = (0.5 - mic_pos).max(0.0) * 2.0; // 0 at centre, 1 at the edge
-            self.comb_g = -off_axis * COMB_MAX_DEPTH;
-            self.last_mic_pos = mic_pos;
-        }
+        self.blend.set(blend, room);
+        self.mic.set(mic_pos);
 
-        // Speaker (pre-mic) nonlinearities on the mono drive: cone breakup then the
-        // thermal power compression of the resulting acoustic output.
-        let drive = self.power_compress(cone_breakup(sample));
-
-        // Linear capture, then the physical mic-position colouration per channel.
-        let lc = self.conv_l.process(drive);
-        let rc = self.conv_r.process(drive);
-        let l = self.comb_l.process(
-            self.mic_l.process(self.prox_l.process(lc)),
-            self.comb_g,
-            self.comb_d,
-        );
-        let r = self.comb_r.process(
-            self.mic_r.process(self.prox_r.process(rc)),
-            self.comb_g,
-            self.comb_d,
-        );
-        (l, r)
+        let drive = self.speaker.process(sample);
+        let (l, r) = self.blend.process(drive);
+        self.mic.process(l, r)
     }
 }
 
