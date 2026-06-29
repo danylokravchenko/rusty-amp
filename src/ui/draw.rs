@@ -83,6 +83,10 @@ fn render_header(
             "  R U S T Y  A M P  ",
             Style::default().fg(ORANGE).add_modifier(Modifier::BOLD),
         ),
+        Span::styled(
+            concat!("v", env!("CARGO_PKG_VERSION"), "  "),
+            Style::default().fg(DIM),
+        ),
         Span::styled("▐", Style::default().fg(WARM)),
         Span::styled(
             format!("  {amp_name}  "),
