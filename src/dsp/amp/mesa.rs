@@ -1,4 +1,4 @@
-use super::{Amplifier, Bloom, SpeakerLoad};
+use super::{Amplifier, Bloom, BrightCap, CathodeBias, OutputTransformer, SpeakerLoad};
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
 use crate::dsp::tonestack::{Components, ToneStack};
@@ -31,6 +31,12 @@ pub struct Mesa {
     power_hp: Biquad,
     power_hp2: Biquad,
     bloom: Bloom,
+    // Treble-bleed cap across the gain control (Recto bright cap).
+    bright: BrightCap,
+    // Dynamic cathode-bias shift on the first triode stage (8× rate).
+    cathode: CathodeBias,
+    // Output-transformer core saturation + push-pull crossover (base rate).
+    xfmr: OutputTransformer,
     // Passive FMV tone stack (base rate) — Fender-type values for the Recto's
     // thicker low end and gentler scoop.
     tone: ToneStack,
@@ -85,6 +91,15 @@ impl Mesa {
             power_hp: Biquad::highpass(sr, 55.0, 0.707),
             power_hp2: Biquad::highpass(sr, 55.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 55.0),
+            // Recto bright cap: corner a touch higher (~2.4 kHz) and lighter than the
+            // JCM800 — the Recto is already a bright amp.
+            bright: BrightCap::new(sr, 2400.0, 0.12),
+            // First-stage cathode bias, same fast-charge / RC-recovery shape as the
+            // JCM800; the Recto's tighter feel keeps the depth modest.
+            cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.028, 1.0),
+            // Output transformer: the big Recto iron compresses the lows; corner
+            // ~140 Hz, gentle drive and a trace of crossover.
+            xfmr: OutputTransformer::new(sr, 140.0, 1.5, 0.04),
             tone: ToneStack::new(sr, Components::FENDER),
             last_bass: -1.0,
             last_mid: -1.0,
@@ -157,6 +172,8 @@ impl Amplifier for Mesa {
 
         let x = self.dc_block.process(sample);
         let x = self.input_hp.process(x);
+        // Bright cap across the gain pot (see BrightCap).
+        let x = self.bright.process(x, gain);
 
         let pregain = 1.0 + gain * 30.0;
         // Bias depth halved and bloom release shortened (above) so a note attacks
@@ -172,7 +189,9 @@ impl Amplifier for Mesa {
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
-            let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            // Dynamic cathode bias on stage 1 (DC removed by the inter-stage HP).
+            let d = self.cathode.shift((u + bias) * pregain);
+            let s = tube_clip_asym(d) / pregain.sqrt();
             let s = self.stage_hp_1.process(s);
             let s = tube_clip_asym(s * 2.6) / 2.6_f32.sqrt();
             let s = self.stage_hp_2.process(s);
@@ -190,6 +209,8 @@ impl Amplifier for Mesa {
         // sub-bass into difference-tone mud.
         let x = self.power_hp.process(x);
         let x = self.power_amp(x);
+        // Output transformer: low-frequency core saturation + push-pull crossover.
+        let x = self.xfmr.process(x);
         let x = self.speaker.process(x, self.envelope);
         // Second subsonic stage after the asymmetric clipper, which regenerates a
         // low difference-tone "fart" from the chord's intervals.

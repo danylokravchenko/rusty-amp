@@ -1,4 +1,4 @@
-use super::{Amplifier, Bloom, SpeakerLoad};
+use super::{Amplifier, Bloom, BrightCap, CathodeBias, OutputTransformer, SpeakerLoad};
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
 use crate::dsp::tonestack::{Components, ToneStack};
@@ -29,6 +29,13 @@ pub struct Marshall {
     stage_hp: Biquad,
     // Dynamic preamp bloom
     bloom: Bloom,
+    // Treble-bleed cap across the gain control (sparkle at low gain).
+    bright: BrightCap,
+    // Dynamic cathode-bias shift on the first triode stage (blocking-distortion
+    // bloom / touch sensitivity), runs at 8× rate before the stage-1 waveshaper.
+    cathode: CathodeBias,
+    // Output-transformer core saturation + push-pull crossover (base rate).
+    xfmr: OutputTransformer,
     // Passive FMV tone stack (base rate) — bass/mid/treble interact like the real
     // JCM800 network, with the characteristic mid scoop.
     tone: ToneStack,
@@ -69,6 +76,16 @@ impl Marshall {
             // stage so the note leads its overtones, while still tightening the lows.
             stage_hp: Biquad::highpass(sr8, 300.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 55.0),
+            // Bright cap: JCM800 treble-bleed, corner ~2 kHz, gentle so it adds
+            // sparkle at low gain without turning the clean edge brittle.
+            bright: BrightCap::new(sr, 2000.0, 0.16),
+            // First-stage cathode bias: grid current charges fast (~1.5 ms), bleeds
+            // back over ~45 ms. Threshold/depth kept light so the dynamic give lives
+            // within a note and recovers between notes (no cross-note timbre drift).
+            cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.030, 1.0),
+            // Output transformer: lows (core flux) below ~160 Hz compress; modest
+            // drive and a trace of crossover for the woolly, complex cranked-PA low end.
+            xfmr: OutputTransformer::new(sr, 160.0, 1.4, 0.045),
             tone: ToneStack::new(sr, Components::MARSHALL),
             last_bass: -1.0,
             last_mid: -1.0,
@@ -146,6 +163,9 @@ impl Amplifier for Marshall {
 
         let x = self.dc_block.process(sample);
         let x = self.input_hp.process(x);
+        // Bright cap across the gain pot: injects highs that then feed the clipper,
+        // strongest at low gain (see BrightCap).
+        let x = self.bright.process(x, gain);
 
         let pregain = 1.0 + gain * 39.0;
         // Dynamic grid-bias offset (removed downstream by the inter-stage HP).
@@ -162,7 +182,10 @@ impl Amplifier for Marshall {
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
-            let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            // Dynamic cathode bias shifts the operating point under hard drive
+            // before the stage-1 waveshaper; the inter-stage HP strips its DC.
+            let d = self.cathode.shift((u + bias) * pregain);
+            let s = tube_clip_asym(d) / pregain.sqrt();
             let s = self.stage_hp.process(s);
             *o = tube_clip_asym(s * 3.2) / 3.2_f32.sqrt();
         }
@@ -177,6 +200,8 @@ impl Amplifier for Marshall {
 
         // Power amp: transformer sag + light saturation
         let x = self.power_amp(x);
+        // Output transformer: low-frequency core saturation + push-pull crossover.
+        let x = self.xfmr.process(x);
 
         // Speaker impedance interaction — dynamic low-end bloom driven by sag.
         let x = self.speaker.process(x, self.envelope);
