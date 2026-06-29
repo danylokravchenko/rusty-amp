@@ -21,10 +21,21 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow};
 use clack_extensions::audio_ports::{AudioPortInfoBuffer, AudioPortType, PluginAudioPorts};
+use clack_extensions::params::{
+    HostParams, HostParamsImplMainThread, HostParamsImplShared, ParamClearFlags, ParamInfoBuffer,
+    ParamRescanFlags, PluginParams,
+};
+use clack_host::events::event_types::ParamValueEvent;
 use clack_host::prelude::*;
 use clack_host::process::StartedPluginAudioProcessor;
+use clack_host::utils::{ClapId, Cookie};
+use rtrb::{Consumer, Producer, RingBuffer};
 
 use crate::dsp::StereoInsert;
+
+/// How many pending parameter changes the UI→audio ring can hold before it drops
+/// the oldest (the next push always reflects the latest knob position anyway).
+const PARAM_QUEUE_CAP: usize = 256;
 
 // ── Host handlers ─────────────────────────────────────────────────────────────
 //
@@ -47,12 +58,50 @@ impl<'a> MainThreadHandler<'a> for RaMainThread<'a> {
     fn initialized(&mut self, _instance: InitializedPluginHandle<'a>) {}
 }
 
+// Params extension host callbacks. We drive parameters one-way (UI → plugin) and
+// don't track the plugin's own value changes, so these are intentionally no-ops —
+// but the plugin needs the extension declared to accept our automation events.
+impl HostParamsImplShared for RaShared {
+    fn request_flush(&self) {}
+}
+
+impl HostParamsImplMainThread for RaMainThread<'_> {
+    fn rescan(&mut self, _flags: ParamRescanFlags) {}
+    fn clear(&mut self, _param_id: ClapId, _flags: ParamClearFlags) {}
+}
+
 struct RaHost;
 
 impl HostHandlers for RaHost {
     type Shared<'a> = RaShared;
     type MainThread<'a> = RaMainThread<'a>;
     type AudioProcessor<'a> = ();
+
+    fn declare_extensions(builder: &mut HostExtensions<Self>, _shared: &Self::Shared<'_>) {
+        builder.register::<HostParams>();
+    }
+}
+
+/// A single automatable parameter the UI sends to the plugin.
+#[derive(Clone, Copy)]
+struct ParamChange {
+    id: ClapId,
+    value: f64,
+}
+
+/// A plugin parameter, as surfaced to the UI for display and editing.
+#[derive(Clone)]
+pub struct PluginParam {
+    /// CLAP parameter id (used to address it when sending changes).
+    id: ClapId,
+    /// Display name.
+    pub name: String,
+    /// Minimum plain value.
+    pub min: f64,
+    /// Maximum plain value.
+    pub max: f64,
+    /// Current value (cached on the UI side; updated as the user edits).
+    pub value: f64,
 }
 
 fn host_info() -> Result<HostInfo> {
@@ -191,11 +240,34 @@ pub struct LoadedPlugin {
     pub name: String,
     /// CLAP id of the loaded plugin.
     pub id: String,
+    /// The plugin's automatable parameters (for display and editing).
+    params: Vec<PluginParam>,
+    /// Sends parameter changes to the audio-thread insert.
+    param_tx: Producer<ParamChange>,
     // Kept purely to own the plugin's lifetime on this (non-audio) thread.
     #[allow(dead_code)]
     entry: PluginEntry,
     #[allow(dead_code)]
     instance: PluginInstance<RaHost>,
+}
+
+impl LoadedPlugin {
+    /// The plugin's parameters, in discovery order.
+    pub fn params(&self) -> &[PluginParam] {
+        &self.params
+    }
+
+    /// Set parameter `index` to `value` (clamped to its range), updating the cached
+    /// value and queueing the change for the audio thread. A full queue is ignored:
+    /// the next change carries the latest value anyway.
+    pub fn set_param(&mut self, index: usize, value: f64) {
+        let Some(param) = self.params.get_mut(index) else {
+            return;
+        };
+        let value = value.clamp(param.min, param.max);
+        param.value = value;
+        let _ = self.param_tx.push(ParamChange { id: param.id, value });
+    }
 }
 
 /// Load `plugin`, activate it for the given audio config, and return both the
@@ -223,6 +295,7 @@ pub fn load(
 
     let in_ch = main_port_channels(&mut instance, true);
     let out_ch = main_port_channels(&mut instance, false);
+    let params = query_params(&mut instance);
 
     let config = PluginAudioConfiguration {
         sample_rate: f64::from(sample_rate),
@@ -236,16 +309,48 @@ pub fn load(
         .start_processing()
         .map_err(|e| anyhow!("start processing {}: {e}", plugin.id))?;
 
-    let insert = ClapInsert::new(processor, in_ch, out_ch, max_block as usize);
+    let (param_tx, param_rx) = RingBuffer::<ParamChange>::new(PARAM_QUEUE_CAP);
+
+    let insert = ClapInsert::new(processor, in_ch, out_ch, max_block as usize, param_rx);
 
     let loaded = LoadedPlugin {
         name: plugin.name.clone(),
         id: plugin.id.clone(),
+        params,
+        param_tx,
         entry,
         instance,
     };
 
     Ok((loaded, Box::new(insert)))
+}
+
+/// Read the plugin's parameter list (id, name, range, current value) via the
+/// params extension. Returns empty if the plugin doesn't implement params.
+fn query_params(instance: &mut PluginInstance<RaHost>) -> Vec<PluginParam> {
+    let mut handle = instance.plugin_handle();
+    let Some(params) = handle.get_extension::<PluginParams>() else {
+        return Vec::new();
+    };
+
+    let mut info_buf = ParamInfoBuffer::new();
+    let mut out = Vec::new();
+    for i in 0..params.count(&mut handle) {
+        let Some(info) = params.get_info(&mut handle, i, &mut info_buf) else {
+            continue;
+        };
+        let value = params
+            .get_value(&mut handle, info.id)
+            .unwrap_or(info.default_value);
+        out.push(PluginParam {
+            id: info.id,
+            name: String::from_utf8_lossy(info.name).into_owned(),
+            min: info.min_value,
+            max: info.max_value,
+            value,
+        });
+    }
+    out
 }
 
 /// Returns the channel count (clamped to 1 or 2) of the plugin's first/main audio
@@ -292,6 +397,10 @@ struct ClapInsert {
     max_block: usize,
     /// Steady-time frame counter handed to the plugin's `process`.
     steady: u64,
+    /// Parameter changes pushed by the UI thread.
+    param_rx: Consumer<ParamChange>,
+    /// Reused buffer the drained param changes are turned into for `process`.
+    events: EventBuffer,
 }
 
 impl ClapInsert {
@@ -300,6 +409,7 @@ impl ClapInsert {
         in_ch: usize,
         out_ch: usize,
         max_block: usize,
+        param_rx: Consumer<ParamChange>,
     ) -> Self {
         Self {
             processor,
@@ -311,6 +421,8 @@ impl ClapInsert {
             out_ch,
             max_block,
             steady: 0,
+            param_rx,
+            events: EventBuffer::with_capacity(PARAM_QUEUE_CAP),
         }
     }
 
@@ -331,6 +443,19 @@ impl ClapInsert {
             {
                 *dst = 0.5 * (*l + *r);
             }
+        }
+
+        // Turn any pending parameter changes into automation events for this block.
+        // Draining empties the queue, so later chunks in the same block see none.
+        self.events.clear();
+        while let Ok(change) = self.param_rx.pop() {
+            self.events.push(&ParamValueEvent::new(
+                0,
+                change.id,
+                Pckn::match_all(),
+                change.value,
+                Cookie::empty(),
+            ));
         }
 
         {
@@ -355,7 +480,7 @@ impl ClapInsert {
             let _ = self.processor.process(
                 &ins,
                 &mut outs,
-                &InputEvents::empty(),
+                &self.events.as_input(),
                 &mut OutputEvents::void(),
                 Some(self.steady),
                 None,
