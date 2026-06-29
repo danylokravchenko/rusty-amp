@@ -248,6 +248,12 @@ pub struct Params {
     pub amp_master: Arc<AtomicF32>,
 }
 
+impl Default for Params {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Params {
     pub fn new() -> Self {
         macro_rules! p {
@@ -393,6 +399,12 @@ impl Params {
 pub struct Levels {
     pub input: Arc<AtomicF32>,
     pub output: Arc<AtomicF32>,
+}
+
+impl Default for Levels {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Levels {

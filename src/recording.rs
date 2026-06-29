@@ -9,6 +9,12 @@ pub struct RecordingState {
     pub sample_rate: Arc<AtomicU32>,
 }
 
+impl Default for RecordingState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecordingState {
     pub fn new() -> Self {
         Self {

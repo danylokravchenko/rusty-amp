@@ -151,8 +151,8 @@ Runs first in the chain so it sees the rawest pickup signal. Two cascaded clippi
 
 | Knob | Range | Effect |
 | ------ | ------- | -------- |
-| Drive | 0–10 | Gain into the hard-clip stage (1×–61×). More aggressive than the TS |
-| Tone | 0–10 | Active LP/HP blend. 0 = dark & full, 5 = mid-scooped, 10 = bright & cutting |
+| Drive | 0–10 | Gain into the cubic clip stage (1×–61×). More aggressive than the TS |
+| Tone | 0–10 | Tilt control (bass↔treble seesaw around ~1 kHz). 0 = dark & full, 5 = flat, 10 = bright & cutting |
 | Level | 0–10 | Output volume of the pedal into the next stage |
 
 #### Stereo Reverb  _(bypassable with Space)_
@@ -248,11 +248,11 @@ Fuzz  [bypassable · Big Muff style]
   │
   ▼
 TS-808 Tube Screamer  [bypassable]
-  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → variable tone LP
+  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → output coupling cap (DC block) → variable tone LP
   │
   ▼
 DS-1 Distortion  [bypassable]
-  DC block → 80 Hz HP → [4× OS: pre-clip HP → symmetric silicon diode clip] → active tone (LP+HP blend)
+  DC block → 80 Hz HP → 800 Hz mid-emphasis → [4× OS: pre-clip HP → near-symmetric cubic diode clip] → post-clip HP → tilt tone → 6.5 kHz post-clip LP
   │
   ▼
 Pre-amp EQ  [bypassable]
