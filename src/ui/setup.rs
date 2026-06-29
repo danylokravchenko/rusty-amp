@@ -50,7 +50,7 @@ pub fn run(
     loop {
         let step_ref = &step;
         terminal.draw(|f| {
-            draw(f, params, levels, None, false, false, None, None);
+            draw(f, params, levels, None, &[], false, false, None, None);
             match step_ref {
                 Step::InputDevice { cursor } => {
                     render_list_modal(
@@ -163,8 +163,6 @@ pub fn run(
         }
     }
 }
-
-// ── Modal renderer ────────────────────────────────────────────────────────────
 
 fn render_list_modal(
     f: &mut ratatui::Frame,

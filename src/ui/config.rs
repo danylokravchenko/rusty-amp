@@ -1,7 +1,13 @@
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 
 use atomic_float::AtomicF32;
+use ratatui::style::Color;
 
+use super::styles::{
+    PEDAL_BLUE, PEDAL_GOLD, PEDAL_GREEN, PEDAL_LIME, PEDAL_ORANGE, PEDAL_PURPLE, PEDAL_RED,
+    PEDAL_SILVER, PEDAL_TEAL,
+};
 use crate::dsp::Params;
 
 pub(super) struct Knob {
@@ -9,13 +15,24 @@ pub(super) struct Knob {
     pub(super) param: fn(&Params) -> &Arc<AtomicF32>,
 }
 
-// Knob index range boundaries.
+/// A rig pedal: its livery, the slice of `KNOBS` it owns, and its on/off flag.
+/// `render_rig` walks this table to draw both the compact tiles and the detail
+/// editor, so adding a pedal is a single entry here (plus its knobs above).
+pub(super) struct Pedal {
+    pub(super) name: &'static str,
+    pub(super) color: Color,
+    pub(super) start: usize,
+    pub(super) end: usize,
+    pub(super) enabled: fn(&Params) -> &Arc<AtomicBool>,
+}
+
+// Knob-index ranges: each section owns a contiguous `[START, END)` slice of the
+// KNOBS array below. The amp/mic panels and the PEDALS table reference these
+// bounds.
 //
-// IMPORTANT: this order must mirror the on-screen layout top-to-bottom,
-// left-to-right, because Left/Right navigation walks the KNOBS array by ±1.
-// The amplifier head (tone stack + mic) sits above the pedalboard rig, then
-// rig row 1 (TS, DS, Reverb, Delay), then rig row 2 (Comp, Fuzz, Noise Gate,
-// Pre-amp EQ, Parametric EQ). The KNOBS array below is in the same order.
+// IMPORTANT: ←/→ navigation walks KNOBS linearly, so this order — amp tone
+// stack, cabinet mics, then the pedals in signal-chain order — must match the
+// KNOBS array one-to-one.
 pub(super) const AMP_START: usize = 0;
 pub(super) const AMP_END: usize = 6;
 pub(super) const MIC_START: usize = 6;
@@ -193,19 +210,79 @@ pub(super) const KNOBS: &[Knob] = &[
     },
 ];
 
-// Tab order follows the layout: selectors → Amp → Mic → rig pedals
-// (row 1 left-to-right, then row 2 left-to-right).
-pub(super) const SECTION_STARTS: &[Option<usize>] = &[
-    None,
-    Some(AMP_START),
-    Some(MIC_START),
-    Some(TS_START),
-    Some(DS_START),
-    Some(REV_START),
-    Some(DELAY_START),
-    Some(CMP_START),
-    Some(FUZZ_START),
-    Some(NG_START),
-    Some(PEQ_START),
-    Some(EQ_START),
+// Rig pedals in navigation order (mirrors the KNOBS slices above). The tile
+// grid and detail editor both iterate this table.
+pub(super) const PEDALS: &[Pedal] = &[
+    Pedal {
+        name: "TS-808",
+        color: PEDAL_GREEN,
+        start: TS_START,
+        end: TS_END,
+        enabled: |p| &p.ts_enabled,
+    },
+    Pedal {
+        name: "DS-1",
+        color: PEDAL_ORANGE,
+        start: DS_START,
+        end: DS_END,
+        enabled: |p| &p.ds_enabled,
+    },
+    Pedal {
+        name: "SPRING REVERB",
+        color: PEDAL_BLUE,
+        start: REV_START,
+        end: REV_END,
+        enabled: |p| &p.rev_enabled,
+    },
+    Pedal {
+        name: "DELAY",
+        color: PEDAL_PURPLE,
+        start: DELAY_START,
+        end: DELAY_END,
+        enabled: |p| &p.delay_enabled,
+    },
+    Pedal {
+        name: "COMP",
+        color: PEDAL_GOLD,
+        start: CMP_START,
+        end: CMP_END,
+        enabled: |p| &p.cmp_enabled,
+    },
+    Pedal {
+        name: "FUZZ",
+        color: PEDAL_RED,
+        start: FUZZ_START,
+        end: FUZZ_END,
+        enabled: |p| &p.fz_enabled,
+    },
+    Pedal {
+        name: "NOISE GATE",
+        color: PEDAL_SILVER,
+        start: NG_START,
+        end: NG_END,
+        enabled: |p| &p.ng_enabled,
+    },
+    Pedal {
+        name: "PRE-AMP EQ",
+        color: PEDAL_LIME,
+        start: PEQ_START,
+        end: PEQ_END,
+        enabled: |p| &p.peq_enabled,
+    },
+    Pedal {
+        name: "PARAMETRIC EQ",
+        color: PEDAL_TEAL,
+        start: EQ_START,
+        end: EQ_END,
+        enabled: |p| &p.eq_enabled,
+    },
 ];
+
+// Sentinel focus value for the "+ ADD" tile at the end of the board. It is not
+// a real knob index, so any code that indexes `KNOBS` must guard against it.
+pub(super) const ADD_TILE: usize = KNOBS.len();
+
+/// Index into `PEDALS` owning the given knob, or `None` for amp/mic knobs.
+pub(super) fn pedal_of(knob: usize) -> Option<usize> {
+    PEDALS.iter().position(|p| (p.start..p.end).contains(&knob))
+}

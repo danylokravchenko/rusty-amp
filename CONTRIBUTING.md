@@ -37,10 +37,12 @@ src/
     oversample.rs   — polyphase N× oversampling (with a `process(x, f)` clip helper)
     mod.rs          — Params, DspChain, and the bypass-stage macros that wire it
   ui/
-    draw.rs         — ratatui rendering
-    input.rs        — keyboard handling
+    mod.rs          — UI loop, board (on-board pedal) state, modal wiring
+    draw.rs         — ratatui rendering (rig tile grid + detail editor)
+    input.rs        — keyboard handling and board-aware navigation
+    setup.rs        — device-selection modals shown before audio starts
     presets.rs      — preset browser overlay
-    config.rs       — shared UI state
+    config.rs       — KNOBS + PEDALS tables and knob-range constants
     styles.rs       — colour palette and styles
 presets/            — bundled read-only presets (TOML)
 ```
@@ -89,11 +91,23 @@ To add one:
 3. Add a field to `DspChain` and a line in `DspChain::process` using the
    `mono_stage!` / `stereo_stage!` macro (in `src/dsp/mod.rs`) so it bypasses
    cleanly and reads its knobs from the shared `Params`.
-4. Add the `Params` fields + defaults in `src/dsp/mod.rs`.
-5. Expose knobs in `src/ui/config.rs` and render them in `src/ui/draw.rs`.
-6. Handle keyboard input in `src/ui/input.rs`.
-7. Add preset fields in `src/preset.rs`.
-8. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
+4. Add the `Params` fields + defaults in `src/dsp/mod.rs` — the per-knob
+   `Arc<AtomicF32>` values **and** the `<fx>_enabled: Arc<AtomicBool>` bypass flag
+   (the macro stage and the UI both read it).
+5. In `src/ui/config.rs`, add the knob-range constants (`<FX>_START` / `<FX>_END`)
+   and the matching `KNOBS` entries. Keep them in the same top-to-bottom order as
+   the rest — `←`/`→` navigation walks the `KNOBS` array linearly, so the order
+   *is* the on-screen layout.
+6. Register the pedal in the `PEDALS` table (also `src/ui/config.rs`): one entry
+   with its name, livery colour (add a `PEDAL_<NAME>` colour to `src/ui/styles.rs`),
+   knob range, and `enabled`-flag accessor. The rig tile grid, the detail editor,
+   the `+ ADD` picker, and `D`-to-remove all derive from this table — no `draw.rs`
+   layout code is needed.
+7. Add the pedal's `enabled` flag to the `toggle_pedal` match in `src/ui/input.rs`
+   so `Space` can bypass it while it's on the board.
+8. Add preset fields in `src/preset.rs` (including the on/off state so a preset can
+   place the pedal on the board — `sync_board` reads the enabled flags after load).
+9. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
    (finite/bounded output, and that each knob moves the band/level it should).
 
 ### Adding a new amp model
