@@ -59,8 +59,6 @@ pub fn list_devices() -> Result<DeviceInfo> {
     Ok(DeviceInfo { inputs, outputs })
 }
 
-// ── Stream start ──────────────────────────────────────────────────────────────
-
 pub fn start(
     input_idx: usize,
     guitar_ch: usize,
@@ -101,8 +99,6 @@ pub fn start(
     )
 }
 
-// ── Config negotiation ────────────────────────────────────────────────────────
-
 fn negotiate_configs(
     input: &Device,
     output: &Device,
@@ -125,8 +121,6 @@ fn negotiate_configs(
 
     Ok((in_sup.into(), out_sup.into(), in_sr as f32, in_fmt))
 }
-
-// ── Stream construction ───────────────────────────────────────────────────────
 
 #[allow(clippy::too_many_arguments)]
 fn build_engine(

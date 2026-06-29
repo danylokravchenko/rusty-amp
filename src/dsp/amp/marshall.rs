@@ -1,4 +1,7 @@
-use super::{Amplifier, Bloom, SpeakerLoad};
+use super::{
+    Amplifier, Bloom, BrightCap, Cached, CathodeBias, FrontEnd, OutputTransformer, SpeakerLoad,
+    ToneCache, VoiceBalance,
+};
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
 use crate::dsp::tonestack::{Components, ToneStack};
@@ -17,9 +20,8 @@ use crate::dsp::tonestack::{Components, ToneStack};
 ///   • Presence shelf in the power-amp NFB loop adds air and cut at 3.5 kHz
 pub struct Marshall {
     sr: f32,
-    // Pre-gain linear filters (base rate)
-    dc_block: Biquad,
-    input_hp: Biquad,
+    // Pre-gain front end: DC block + input HP (base rate)
+    front: FrontEnd,
     // 8× oversampling for the nonlinear section
     os: Oversampler8,
     // Bass cut before the first gain stage at 8× rate — prevents sub-bass from
@@ -29,21 +31,25 @@ pub struct Marshall {
     stage_hp: Biquad,
     // Dynamic preamp bloom
     bloom: Bloom,
+    // Treble-bleed cap across the gain control (sparkle at low gain).
+    bright: BrightCap,
+    // Tone-stack change detector — recompute coefficients only when a knob moves.
+    tone_cache: ToneCache,
+    // Dynamic cathode-bias shift on the first triode stage (blocking-distortion
+    // bloom / touch sensitivity), runs at 8× rate before the stage-1 waveshaper.
+    cathode: CathodeBias,
+    // Output-transformer core saturation + push-pull crossover (base rate).
+    xfmr: OutputTransformer,
     // Passive FMV tone stack (base rate) — bass/mid/treble interact like the real
     // JCM800 network, with the characteristic mid scoop.
     tone: ToneStack,
-    last_bass: f32,
-    last_mid: f32,
-    last_treble: f32,
     // Presence — power-amp NFB characteristic (base rate)
     presence_shelf: Biquad,
-    last_presence: f32,
-    // Structural voicing balance (base rate): a static low shelf restores low-mid
-    // body and a static high shelf tames the tone stack's treble-forward tilt, so
-    // notes stay even in level across the neck instead of the upper register
-    // blasting out (its fundamentals otherwise ride the upper-mid rise).
-    body: Biquad,
-    tilt: Biquad,
+    presence_cache: Cached,
+    // Structural voicing balance (base rate): low shelf restores low-mid body, high
+    // shelf tames the tone stack's treble-forward tilt, so notes stay even across
+    // the neck rather than the upper register blasting out.
+    voice: VoiceBalance,
     // Output DC blocker (the asymmetric power clip leaves a small offset).
     out_hp: Biquad,
     // Power amp envelope follower (sag simulation)
@@ -57,8 +63,7 @@ impl Marshall {
         let sr8 = sr * 8.0;
         let mut m = Self {
             sr,
-            dc_block: Biquad::highpass(sr, 10.0, 0.707),
-            input_hp: Biquad::highpass(sr, 60.0, 0.707),
+            front: FrontEnd::new(sr, 60.0),
             os: Oversampler8::new(sr),
             // JCM800 input coupling cap → sub-rumble cut at ~35 Hz, kept below the
             // 82 Hz low-E fundamental so the distorted bass string stays intact.
@@ -69,14 +74,21 @@ impl Marshall {
             // stage so the note leads its overtones, while still tightening the lows.
             stage_hp: Biquad::highpass(sr8, 300.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 55.0),
+            // Bright cap: JCM800 treble-bleed, corner ~2 kHz, gentle so it adds
+            // sparkle at low gain without turning the clean edge brittle.
+            bright: BrightCap::new(sr, 2000.0, 0.16),
+            tone_cache: ToneCache::new(),
+            // First-stage cathode bias: grid current charges fast (~1.5 ms), bleeds
+            // back over ~45 ms. Threshold/depth kept light so the dynamic give lives
+            // within a note and recovers between notes (no cross-note timbre drift).
+            cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.030, 1.0),
+            // Output transformer: lows (core flux) below ~160 Hz compress; modest
+            // drive and a trace of crossover for the woolly, complex cranked-PA low end.
+            xfmr: OutputTransformer::new(sr, 160.0, 1.4, 0.045),
             tone: ToneStack::new(sr, Components::MARSHALL),
-            last_bass: -1.0,
-            last_mid: -1.0,
-            last_treble: -1.0,
             presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
-            last_presence: -1.0,
-            body: Biquad::low_shelf(sr, 180.0, 3.5),
-            tilt: Biquad::high_shelf(sr, 750.0, -7.0),
+            presence_cache: Cached::new(),
+            voice: VoiceBalance::new(sr, 180.0, 3.5, 750.0, -7.0),
             out_hp: Biquad::highpass(sr, 12.0, 0.707),
             envelope: 0.0,
             // 8×12 resonance ~95 Hz; tube amp has moderate damping. Dynamic bloom
@@ -92,15 +104,11 @@ impl Marshall {
 
     fn update_tone_stack(&mut self, bass: f32, mid: f32, treble: f32) {
         self.tone.update(bass, mid, treble);
-        self.last_bass = bass;
-        self.last_mid = mid;
-        self.last_treble = treble;
     }
 
     fn update_presence(&mut self, presence: f32) {
         // Presence models the JCM800 output-transformer NFB loop: shelf at 3.5 kHz, ±6 dB
         self.presence_shelf = Biquad::high_shelf(self.sr, 3500.0, (presence - 0.5) * 12.0);
-        self.last_presence = presence;
     }
 
     #[inline]
@@ -134,18 +142,17 @@ impl Amplifier for Marshall {
         presence: f32,
         master: f32,
     ) -> f32 {
-        if (bass - self.last_bass).abs() > 0.001
-            || (mid - self.last_mid).abs() > 0.001
-            || (treble - self.last_treble).abs() > 0.001
-        {
+        if self.tone_cache.changed(bass, mid, treble) {
             self.update_tone_stack(bass, mid, treble);
         }
-        if (presence - self.last_presence).abs() > 0.001 {
+        if self.presence_cache.changed(presence) {
             self.update_presence(presence);
         }
 
-        let x = self.dc_block.process(sample);
-        let x = self.input_hp.process(x);
+        let x = self.front.process(sample);
+        // Bright cap across the gain pot: injects highs that then feed the clipper,
+        // strongest at low gain (see BrightCap).
+        let x = self.bright.process(x, gain);
 
         let pregain = 1.0 + gain * 39.0;
         // Dynamic grid-bias offset (removed downstream by the inter-stage HP).
@@ -162,7 +169,10 @@ impl Amplifier for Marshall {
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
-            let s = tube_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            // Dynamic cathode bias shifts the operating point under hard drive
+            // before the stage-1 waveshaper; the inter-stage HP strips its DC.
+            let d = self.cathode.shift((u + bias) * pregain);
+            let s = tube_clip_asym(d) / pregain.sqrt();
             let s = self.stage_hp.process(s);
             *o = tube_clip_asym(s * 3.2) / 3.2_f32.sqrt();
         }
@@ -172,11 +182,12 @@ impl Amplifier for Marshall {
         // Passive FMV tone stack (base rate — no aliasing risk)
         let x = self.tone.process(x);
         // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
-        let x = self.body.process(x);
-        let x = self.tilt.process(x);
+        let x = self.voice.process(x);
 
         // Power amp: transformer sag + light saturation
         let x = self.power_amp(x);
+        // Output transformer: low-frequency core saturation + push-pull crossover.
+        let x = self.xfmr.process(x);
 
         // Speaker impedance interaction — dynamic low-end bloom driven by sag.
         let x = self.speaker.process(x, self.envelope);
