@@ -16,6 +16,7 @@ use super::config::{
 };
 use super::styles::*;
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw(
     f: &mut Frame,
     params: &Params,
@@ -24,6 +25,7 @@ pub(super) fn draw(
     recording: bool,
     blink: bool,
     status: Option<&str>,
+    plugin: Option<&str>,
 ) {
     let area = f.area();
 
@@ -47,7 +49,7 @@ pub(super) fn draw(
         ])
         .split(inner);
 
-    render_header(f, rows[0], params, recording, blink);
+    render_header(f, rows[0], params, recording, blink, plugin);
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
     render_amp(f, rows[3], params, focus);
@@ -55,7 +57,14 @@ pub(super) fn draw(
     render_help(f, rows[5], status);
 }
 
-fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, blink: bool) {
+fn render_header(
+    f: &mut Frame,
+    area: Rect,
+    params: &Params,
+    recording: bool,
+    blink: bool,
+    plugin: Option<&str>,
+) {
     let block = Block::default()
         .borders(Borders::BOTTOM)
         .border_type(BorderType::Double)
@@ -72,7 +81,7 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
     let amp_name = params.amp_model().name().to_uppercase();
     let cab_name = params.cab_model().name().to_uppercase();
 
-    let title = Paragraph::new(Line::from(vec![
+    let mut title_spans = vec![
         Span::styled(
             "  R U S T Y  A M P  ",
             Style::default().fg(ORANGE).add_modifier(Modifier::BOLD),
@@ -88,23 +97,34 @@ fn render_header(f: &mut Frame, area: Rect, params: &Params, recording: bool, bl
             Style::default().fg(CHROME).add_modifier(Modifier::BOLD),
         ),
         Span::styled("▐", Style::default().fg(WARM)),
+    ];
+
+    // Loaded plugin insert (if any), between the cabinet and the power lamp.
+    if let Some(name) = plugin {
+        title_spans.push(Span::styled(
+            format!("  🔌 {name}  "),
+            Style::default().fg(AMBER).add_modifier(Modifier::BOLD),
+        ));
+        title_spans.push(Span::styled("▐", Style::default().fg(WARM)));
+    }
+
+    title_spans.push(Span::styled(
+        "  ● POWER ON  ",
+        Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
+    ));
+    title_spans.push(Span::styled("▐", Style::default().fg(WARM)));
+    title_spans.push(if recording && blink {
         Span::styled(
-            "  ● POWER ON  ",
-            Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled("▐", Style::default().fg(WARM)),
-        if recording && blink {
-            Span::styled(
-                "  ● ON AIR  ",
-                Style::default().fg(HOT).add_modifier(Modifier::BOLD),
-            )
-        } else if recording {
-            Span::styled("  ○ ON AIR  ", Style::default().fg(HOT))
-        } else {
-            Span::styled("  ○ OFF AIR  ", Style::default().fg(OFF))
-        },
-    ]));
-    f.render_widget(title, rows[0]);
+            "  ● ON AIR  ",
+            Style::default().fg(HOT).add_modifier(Modifier::BOLD),
+        )
+    } else if recording {
+        Span::styled("  ○ ON AIR  ", Style::default().fg(HOT))
+    } else {
+        Span::styled("  ○ OFF AIR  ", Style::default().fg(OFF))
+    });
+
+    f.render_widget(Paragraph::new(Line::from(title_spans)), rows[0]);
 
     let ng_on = params.ng_enabled.load(Relaxed);
     let cmp_on = params.cmp_enabled.load(Relaxed);

@@ -92,19 +92,13 @@ pub fn run(
             save_msg = None;
         }
 
-        // Transient save messages take priority; otherwise show the active plugin.
-        let status_text: Option<String> = if let Some((msg, _)) = &save_msg {
-            Some(msg.clone())
-        } else {
-            #[cfg(feature = "clap")]
-            {
-                browser.loaded_name().map(|n| format!("plugin: {n}"))
-            }
-            #[cfg(not(feature = "clap"))]
-            {
-                None
-            }
-        };
+        let status = save_msg.as_ref().map(|(msg, _)| msg.as_str());
+        // The loaded plugin (if any) is shown in the header, not the status line, so
+        // the help/status footer stays intact while a plugin is active.
+        #[cfg(feature = "clap")]
+        let plugin_name = browser.loaded_name();
+        #[cfg(not(feature = "clap"))]
+        let plugin_name: Option<&str> = None;
 
         terminal.draw(|f| {
             draw(
@@ -114,7 +108,8 @@ pub fn run(
                 focus,
                 rec_active,
                 blink,
-                status_text.as_deref(),
+                status,
+                plugin_name,
             );
             if preset_open {
                 render_preset_modal(f, &presets, preset_cursor);
