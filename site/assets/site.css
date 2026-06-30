@@ -428,9 +428,6 @@ pre::before {
 }
 pre code { background: none; color: #cbb9a8; padding: 0; font-size: 13px; }
 
-/* signal-chain ascii block */
-pre.chain-art { color: var(--muted); font-size: 12px; line-height: 1.5; }
-
 /* ── callouts ───────────────────────────────────────────────────────────── */
 
 .note {
@@ -560,3 +557,335 @@ footer a:hover { color: var(--rust); }
 }
 
 hr { border: none; border-top: 1px solid var(--border-dim); margin: 36px 0; }
+
+/* ── signal-chain flow (the "Full signal chain" diagram) ─────────────────── */
+
+.flow { margin: 26px 0 10px; }
+
+.flow__stage {
+  --c: var(--rust);
+  position: relative;
+  padding: 0 0 16px 40px;
+  margin-left: 9px;
+  border-left: 2px solid var(--border-dim);
+}
+.flow__stage:last-child { border-left-color: transparent; padding-bottom: 0; }
+
+/* the node sitting on the rail */
+.flow__stage::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 14px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--c);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent);
+  z-index: 1;
+}
+/* little down-arrow on the rail between nodes — centered on the node/rail axis */
+.flow__stage::after {
+  content: "▼";
+  position: absolute;
+  left: -9px;
+  width: 16px;
+  text-align: center;
+  bottom: -4px;
+  font-size: 9px;
+  line-height: 1;
+  color: var(--border);
+}
+.flow__stage:last-child::after { content: none; }
+
+.flow__card {
+  border: 1px solid color-mix(in srgb, var(--c) 38%, var(--border-dim));
+  border-radius: 9px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 8%, var(--panel)), var(--panel));
+  padding: 12px 16px;
+  transition: border-color .15s, transform .12s;
+}
+.flow__card:hover { border-color: color-mix(in srgb, var(--c) 65%, #000); transform: translateX(2px); }
+
+.flow__head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.flow__name {
+  color: var(--c);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.4px;
+}
+.flow__tag { color: var(--faint); font-size: 12px; font-weight: 400; }
+
+.flow__badge {
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid currentColor;
+  opacity: 0.85;
+}
+.flow__badge--bypass { color: var(--faint); }
+.flow__badge--live   { color: var(--green); }
+.flow__badge--mono   { color: var(--amber); }
+.flow__badge--stereo { color: var(--blue); }
+
+/* the DSP detail line(s) — a faint monospace "signal path" */
+.flow__sig {
+  margin-top: 9px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.flow__sig .op { color: color-mix(in srgb, var(--c) 75%, var(--faint)); padding: 0 1px; }
+.flow__sig .os { color: var(--c); font-weight: 600; }
+
+.flow__sub {
+  margin-top: 7px;
+  padding-left: 12px;
+  border-left: 2px solid color-mix(in srgb, var(--c) 30%, var(--border-dim));
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.flow__sub b { color: var(--c); font-weight: 600; }
+
+/* endpoints (Guitar in, Output out) read as solid pills, not effects */
+.flow__stage--io { --c: var(--rust-light); }
+.flow__stage--io .flow__card {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 16%, var(--panel)), var(--panel));
+  border-color: color-mix(in srgb, var(--c) 55%, #000);
+}
+
+@media (max-width: 520px) {
+  .flow__stage { padding-left: 30px; }
+}
+
+/* ── tabbed selectors (amps & cabinets) ──────────────────────────────────── */
+
+.selector { --c: var(--rust); margin: 18px 0 8px; }
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+@media (max-width: 620px) { .tiles { grid-template-columns: 1fr; } }
+
+.tile {
+  appearance: none;
+  text-align: left;
+  font-family: var(--mono);
+  cursor: pointer;
+  border: 1px solid var(--border-dim);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--panel-soft), var(--panel));
+  padding: 14px 16px;
+  color: var(--text);
+  transition: border-color .15s, transform .12s, box-shadow .15s;
+}
+.tile:hover { transform: translateY(-2px); border-color: var(--border); }
+.tile:focus-visible { outline: 2px solid var(--c); outline-offset: 2px; }
+.tile.is-active {
+  border-color: var(--c);
+  box-shadow: 0 0 0 1px var(--c), 0 0 26px color-mix(in srgb, var(--c) 26%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 12%, var(--panel)), var(--panel));
+}
+.tile__name { font-weight: 700; font-size: 15px; color: #fff; letter-spacing: 0.3px; }
+.tile.is-active .tile__name { color: var(--c); }
+.tile__sub { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.tile__dot {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 8px var(--c);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* faux amp-head control strip */
+.tile__amp { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+.tile__amp i {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #2a201a, #100b08 72%);
+  border: 1px solid var(--border);
+  position: relative;
+}
+.tile__amp i::after {
+  content: ""; position: absolute; left: 50%; top: 1px;
+  width: 1.5px; height: 5px; background: var(--c); border-radius: 2px;
+  transform: translateX(-50%) rotate(var(--r, 0deg)); transform-origin: bottom center;
+}
+
+/* faux 4×12 grille */
+.tile__cab {
+  margin-top: 12px; height: 30px; border-radius: 5px;
+  border: 1px solid var(--border-dim);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 4px, rgba(0,0,0,.45) 4px 6px),
+    linear-gradient(180deg, #161009, #0c0805);
+}
+
+.tab-panel { display: none; }
+.tab-panel.is-active { display: block; animation: fade .18s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+/* spec grid inside a panel */
+.specs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 4px 0 18px;
+}
+@media (max-width: 620px) { .specs { grid-template-columns: 1fr; } }
+.spec {
+  border: 1px solid var(--border-dim);
+  border-left: 2px solid var(--c);
+  border-radius: 0 8px 8px 0;
+  padding: 9px 13px;
+  background: var(--panel);
+}
+.spec__k { font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase; color: var(--c); }
+.spec__v { font-size: 13px; color: var(--text); margin-top: 2px; }
+
+/* knob / value rows */
+.kv { display: grid; grid-template-columns: 92px 1fr; gap: 6px 14px; padding: 8px 0; border-bottom: 1px solid var(--border-dim); }
+.kv:last-child { border-bottom: none; }
+.kv__k { color: var(--c); font-weight: 700; font-size: 13px; }
+.kv__v { color: var(--muted); font-size: 13px; }
+.kv__r {
+  display: inline-block;
+  font-size: 10.5px;
+  color: var(--c);
+  border: 1px solid color-mix(in srgb, var(--c) 40%, var(--border-dim));
+  border-radius: 20px;
+  padding: 0 8px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+
+/* frequency chips for cabinets */
+.freqs { display: flex; flex-wrap: wrap; gap: 8px; margin: 6px 0 4px; }
+.freq {
+  font-size: 12px;
+  border: 1px solid color-mix(in srgb, var(--c) 40%, var(--border-dim));
+  background: color-mix(in srgb, var(--c) 8%, var(--panel));
+  color: var(--text);
+  border-radius: 20px;
+  padding: 4px 12px;
+}
+.freq b { color: var(--c); }
+
+/* ── mic knob cards ──────────────────────────────────────────────────────── */
+
+.miccards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 16px 0 8px;
+}
+@media (max-width: 680px) { .miccards { grid-template-columns: 1fr; } }
+
+.miccard {
+  --c: var(--teal);
+  border: 1px solid color-mix(in srgb, var(--c) 32%, var(--border-dim));
+  border-radius: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 7%, var(--panel)), var(--panel));
+  padding: 18px 16px 16px;
+}
+.miccard__top { display: flex; align-items: center; gap: 14px; }
+.miccard .knob__dial { margin: 0; flex: none; }
+.miccard .knob__dial::after { background: var(--c); box-shadow: 0 0 6px var(--c); }
+.miccard__id { text-align: left; }
+.miccard__name { color: var(--c); font-weight: 700; font-size: 15px; letter-spacing: 0.4px; }
+.miccard__range { font-size: 11px; color: var(--faint); margin-top: 2px; }
+
+.miccard__bar {
+  position: relative;
+  height: 6px;
+  border-radius: 4px;
+  margin: 16px 0 6px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--c) 20%, var(--bg)),
+    var(--c));
+  opacity: 0.9;
+}
+/* marker showing the ship-default position — matches the dial's arrow */
+.miccard__mark {
+  position: absolute;
+  top: 50%;
+  left: var(--at, 50%);
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--c);
+  border: 2px solid var(--panel);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 8px var(--c);
+}
+.miccard__ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.miccard__def { font-size: 10.5px; color: var(--faint); margin-top: 7px; letter-spacing: 0.5px; }
+.miccard__def b { color: var(--c); }
+.miccard__desc { font-size: 12.5px; color: var(--muted); margin-top: 11px; line-height: 1.55; }
+
+/* ── interactive widgets (tuner, recorder) ───────────────────────────────── */
+
+.widget {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #0a0705, #060504);
+  padding: 24px 22px 20px;
+  margin: 18px 0 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.widget__demo {
+  font-size: 11px;
+  color: var(--faint);
+  letter-spacing: 0.5px;
+  margin: 12px 0 0;
+  text-align: center;
+}
+.widget__demo b { color: var(--rust); }
+
+/* ── recorder ────────────────────────────────────────────────────────────── */
+
+.rec__header { display: flex; align-items: center; gap: 14px; justify-content: center; font-size: 13px; letter-spacing: 1px; color: var(--muted); }
+.rec__air { font-weight: 700; color: var(--faint); }
+.rec.is-rec .rec__air { color: #e06b6b; animation: blink 1s steps(2, start) infinite; }
+@keyframes blink { 50% { opacity: .25; } }
+
+.rec__wave { display: flex; align-items: center; justify-content: center; gap: 3px; height: 62px; margin: 18px 0; }
+.rec__wave i { width: 4px; height: 8px; background: var(--faint); border-radius: 2px; transition: background .2s; }
+.rec.is-rec .rec__wave i {
+  background: linear-gradient(180deg, var(--rust-light), var(--rust-dark));
+  animation: wv .9s ease-in-out infinite;
+}
+@keyframes wv { 0%, 100% { height: 8px; } 50% { height: var(--h, 30px); } }
+
+.rec__time { text-align: center; font-size: 26px; font-weight: 700; letter-spacing: 2px; color: var(--muted); }
+.rec.is-rec .rec__time { color: var(--rust); }
+
+.rec__controls { text-align: center; margin-top: 16px; }
+.rec__btn {
+  font-family: var(--mono);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 10px 22px;
+  font-weight: 700;
+}
+.rec__btn .dot { color: #e06b6b; margin-right: 6px; }
+.rec.is-rec .rec__btn { border-color: #e06b6b; color: #e06b6b; }
+.rec__file { text-align: center; margin-top: 14px; font-size: 12.5px; color: var(--muted); min-height: 1.3em; }

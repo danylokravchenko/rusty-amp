@@ -8,7 +8,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
 
 <header class="hero">
   <div class="wrap">
-    <p class="eyebrow">● POWER ON · OFF AIR</p>
+    <p class="eyebrow">● POWER ON · ON AIR</p>
     <h1>rusty-amp</h1>
     <p class="tagline">a guitar amp &amp; pedalboard rig in your <span class="term">terminal</span></p>
     <p class="blurb">

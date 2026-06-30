@@ -8,56 +8,173 @@ eyebrow: "Amps, cabinets & IRs"
 heading: "The amp head & cabinet"
 lead: "Three switchable amps, three multi-mic'd 4×12 cabinets, and a loader for your own impulse responses."
 toc:
-  - { href: "#amp", label: "Amp knobs" }
-  - { href: "#models", label: "Amp models" }
+  - { href: "#amp", label: "Amplifiers" }
   - { href: "#mics", label: "Cabinet mics" }
-  - { href: "#cabs", label: "Cabinet models" }
+  - { href: "#cabs", label: "Cabinets" }
   - { href: "#irs", label: "External IRs" }
   - { href: "#packaging", label: "Packaging IRs" }
 prev: { href: "pedals.html", label: "Pedals &amp; effects" }
 next: { href: "presets.html", label: "Presets" }
 ---
 
-## Amp knobs <span class="muted">(<kbd>↑</kbd>/<kbd>↓</kbd> or <kbd>A</kbd> on the selector row)</span> {#amp}
+## Amplifiers {#amp}
 
-| Knob | Range | Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead |
-| ---- | ----- | --------------- | ------------------- | --------------- |
-| Gain | 0–10 | Preamp gain 1×–40× into dual 12AX7 | Preamp gain 1×–36× into three stages | Preamp gain 1×–46× into FET+BJT stages |
-| Bass | 0–10 | Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall values) | Passive FMV stack (Fender-type values: fuller lows, gentler scoop) | Active tone stack — low shelf at 80 Hz |
-| Mid | 0–10 | …the mid pot sets the depth of the stack's inherent scoop | …gentler scoop than the Marshall | Peak EQ at 500 Hz |
-| Treble | 0–10 | …treble interacts with mid/bass, lossy & peak-normalised | …same interacting network | High shelf at 4.5 kHz |
-| Presence | 0–10 | High shelf at 3.5 kHz (±6 dB) | High shelf at 4 kHz (±6 dB) | High shelf at 5 kHz (+3 dB fixed offset, ±6 dB) |
-| Master | 0–10 | Post-amp output level | Post-amp output level | Post-amp output level |
+Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓</kbd> on the selector row) — the cabinet state is preserved when you switch. Pick one to see its voicing and per-knob behaviour.
+
+<div class="selector" style="--c:var(--rust)" data-tabs>
+  <div class="tiles" role="tablist" aria-label="Amplifier models">
+    <button class="tile is-active" role="tab" aria-selected="true" data-tab="jcm800">
+      <div class="tile__name">Marshall JCM800</div>
+      <div class="tile__sub">Punchy · dynamic · touch-sensitive</div>
+      <div class="tile__amp"><i style="--r:-50deg"></i><i style="--r:-20deg"></i><i style="--r:10deg"></i><i style="--r:30deg"></i><i style="--r:55deg"></i><i style="--r:80deg"></i></div>
+    </button>
+    <button class="tile" role="tab" aria-selected="false" data-tab="mesa">
+      <div class="tile__name">Mesa Dual Rectifier</div>
+      <div class="tile__sub">Compressed · aggressive · modern</div>
+      <div class="tile__amp"><i style="--r:-40deg"></i><i style="--r:0deg"></i><i style="--r:20deg"></i><i style="--r:45deg"></i><i style="--r:60deg"></i><i style="--r:85deg"></i></div>
+    </button>
+    <button class="tile" role="tab" aria-selected="false" data-tab="randall">
+      <div class="tile__name">Randall Warhead</div>
+      <div class="tile__sub">Tight · crushing · solid-state</div>
+      <div class="tile__amp"><i style="--r:-30deg"></i><i style="--r:-5deg"></i><i style="--r:25deg"></i><i style="--r:50deg"></i><i style="--r:70deg"></i><i style="--r:90deg"></i></div>
+    </button>
+  </div>
+
+  <div class="tab-panel is-active" role="tabpanel" data-panel="jcm800">
+    <div class="specs">
+      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–40× into dual 12AX7</div></div>
+      <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Marshall values)</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Tube sag (5 ms / 200 ms) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
+    </div>
+    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–40× into dual 12AX7.</span></div>
+    <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall values).</span></div>
+    <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Sets the depth of the stack's inherent scoop.</span></div>
+    <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Interacts with mid/bass, lossy &amp; peak-normalised.</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 3.5 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
+  </div>
+
+  <div class="tab-panel" role="tabpanel" data-panel="mesa">
+    <div class="specs">
+      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–36× into three stages</div></div>
+      <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Fender values)</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Silicon sag (0.5 ms / 80 ms) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">3-stage: atan → atan → exponential</div></div>
+    </div>
+    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–36× into three stages.</span></div>
+    <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV stack (Fender-type values: fuller lows, gentler scoop).</span></div>
+    <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Gentler scoop than the Marshall.</span></div>
+    <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Same interacting network.</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
+  </div>
+
+  <div class="tab-panel" role="tabpanel" data-panel="randall">
+    <div class="specs">
+      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–46× into FET+BJT stages</div></div>
+      <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Active, independent bands + fixed +3 dB presence</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">No sag — stiff solid-state rails + static speaker resonance</div></div>
+      <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">FET (x/√(1+x²)) → BJT (tanh) → rail-clip</div></div>
+    </div>
+    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–46× into FET+BJT stages.</span></div>
+    <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Active tone stack — low shelf at 80 Hz.</span></div>
+    <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Peak EQ at 500 Hz.</span></div>
+    <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">High shelf at 4.5 kHz.</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 5 kHz (+3 dB fixed offset, ±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
+  </div>
+</div>
 
 The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC network where the three controls interact and the mids inherently scoop, exactly like a real amp — followed by a **power-amp ↔ speaker interaction** model: the speaker's impedance resonance blooms the low end dynamically as the supply sags under hard playing. The Randall keeps an active (independent-band) stack and a small static speaker resonance, true to its stiff solid-state design.
-
-## Amp models {#models}
-
-| Model | Character | Tone stack | Rectifier / power | Gain stages |
-| ----- | --------- | ---------- | ----------------- | ----------- |
-| **Marshall JCM800** | Punchy, dynamic, touch-sensitive | Passive FMV (Marshall values) | Tube sag (5 ms / 200 ms) + dynamic speaker-load bloom | 2 × 12AX7 atan soft-clip |
-| **Mesa Dual Rectifier** | Compressed, aggressive, modern | Passive FMV (Fender values) | Silicon sag (0.5 ms / 80 ms) + dynamic speaker-load bloom | 3-stage: atan → atan → exponential |
-| **Randall Warhead** | Tight, crushing, solid-state | Active, independent bands + fixed +3 dB presence | No sag — stiff solid-state rails + static speaker resonance | FET (x/√(1+x²)) → BJT (tanh) → rail-clip |
-
-Cycle amp models with <kbd>A</kbd> at any time; the cabinet state is preserved when switching.
 
 ## Cabinet mics {#mics}
 
 Three controls model a multi-mic'd 4×12 — the close mic's position, a blend from a dynamic to a ribbon, and a room mic for depth. The blend is a weighted sum of the three mics' impulse responses, so it costs no extra per-sample CPU.
 
-| Knob | Range | Effect |
-| ---- | ----- | ------ |
-| Mic | 0–10 | Close-mic position: 0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz). |
-| Blend | 0–10 | Close-mic capsule: 0 = SM57 dynamic (bright, present) · 10 = R121 ribbon (darker, fuller low-mids, silky top). |
-| Room | 0–10 | Amount of a distant room mic mixed in — adds air and three-dimensional depth (0 = dry close mic only). |
+<div class="miccards">
+  <div class="miccard">
+    <div class="miccard__top">
+      <div class="knob__dial" style="--r:0deg"></div>
+      <div class="miccard__id"><div class="miccard__name">Mic</div><div class="miccard__range">Close-mic position · 0–10</div></div>
+    </div>
+    <div class="miccard__bar"><span class="miccard__mark" style="--at:50%"></span></div>
+    <div class="miccard__ends"><span>Edge · dark</span><span>On-axis · bright</span></div>
+    <div class="miccard__def">Default <b>5.0</b> · centre neutral</div>
+    <div class="miccard__desc">0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz).</div>
+  </div>
 
-## Cabinet models {#cabs}
+  <div class="miccard">
+    <div class="miccard__top">
+      <div class="knob__dial" style="--r:-95deg"></div>
+      <div class="miccard__id"><div class="miccard__name">Blend</div><div class="miccard__range">Close-mic capsule · 0–10</div></div>
+    </div>
+    <div class="miccard__bar"><span class="miccard__mark" style="--at:15%"></span></div>
+    <div class="miccard__ends"><span>SM57 dynamic</span><span>R121 ribbon</span></div>
+    <div class="miccard__def">Default <b>1.5</b> · mostly SM57</div>
+    <div class="miccard__desc">0 = SM57 dynamic (bright, present) · 10 = R121 ribbon (darker, fuller low-mids, silky top).</div>
+  </div>
 
-| Model | Character | Key frequencies |
-| ----- | --------- | --------------- |
-| **Mesa 4×12 (V30)** | Scooped, aggressive, forward-projecting | −5 dB mid scoop at 400 Hz, +7 dB presence at 3.5 kHz, hard rolloff above 6 kHz |
-| **Marshall 4×12 (Greenback)** | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
-| **Orange PPC412 (V30)** | Thick, chunky, mid-forward (closed-back birch) | +5 dB low-mid "wall" at 600 Hz, +3 dB grind at 1.2 kHz, +5 dB presence at 3.2 kHz |
+  <div class="miccard">
+    <div class="miccard__top">
+      <div class="knob__dial" style="--r:-95deg"></div>
+      <div class="miccard__id"><div class="miccard__name">Room</div><div class="miccard__range">Room-mic amount · 0–10</div></div>
+    </div>
+    <div class="miccard__bar"><span class="miccard__mark" style="--at:15%"></span></div>
+    <div class="miccard__ends"><span>Dry close mic</span><span>Full room</span></div>
+    <div class="miccard__def">Default <b>1.5</b> · a touch of room</div>
+    <div class="miccard__desc">Amount of a distant room mic mixed in — adds air and three-dimensional depth (0 = dry close mic only).</div>
+  </div>
+</div>
+
+## Cabinets {#cabs}
+
+Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its character and voiced frequency bands.
+
+<div class="selector" style="--c:var(--teal)" data-tabs>
+  <div class="tiles" role="tablist" aria-label="Cabinet models">
+    <button class="tile is-active" role="tab" aria-selected="true" data-tab="cab-mesa">
+      <div class="tile__name">Mesa 4×12 (V30)</div>
+      <div class="tile__sub">Scooped · aggressive · forward</div>
+      <div class="tile__cab"></div>
+    </button>
+    <button class="tile" role="tab" aria-selected="false" data-tab="cab-marshall">
+      <div class="tile__name">Marshall 4×12 (Greenback)</div>
+      <div class="tile__sub">Warm · mid-forward · smooth top</div>
+      <div class="tile__cab"></div>
+    </button>
+    <button class="tile" role="tab" aria-selected="false" data-tab="cab-orange">
+      <div class="tile__name">Orange PPC412 (V30)</div>
+      <div class="tile__sub">Thick · chunky · closed-back birch</div>
+      <div class="tile__cab"></div>
+    </button>
+  </div>
+
+  <div class="tab-panel is-active" role="tabpanel" data-panel="cab-mesa">
+    <p class="muted" style="margin:2px 0 4px">Scooped, aggressive, and forward-projecting — the modern high-gain reference.</p>
+    <div class="freqs">
+      <span class="freq"><b>−5 dB</b> @ 400 Hz · mid scoop</span>
+      <span class="freq"><b>+7 dB</b> @ 3.5 kHz · presence</span>
+      <span class="freq"><b>hard rolloff</b> above 6 kHz</span>
+    </div>
+  </div>
+  <div class="tab-panel" role="tabpanel" data-panel="cab-marshall">
+    <p class="muted" style="margin:2px 0 4px">Warm and mid-forward with a smooth top end — the classic rock voice.</p>
+    <div class="freqs">
+      <span class="freq"><b>+4 dB</b> @ 800 Hz · body</span>
+      <span class="freq"><b>+5 dB</b> @ 2.5 kHz · presence</span>
+      <span class="freq"><b>soft rolloff</b> above 5 kHz</span>
+    </div>
+  </div>
+  <div class="tab-panel" role="tabpanel" data-panel="cab-orange">
+    <p class="muted" style="margin:2px 0 4px">Thick and chunky from the closed-back birch enclosure — a wall of low-mids.</p>
+    <div class="freqs">
+      <span class="freq"><b>+5 dB</b> @ 600 Hz · low-mid “wall”</span>
+      <span class="freq"><b>+3 dB</b> @ 1.2 kHz · grind</span>
+      <span class="freq"><b>+5 dB</b> @ 3.2 kHz · presence</span>
+    </div>
+  </div>
+</div>
 
 Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz). Two slightly different L/R IRs decorrelate the stereo image for natural width.
 

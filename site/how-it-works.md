@@ -12,7 +12,7 @@ toc:
   - { href: "#chain", label: "Full signal chain" }
   - { href: "#amp", label: "Amp stages" }
   - { href: "#cabinet", label: "Cabinet convolution" }
-prev: { href: "plugins.html", label: "CLAP plugins" }
+prev: { href: "tools.html", label: "Tuner &amp; recording" }
 next: { href: "https://github.com/danylokravchenko/rusty-amp/blob/main/CONTRIBUTING.md", label: "Contributing on GitHub ↗" }
 ---
 
@@ -40,63 +40,110 @@ next: { href: "https://github.com/danylokravchenko/rusty-amp/blob/main/CONTRIBUT
 
 Every block below is processed per sample. Bracketed stages are `[bypassable]` — remove or bypass them and they drop out of the path entirely.
 
-<pre class="chain-art"><code>Guitar
-  │
-  ▼
-Noise Gate  [bypassable]
-  Envelope follower → gain ramp (smooth open/close to avoid clicks)
-  │
-  ▼
-Compressor  [bypassable]
-  Peak-follower detector → hard-knee gain computer (2:1–10:1) → smoothed gain + auto makeup
-  │
-  ▼
-Fuzz  [bypassable · Big Muff style]
-  DC block → 70 Hz HP → [4× OS: two cascaded asymmetric soft-clip stages] → DC block → 700 Hz mid scoop → variable tone LP
-  │
-  ▼
-TS-808 Tube Screamer  [bypassable]
-  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → output coupling cap (DC block) → variable tone LP
-  │
-  ▼
-DS-1 Distortion  [bypassable]
-  DC block → 80 Hz HP → 800 Hz mid-emphasis → [4× OS: pre-clip HP → near-symmetric cubic diode clip] → post-clip HP → tilt tone → 6.5 kHz post-clip LP
-  │
-  ▼
-Pre-amp EQ  [bypassable]
-  Low shelf (100 Hz) → Mid peak (650 Hz) → High shelf (3 kHz) — each ±12 dB — shapes what the amp clips
-  │
-  ▼
-Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
-  8× oversampled nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
-  JCM800:   dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom
-  Mesa DR:  triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom
-  Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
-  │
-  ▼  (mono → STEREO)
-Cabinet  [Mesa 4×12 V30 | Marshall 4×12 Greenback | Orange PPC412 V30 — switchable in real time]
-  Blended multi-mic impulse-response convolution of a 4×12 cabinet:
-  close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced EQ
-  skeleton + early-reflection comb + late room reflections + deep cone-resonance
-  ring, decorrelated L/R → natural stereo width and depth · mic-position shelf
-  │
-  ▼  (stereo from here on)
-Parametric EQ  [bypassable]
-  Low shelf (120 Hz) → Mid peak (800 Hz, Q 1.5) → High shelf (5 kHz) — each ±15 dB
-  │
-  ▼
-Delay  [bypassable]
-  Stereo ping-pong delay — repeats bounce L↔R — TIME 0–500 ms, FEEDBACK 0–85%, dry/wet MIX
-  │
-  ▼
-Stereo Reverb  [bypassable]
-  Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix
-  │
-  ▼
-Master-bus mid/side stereo widener (mono center preserved)
-  │
-  ▼
-Per-channel output soft limiter → stereo (L, R)</code></pre>
+<div class="flow">
+
+  <div class="flow__stage flow__stage--io" style="--c:var(--rust-light)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Guitar</span><span class="flow__badge flow__badge--mono">Mono in</span></div>
+      <div class="flow__sig">Dry signal from your high-impedance instrument input.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--gray)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Noise Gate</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Envelope follower → gain ramp (smooth open/close to avoid clicks).</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--gold)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Compressor</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Peak-follower detector → hard-knee gain computer (2:1–10:1) → smoothed gain + auto makeup.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--magenta)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Fuzz</span><span class="flow__tag">Big Muff style</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">DC block → 70 Hz HP → <span class="os">[4× OS: two cascaded asymmetric soft-clip stages]</span> → DC block → 700 Hz mid scoop → variable tone LP.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--green)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">TS-808 Tube Screamer</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">DC block → 340 Hz HP → 720 Hz mid-peak → <span class="os">[4× OS: asymmetric diode soft-clip]</span> → output coupling cap (DC block) → variable tone LP.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:#e08840">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">DS-1 Distortion</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">DC block → 80 Hz HP → 800 Hz mid-emphasis → <span class="os">[4× OS: pre-clip HP → near-symmetric cubic diode clip]</span> → post-clip HP → tilt tone → 6.5 kHz post-clip LP.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--lime)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Pre-amp EQ</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Low shelf (100 Hz) → Mid peak (650 Hz) → High shelf (3 kHz) — each ±12 dB · shapes what the amp clips.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--rust)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Amp</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
+      <div class="flow__sig"><span class="os">8× oversampled</span> nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias “bloom” for touch sensitivity.</div>
+      <div class="flow__sub"><b>JCM800</b> — dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom</div>
+      <div class="flow__sub"><b>Mesa DR</b> — triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom</div>
+      <div class="flow__sub"><b>Randall</b> — FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--amber)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Cabinet</span><span class="flow__badge flow__badge--mono">Mono → Stereo</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
+      <div class="flow__sig">Blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--teal)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Parametric EQ</span><span class="flow__badge flow__badge--stereo">Stereo</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Low shelf (120 Hz) → Mid peak (800 Hz, Q 1.5) → High shelf (5 kHz) — each ±15 dB.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--purple)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Delay</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Stereo ping-pong — repeats bounce L↔R · TIME 0–500 ms · FEEDBACK 0–85% · dry/wet MIX.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--blue)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Stereo Reverb</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix.</div>
+    </div>
+  </div>
+
+  <div class="flow__stage" style="--c:var(--gray)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Master bus</span></div>
+      <div class="flow__sig">Mid/side stereo widener (mono centre preserved).</div>
+    </div>
+  </div>
+
+  <div class="flow__stage flow__stage--io" style="--c:var(--rust-light)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Output</span><span class="flow__badge flow__badge--stereo">Stereo L / R</span></div>
+      <div class="flow__sig">Per-channel output soft limiter → stereo (L, R).</div>
+    </div>
+  </div>
+
+</div>
 
 For the per-knob behaviour of each pedal, see [Pedals & effects](pedals.html).
 

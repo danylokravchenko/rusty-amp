@@ -13,7 +13,7 @@ toc:
   - { href: "#load", label: "Loading & configuring" }
   - { href: "#limits", label: "Limitations" }
 prev: { href: "presets.html", label: "Presets" }
-next: { href: "how-it-works.html", label: "How it works (under the hood)" }
+next: { href: "tools.html", label: "Tuner &amp; recording" }
 ---
 
 ## Overview {#overview}

@@ -3,7 +3,7 @@ layout: page.njk
 permalink: getting-started.html
 title: "Get started · rusty-amp"
 ogTitle: "rusty-amp · get started"
-description: "Install rusty-amp from a pre-built binary or build from source, then learn the keyboard controls, startup flow, tuner, and recording."
+description: "Install rusty-amp from a pre-built binary or build from source, then learn the keyboard controls and startup flow."
 eyebrow: "Get started"
 heading: "Install, launch & play"
 lead: "Everything you need to get a guitar signal running through rusty-amp — and the full keyboard map once you're in."
@@ -13,8 +13,6 @@ toc:
   - { href: "#build", label: "Build from source" }
   - { href: "#startup", label: "Startup flow" }
   - { href: "#controls", label: "Controls" }
-  - { href: "#tuner", label: "Tuner" }
-  - { href: "#recording", label: "Recording" }
 prev: { href: "index.html", label: "Home" }
 next: { href: "pedals.html", label: "Pedals &amp; effects reference" }
 ---
@@ -98,33 +96,14 @@ The app launches immediately with default values. Press <kbd>P</kbd> at any time
 | <kbd>Enter</kbd> | Open the **Add pedal** picker when the `+ ADD` tile is focused |
 | <kbd>D</kbd> | Remove the focused pedal from the board (bypassed and hidden — re-add it from `+ ADD`) |
 | <kbd>P</kbd> | Open the preset browser overlay |
-| <kbd>T</kbd> | Open the [tuner](#tuner) — bypasses the rig for a clean signal |
+| <kbd>T</kbd> | Open the [tuner](tools.html#tuner) — bypasses the rig for a clean signal |
 | <kbd>V</kbd> | Open the CLAP [plugin browser](plugins.html) |
 | <kbd>S</kbd> | Save the current state as a new user preset |
-| <kbd>R</kbd> | Start / stop recording — saves a WAV file to your home directory when stopped |
+| <kbd>R</kbd> | Start / stop [recording](tools.html#recording) — saves a WAV file to your home directory when stopped |
 | <kbd>Q</kbd> / <kbd>Ctrl-C</kbd> | Quit |
 
 Focus starts on the **selector row** (amp + cabinet). <kbd>Tab</kbd> moves down through the amp, cabinet mics, each pedal on the board, and finally the `+ ADD` tile. See [the pedalboard](pedals.html#board) for add/remove details, and [Presets](presets.html) for the browser and save dialog.
 
-## Tuner <span class="muted">(<kbd>T</kbd>)</span> {#tuner}
-
-Press <kbd>T</kbd> to open the chromatic tuner. While it's open the **entire rig is bypassed** — every pedal, the amp, and the cabinet are taken out of the path and the dry guitar passes straight to the output, so you hear (and tune against) a clean signal. Pitch is estimated with the McLeod normalised square-difference function (NSDF), accurate to a few cents.
-
-The tuner shows:
-
-- **The detected note** — large, with its octave (e.g. `E2`), green when in tune.
-- **A ±cents needle** — `♭ ◄ … centre … ► ♯`. Left when flat, right when sharp; green within ±5 cents, amber within ±15, red beyond.
-- **A verdict** — `IN TUNE`, `TUNE UP ▲` (flat), or `TUNE DOWN ▼` (sharp), plus the raw frequency in Hz.
-- **A live note spectrum** — a log-spaced magnitude display from ~60 Hz to ~1.2 kHz, with the played fundamental highlighted.
-
-<div class="note">
-Standard tuning reference:
-<b>E2</b> 82.41 Hz · <b>A2</b> 110.00 · <b>D3</b> 146.83 · <b>G3</b> 196.00 · <b>B3</b> 246.94 · <b>E4</b> 329.63.
-Press <kbd>Esc</kbd> / <kbd>T</kbd> to close and restore the full rig.
+<div class="note note--info">
+Looking for the <b>chromatic tuner</b> (<kbd>T</kbd>) or <b>one-key recording</b> (<kbd>R</kbd>)? They have their own page — see <a href="tools.html">Tuner &amp; recording</a>.
 </div>
-
-## Recording <span class="muted">(<kbd>R</kbd>)</span> {#recording}
-
-Press <kbd>R</kbd> to start recording. The header switches from `○ OFF AIR` to a blinking `● ON AIR` indicator next to `POWER ON`. Press <kbd>R</kbd> again to stop — the file is written immediately and the saved path is shown briefly in the footer.
-
-Recordings capture the fully-processed signal (after the entire effects chain and output limiter) as a 32-bit float **stereo** WAV at the same sample rate as your audio interface — the full multi-mic cab spread and stereo effects are preserved. Files are named `rusty-amp-<unix-timestamp>.wav` and saved to your home directory (`~/`).
