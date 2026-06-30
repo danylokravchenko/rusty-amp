@@ -6,6 +6,7 @@ mod plugins;
 mod presets;
 mod setup;
 mod styles;
+mod tuner;
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,7 +18,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-use crate::dsp::{Levels, Params};
+use crate::dsp::{Levels, Params, Tuner};
 use crate::preset::Preset;
 use crate::recording::RecordingState;
 
@@ -40,6 +41,7 @@ fn sync_board(params: &Params) -> Vec<bool> {
 pub fn run(
     params: Arc<Params>,
     levels: Arc<Levels>,
+    tuner: Arc<Tuner>,
     presets: Vec<Preset>,
     recording: Arc<RecordingState>,
 ) -> Result<()> {
@@ -72,6 +74,7 @@ pub fn run(
         Arc::clone(&params),
         Arc::clone(&levels),
         Arc::clone(&recording),
+        Arc::clone(&tuner),
     )?;
 
     // ── Plugin browser (CLAP insert) ──────────────────────────────────────────
@@ -97,6 +100,7 @@ pub fn run(
     let mut save_error: Option<String> = None;
     let mut tick: u64 = 0;
     let mut save_msg: Option<(String, std::time::Instant)> = None;
+    let mut tuner_open = false;
 
     loop {
         tick = tick.wrapping_add(1);
@@ -144,6 +148,9 @@ pub fn run(
             if browser.open {
                 browser.render(f);
             }
+            if tuner_open {
+                tuner::render_tuner(f, &tuner);
+            }
         })?;
 
         if event::poll(Duration::from_millis(30))?
@@ -155,7 +162,17 @@ pub fn run(
                 continue;
             }
 
-            if save_open {
+            if tuner_open {
+                match key.code {
+                    KeyCode::Esc | KeyCode::Char('t') | KeyCode::Char('T') | KeyCode::Char('q') => {
+                        tuner_open = false;
+                        tuner
+                            .active
+                            .store(false, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    _ => {}
+                }
+            } else if save_open {
                 match key.code {
                     KeyCode::Esc => {
                         save_open = false;
@@ -300,6 +317,12 @@ pub fn run(
                     KeyCode::Char('p') | KeyCode::Char('P') => {
                         preset_open = true;
                         preset_cursor = 0;
+                    }
+                    KeyCode::Char('t') | KeyCode::Char('T') => {
+                        tuner_open = true;
+                        tuner
+                            .active
+                            .store(true, std::sync::atomic::Ordering::Relaxed);
                     }
                     #[cfg(feature = "clap")]
                     KeyCode::Char('v') | KeyCode::Char('V') => browser.open(),

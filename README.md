@@ -14,6 +14,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
+- 🎵 **Built-in tuner** — press `T` for a chromatic tuner that mutes the rig to a clean signal, shows the played note, a ±cents needle, and a live note spectrum
 - ⏺️ **One-key recording** straight to a stereo WAV file
 - 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
 
@@ -83,6 +84,7 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `Enter` | Open the **Add pedal** picker when the `+ ADD` tile is focused |
 | `D` | Remove the focused pedal from the board (it is bypassed and hidden — re-add it any time from `+ ADD`) |
 | `P` | Open the preset browser overlay |
+| `T` | Open the **tuner** ([see below](#tuner-t)) — bypasses the rig for a clean signal |
 | `V` | Open the CLAP plugin browser ([see below](#clap-plugins)) |
 | `S` | Save the current state as a new user preset |
 | `R` | Start / stop recording — saves a WAV file to your home directory when stopped |
@@ -123,6 +125,23 @@ User presets are marked with a `[user]` tag in the list. The `D` hint appears in
 The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears in the browser immediately — no restart required.
 
 Focus starts on the **selector row** (amp + cabinet). Tab moves down through the amp, cabinet mics, each pedal on the board, and finally the `+ ADD` tile.
+
+## Tuner (`T`)
+
+Press **`T`** to open the chromatic tuner. While it is open the **entire rig is bypassed** — every pedal, the amp, and the cabinet are taken out of the path and the dry guitar passes straight to the output, so you hear (and tune against) a clean signal. Pitch is estimated with the McLeod normalised square-difference function (NSDF), accurate to a few cents.
+
+The tuner shows:
+
+- **The detected note** — large, with its octave (e.g. `E2`), colour-coded green when in tune.
+- **A ±cents needle** — `♭ ◄ … centre … ► ♯`. The marker sits left when flat and right when sharp; it turns green within ±5 cents (in tune), amber within ±15, and red beyond.
+- **A verdict** — `IN TUNE`, `TUNE UP ▲` (flat), or `TUNE DOWN ▼` (sharp), plus the raw frequency in Hz.
+- **A live note spectrum** — a log-spaced magnitude display from ~60 Hz to ~1.2 kHz, with the bar at the played fundamental highlighted.
+
+| Key | Action |
+| ----- | -------- |
+| `Esc` / `T` | Close the tuner and restore the full rig |
+
+Standard tuning reference: **E2 (82.41 Hz) · A2 (110.00) · D3 (146.83) · G3 (196.00) · B3 (246.94) · E4 (329.63)**.
 
 ## Knob sections
 
