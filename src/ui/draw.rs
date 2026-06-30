@@ -865,6 +865,8 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
             Span::styled(" cab  ", Style::default().fg(DIM)),
             Span::styled("P", Style::default().fg(AMBER)),
             Span::styled(" presets  ", Style::default().fg(DIM)),
+            Span::styled("T", Style::default().fg(AMBER)),
+            Span::styled(" tuner  ", Style::default().fg(DIM)),
         ];
         #[cfg(feature = "clap")]
         {

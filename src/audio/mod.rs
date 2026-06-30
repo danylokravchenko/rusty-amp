@@ -7,6 +7,7 @@ use rtrb::{Consumer, Producer, RingBuffer};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
+use crate::dsp::tuner::{Tuner, TunerDetector};
 use crate::dsp::{DspChain, Levels, Params, StereoInsert};
 use crate::recording::RecordingState;
 
@@ -106,6 +107,7 @@ pub fn start(
     params: Arc<Params>,
     levels: Arc<Levels>,
     recording: Arc<RecordingState>,
+    tuner: Arc<Tuner>,
 ) -> Result<AudioEngine> {
     let host = cpal::default_host();
 
@@ -136,6 +138,7 @@ pub fn start(
         params,
         levels,
         recording,
+        tuner,
     )
 }
 
@@ -175,6 +178,7 @@ fn build_engine(
     params: Arc<Params>,
     levels: Arc<Levels>,
     recording: Arc<RecordingState>,
+    tuner: Arc<Tuner>,
 ) -> Result<AudioEngine> {
     recording.sample_rate.store(sr as u32, Relaxed);
 
@@ -182,6 +186,10 @@ fn build_engine(
     let (mut producer, mut consumer) = RingBuffer::<f32>::new(buf_samples);
 
     let mut chain = DspChain::new(sr, Arc::clone(&params));
+
+    // Tuner: when engaged, the rig is bypassed and the dry guitar feeds both the
+    // output (a clean signal to tune against) and the pitch/spectrum detector.
+    let mut tuner_detector = TunerDetector::new(sr);
 
     // Lock-free handoff for swapping the plugin insert in/out without touching the
     // running stream: commands flow UI → audio, displaced inserts flow back to be
@@ -226,7 +234,19 @@ fn build_engine(
                     .map(|frame| frame.get(guitar_ch).copied().unwrap_or(0.0)),
             );
 
-            chain.process_block(&in_buf, &mut out_l, &mut out_r);
+            if tuner.active.load(Relaxed) {
+                // Bypass the whole rig: clean dry guitar to both channels, and
+                // analyse the same signal for pitch and spectrum.
+                tuner_detector.process(&in_buf, &tuner);
+                for ((dst_l, dst_r), &x) in
+                    out_l.iter_mut().zip(out_r.iter_mut()).zip(in_buf.iter())
+                {
+                    *dst_l = x;
+                    *dst_r = x;
+                }
+            } else {
+                chain.process_block(&in_buf, &mut out_l, &mut out_r);
+            }
 
             for ((&sample, &l), &r) in in_buf.iter().zip(out_l.iter()).zip(out_r.iter()) {
                 let a = sample.abs();

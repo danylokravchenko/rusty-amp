@@ -5,6 +5,9 @@ pub mod conv;
 pub mod effects;
 pub mod oversample;
 pub mod tonestack;
+pub mod tuner;
+
+pub use tuner::Tuner;
 
 use atomic_float::AtomicF32;
 use std::sync::Arc;
