@@ -1,6 +1,6 @@
 [package]
 name = "rusty-amp"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 rust-version = "1.95"
 description = "A guitar amplifier and effects simulator in your terminal"

@@ -285,7 +285,10 @@ fn entry(name: &str, detail: &str, selected: bool) -> Line<'static> {
         Span::styled(name.to_owned(), name_style),
     ];
     if !detail.is_empty() {
-        spans.push(Span::styled(format!("  {detail}"), Style::default().fg(DIM)));
+        spans.push(Span::styled(
+            format!("  {detail}"),
+            Style::default().fg(DIM),
+        ));
     }
     Line::from(spans)
 }

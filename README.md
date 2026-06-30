@@ -358,6 +358,8 @@ The **Mic** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after
 
 Beyond the three built-in cabs, rusty-amp can load your own **impulse-response `.wav` file** as the cabinet. A loaded IR replaces the multi-mic blend with a single captured response (the mono drive still passes through the same speaker cone-breakup + thermal power-compression model, so it stays alive and dynamic). Because the file is already a finished, miked capture, the **Mic / Blend / Room** knobs are inert while an external IR is active.
 
+> **One IR is a complete cabinet.** A speaker + cab + mic is a linear time-invariant system, and a single impulse response fully captures its linear response — that's exactly what a `.wav` IR is, and what every IR loader (Two Notes, Helix, NAM cab blocks, OwnHammer/God's Cab) uses: **one IR = one cab, one mic, one position**. rusty-amp adds the speaker's _nonlinear_ behaviour (cone breakup, power compression) back on top, so the loaded IR isn't a static playback. A _multi-mic blend_ is just a sum of IRs — pre-mix it into one file in your DAW, or load one mic at a time and A/B with `X`.
+
 Press **`I`** to open the IR browser, which scans these locations for `.wav` files:
 
 | Order | Location |
@@ -366,7 +368,7 @@ Press **`I`** to open the IR browser, which scans these locations for `.wav` fil
 | 2 | `./irs/` next to where you launched the app |
 | 3 | `~/.config/rusty-amp/irs/` |
 
-Each is searched a few levels deep, so packs in subfolders are found too.
+Each location is searched **up to ~4 folders deep**, so a small pack with a couple of subfolders is found — but deeply-nested commercial packs (see God's Cab below) sit past that limit, so the right move is to **curate a flat folder** rather than point the app at a raw download.
 
 | Key | Action |
 | ----- | -------- |
@@ -378,6 +380,38 @@ Each is searched a few levels deep, so packs in subfolders are found too.
 The loaded IR's name appears in the header in place of the cabinet label (`IR: …`) while it is active. Outside the browser, **`X`** toggles the same A/B at any time. Loading and clearing take effect live — the audio stream is never interrupted (the IR is decoded and resampled off the audio thread, then swapped in on a lock-free handoff, and the displaced cab is freed off the audio thread).
 
 On load the IR is rate-matched to your interface (windowed-sinc resampler), trimmed to ~2048 taps with a raised-cosine tail fade, DC-removed, and energy-normalised so swapping IRs doesn't jump the level. Mono files feed both channels; stereo files keep their L/R. **No IRs are bundled** — load files you are licensed to use; the app never ships or redistributes third-party captures.
+
+### Packaging IR files
+
+Drop **`.wav`** IRs into one of the scanned folders above — the simplest is `~/.config/rusty-amp/irs/` (create it if missing). The **filename (without `.wav`) becomes the label** in the browser, so name them readably (e.g. `Marshall_GB_SM57_cap.wav`).
+
+Accepted format — practically any guitar IR works as-is:
+
+| Property | Supported | Notes |
+| -------- | --------- | ----- |
+| Channels | Mono or stereo | Mono feeds both sides; stereo keeps L/R; extra channels are dropped |
+| Sample rate | Any (44.1 / 48 / 96 kHz …) | Resampled to your interface rate on load |
+| Bit depth | 16 / 24 / 32-bit int or 32-bit float | — |
+| Length | Any (~20 ms to several hundred ms) | Trimmed to ~2048 taps (~43 ms @ 48 kHz) with a tail fade |
+
+**Curate — don't dump a whole pack.** Big libraries ship hundreds or thousands of files in deeply-nested folders (by sample rate → mic → processing). The browser scans only ~4 levels deep and a 2,000-entry list is unusable, so copy a handful of favourites into a **flat** `irs/` folder.
+
+#### Example: God's Cab
+
+[God's Cab](https://wilkinsonaudio.com/products/gods-cab) is a large, free (donationware) IR pack laid out as `Gods_Cab_1.4/<rate>/<mic>/<NO-TS|TS>/<name>.wav`. Pick the sample-rate folder matching your interface, prefer the **`NO-TS`** captures (no Tube Screamer baked in, so rusty-amp's own TS-808 isn't stacked on top), and copy a few mics into `irs/`:
+
+```bash
+SRC=~/.config/rusty-amp/IR/Gods_Cab_1.4/48   # use 44.1 / 48 / 96 to taste
+DST=~/.config/rusty-amp/irs
+mkdir -p "$DST"
+
+# A balanced cone capture per mic, renamed to clean browser labels.
+cp "$SRC/SM57/NO-TS/57_1_inch_cone_near_pres_3.wav"     "$DST/GodsCab_SM57_cone.wav"
+cp "$SRC/MD421/NO-TS/MD421_1_inch_cone_near_pres_3.wav" "$DST/GodsCab_MD421_cone.wav"
+cp "$SRC/U87/NO-TS/U87_grill_cone_near_pres_3.wav"      "$DST/GodsCab_U87_cone.wav"
+```
+
+The capture spot moves brightest → darkest as `cap` → `cone` → `edge`; `1_inch`/`2_inch`/`grill` is mic distance; `pres_1..5` are alternate takes. Press **`I`** in the app and the copied files appear immediately.
 
 ## Presets
 

@@ -155,12 +155,7 @@ fn remove_dc(ir: &mut [f32]) {
 /// quiet source IR lands at a predictable level — while keeping the L/R balance the
 /// recording captured.
 fn normalize_pair(l: &mut [f32], r: &mut [f32]) {
-    let e = l
-        .iter()
-        .chain(r.iter())
-        .map(|v| v * v)
-        .sum::<f32>()
-        .sqrt();
+    let e = l.iter().chain(r.iter()).map(|v| v * v).sum::<f32>().sqrt();
     if e > 1e-9 {
         let g = 1.0 / e;
         for v in l.iter_mut().chain(r.iter_mut()) {
@@ -214,11 +209,7 @@ fn sinc(x: f32) -> f32 {
 
 #[inline]
 fn lanczos(t: f32, half: f32) -> f32 {
-    if t.abs() >= half {
-        0.0
-    } else {
-        sinc(t / half)
-    }
+    if t.abs() >= half { 0.0 } else { sinc(t / half) }
 }
 
 /// A cabinet driven by a loaded `.wav` impulse response: [`SpeakerDrive`] on the
@@ -298,14 +289,16 @@ mod tests {
         std::fs::remove_file(&path).ok();
 
         assert_eq!(ir.l.len(), ir.r.len());
-        assert_eq!(ir.l, ir.r, "mono source must fill both channels identically");
-        let e = ir
-            .l
-            .iter()
-            .chain(ir.r.iter())
-            .map(|v| v * v)
-            .sum::<f32>()
-            .sqrt();
+        assert_eq!(
+            ir.l, ir.r,
+            "mono source must fill both channels identically"
+        );
+        let e =
+            ir.l.iter()
+                .chain(ir.r.iter())
+                .map(|v| v * v)
+                .sum::<f32>()
+                .sqrt();
         assert!((e - 1.0).abs() < 1e-3, "pair not unit-energy: {e}");
         assert!(ir.l.iter().all(|v| v.is_finite()));
     }
