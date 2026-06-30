@@ -14,7 +14,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 
 use amp::AmpBank;
-use cab::CabBank;
+use cab::{CabBank, ExternalIrCab};
 use effects::{
     Compressor, Delay, Distortion, Fuzz, NoiseGate, ParametricEq, PreampEq, Reverb, TubeScreamer,
 };
@@ -124,6 +124,10 @@ const DEFAULT_MIC_POS: f32 = 0.5;
 const DEFAULT_MIC_BLEND: f32 = 0.15;
 const DEFAULT_MIC_ROOM: f32 = 0.15;
 
+// When an external IR is loaded it can be toggled against the built-in cabs live;
+// it starts inactive (the engine boots on a built-in cab).
+const DEFAULT_CAB_EXTERNAL_ACTIVE: bool = false;
+
 const DEFAULT_NG_ENABLED: bool = true;
 const DEFAULT_NG_THRESHOLD: f32 = 0.20;
 const DEFAULT_NG_RELEASE: f32 = 0.30;
@@ -188,6 +192,13 @@ pub struct Params {
     pub mic_blend: Arc<AtomicF32>,
     // Room mic amount (0 = dry close mic only, 1 = full ambient room)
     pub mic_room: Arc<AtomicF32>,
+
+    // External-IR cab override. `cab_external_active` selects the loaded IR over the
+    // built-in cab (flipped live by the UI, instant, no reload). `cab_external_loaded`
+    // is set by the control thread so the UI knows an IR is installed and the toggle
+    // is meaningful.
+    pub cab_external_active: Arc<AtomicBool>,
+    pub cab_external_loaded: Arc<AtomicBool>,
 
     // Noise gate
     pub ng_enabled: Arc<AtomicBool>,
@@ -275,6 +286,8 @@ impl Params {
             mic_pos: p!(DEFAULT_MIC_POS),
             mic_blend: p!(DEFAULT_MIC_BLEND),
             mic_room: p!(DEFAULT_MIC_ROOM),
+            cab_external_active: b!(DEFAULT_CAB_EXTERNAL_ACTIVE),
+            cab_external_loaded: b!(false),
 
             ng_enabled: b!(DEFAULT_NG_ENABLED),
             ng_threshold: p!(DEFAULT_NG_THRESHOLD),
@@ -335,6 +348,10 @@ impl Params {
         self.mic_pos.store(DEFAULT_MIC_POS, Relaxed);
         self.mic_blend.store(DEFAULT_MIC_BLEND, Relaxed);
         self.mic_room.store(DEFAULT_MIC_ROOM, Relaxed);
+        // Fall back to the built-in cab. The loaded IR (if any) stays installed in
+        // the chain — only its active/inactive selection is a default-able param.
+        self.cab_external_active
+            .store(DEFAULT_CAB_EXTERNAL_ACTIVE, Relaxed);
 
         self.ng_enabled.store(DEFAULT_NG_ENABLED, Relaxed);
         self.ng_threshold.store(DEFAULT_NG_THRESHOLD, Relaxed);
@@ -479,6 +496,10 @@ pub struct DspChain {
     /// Optional third-party stereo insert (e.g. a hosted CLAP plugin), placed
     /// after the stereo rack and before the master bus. `None` = passthrough.
     insert: Option<Box<dyn StereoInsert>>,
+    /// Optional user-loaded external-IR cab. When present *and*
+    /// `params.cab_external_active`, it replaces the built-in [`CabBank`] at the cab
+    /// stage. Built off the audio thread and swapped in lock-free, like `insert`.
+    ext_cab: Option<Box<ExternalIrCab>>,
 }
 
 impl DspChain {
@@ -497,12 +518,25 @@ impl DspChain {
             reverb: Reverb::new(sr),
             params,
             insert: None,
+            ext_cab: None,
         }
     }
 
     /// Install (or clear, with `None`) the stereo plugin insert.
     pub fn set_insert(&mut self, insert: Option<Box<dyn StereoInsert>>) {
         self.insert = insert;
+    }
+
+    /// Swap the external-IR cab, returning the displaced one (if any) for disposal
+    /// off the audio thread. Same lock-free pointer-move discipline as
+    /// [`replace_insert`](Self::replace_insert): the freed IR/FFT buffers must not be
+    /// dropped in the realtime callback.
+    #[must_use = "the displaced external cab must be dropped off the audio thread"]
+    pub fn replace_external_cab(
+        &mut self,
+        cab: Option<Box<ExternalIrCab>>,
+    ) -> Option<Box<ExternalIrCab>> {
+        std::mem::replace(&mut self.ext_cab, cab)
     }
 
     /// Swap the stereo plugin insert, returning the displaced one (if any).
@@ -565,14 +599,22 @@ impl DspChain {
             p.amp_master.load(Relaxed),
         );
 
-        // Cabinet simulation — mono in, stereo (multi-mic blend) out
-        let (l, r) = self.cab.process(
-            p.cab_model(),
-            x,
-            p.mic_pos.load(Relaxed),
-            p.mic_blend.load(Relaxed),
-            p.mic_room.load(Relaxed),
-        );
+        // Cabinet simulation — mono in, stereo out. A loaded external IR overrides
+        // the built-in cab when active; otherwise the multi-mic blend renders. The
+        // external path ignores the mic knobs (the capture is already miked).
+        let (l, r) = match self.ext_cab.as_mut() {
+            Some(ext) if p.cab_external_active.load(Relaxed) => {
+                use cab::Cabinet;
+                ext.process(x, 0.0, 0.0, 0.0)
+            }
+            _ => self.cab.process(
+                p.cab_model(),
+                x,
+                p.mic_pos.load(Relaxed),
+                p.mic_blend.load(Relaxed),
+                p.mic_room.load(Relaxed),
+            ),
+        };
 
         // Stereo rack (parametric EQ → ping-pong delay → reverb).
         let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);

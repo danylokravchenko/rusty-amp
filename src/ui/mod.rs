@@ -1,6 +1,7 @@
 mod config;
 mod draw;
 mod input;
+mod ir_browser;
 #[cfg(feature = "clap")]
 mod plugins;
 mod presets;
@@ -82,6 +83,9 @@ pub fn run(
     let mut browser =
         plugins::PluginBrowser::new(engine.sample_rate(), crate::audio::MAX_BLOCK as u32);
 
+    // ── Cabinet-IR browser (external .wav IRs) ────────────────────────────────
+    let mut ir_browser = ir_browser::IrBrowser::new(engine.sample_rate());
+
     // ── Main UI loop ──────────────────────────────────────────────────────────
     let mut focus: Option<usize> = None;
     // Board membership: a pedal is on the board iff it is enabled. Off-board
@@ -122,6 +126,17 @@ pub fn run(
         #[cfg(not(feature = "clap"))]
         let plugin_name: Option<&str> = None;
 
+        // The external IR name is shown in the header (replacing the built-in cab
+        // label) only while it is the active cab.
+        let ext_cab_name = if params
+            .cab_external_active
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            ir_browser.loaded_name()
+        } else {
+            None
+        };
+
         terminal.draw(|f| {
             draw(
                 f,
@@ -133,6 +148,7 @@ pub fn run(
                 blink,
                 status,
                 plugin_name,
+                ext_cab_name,
             );
             if add_open {
                 let available: Vec<usize> = (0..PEDALS.len()).filter(|&i| !board[i]).collect();
@@ -148,6 +164,9 @@ pub fn run(
             if browser.open {
                 browser.render(f);
             }
+            if ir_browser.open {
+                ir_browser.render(f);
+            }
             if tuner_open {
                 tuner::render_tuner(f, &tuner);
             }
@@ -159,6 +178,11 @@ pub fn run(
             #[cfg(feature = "clap")]
             if browser.open {
                 browser.handle_key(key.code, &mut engine);
+                continue;
+            }
+
+            if ir_browser.open {
+                ir_browser.handle_key(key.code, &mut engine, &params);
                 continue;
             }
 
@@ -326,6 +350,15 @@ pub fn run(
                     }
                     #[cfg(feature = "clap")]
                     KeyCode::Char('v') | KeyCode::Char('V') => browser.open(),
+                    KeyCode::Char('i') | KeyCode::Char('I') => ir_browser.open(),
+                    // Live A/B between the loaded IR and the built-in cab (no modal).
+                    KeyCode::Char('x') | KeyCode::Char('X') => {
+                        use std::sync::atomic::Ordering::Relaxed;
+                        if params.cab_external_loaded.load(Relaxed) {
+                            let now = !params.cab_external_active.load(Relaxed);
+                            params.cab_external_active.store(now, Relaxed);
+                        }
+                    }
                     KeyCode::Char('s') | KeyCode::Char('S') => {
                         save_open = true;
                         save_name.clear();
