@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Pedals &amp; effects · rusty-amp</title>
+<meta name="description" content="Every rusty-amp pedal explained: noise gate, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, delay, and stereo reverb — with full knob reference tables." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav__brand" href="index.html">rusty-amp</a>
+    <button class="nav__burger" aria-label="Menu">≡</button>
+    <div class="nav__links">
+      <a href="getting-started.html">Get Started</a>
+      <a href="pedals.html">Pedals</a>
+      <a href="amps-cabs.html">Amps &amp; Cabs</a>
+      <a href="presets.html">Presets</a>
+      <a href="plugins.html">Plugins</a>
+      <a href="how-it-works.html">How It Works</a>
+      <a class="nav__gh" href="https://github.com/danylokravchenko/rusty-amp">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="page-head">
+    <p class="eyebrow">Pedals &amp; effects</p>
+    <h1>Configuring the board</h1>
+    <p class="lead">Nine effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does.</p>
+    <div class="toc">
+      <a href="#board">The board</a>
+      <a href="#gate">Noise Gate</a>
+      <a href="#comp">Compressor</a>
+      <a href="#fuzz">Fuzz</a>
+      <a href="#ts">TS-808</a>
+      <a href="#ds1">DS-1</a>
+      <a href="#preeq">Pre-amp EQ</a>
+      <a href="#peq">Parametric EQ</a>
+      <a href="#delay">Delay</a>
+      <a href="#reverb">Reverb</a>
+    </div>
+  </div>
+
+  <!-- ── the board ───────────────────────────────────────────────────── -->
+  <section id="board">
+    <h2><span class="pfx">## </span>The board <span class="muted">(add / remove / bypass)</span></h2>
+    <p>The <b>Guitar Rig</b> shows one compact tile per pedal that's on the board, followed by a <code>+ ADD</code> tile. <kbd>Tab</kbd> or <kbd>←</kbd>/<kbd>→</kbd> to a tile to load it into the full-size editor below — the editor takes on the pedal's livery colour. Only <b>enabled</b> pedals are on the board at startup; everything else lives in the picker.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd> <span class="muted">(on <code>+ ADD</code>)</span></td><td>Open the picker listing pedals not on the board</td></tr>
+          <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Navigate the picker</td></tr>
+          <tr><td><kbd>Enter</kbd> <span class="muted">(in picker)</span></td><td>Add the selected pedal and jump focus to it</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Close the picker</td></tr>
+          <tr><td><kbd>D</kbd> <span class="muted">(on a pedal)</span></td><td>Remove it from the board</td></tr>
+          <tr><td><kbd>Space</kbd> <span class="muted">(on a pedal)</span></td><td>Bypass / un-bypass it without removing it</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note">
+      <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
+      Gate → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Delay → Reverb.
+      Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
+    </div>
+  </section>
+
+  <!-- ── noise gate ──────────────────────────────────────────────────── -->
+  <section id="gate">
+    <h2><span class="pfx">## </span><span style="color:var(--gray)">●</span> Noise Gate</h2>
+    <p>An envelope follower drives a smooth gain ramp (no clicks) that silences hum and string noise between phrases. Runs first so it cleans the rawest signal.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Thresh</td><td>0–10</td><td>Gate open threshold. 0 = opens at very low levels (−80 dB), 10 = always open. Start around 2–3 for high-gain tones.</td></tr>
+          <tr><td>Release</td><td>0–10</td><td>How long the gate stays open after the signal drops below threshold. Higher = slower, more natural decay.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── compressor ──────────────────────────────────────────────────── -->
+  <section id="comp">
+    <h2><span class="pfx">## </span><span style="color:var(--gold)">●</span> Compressor</h2>
+    <p>Sits right after the gate, before the drive stages, so it evens out picking dynamics and adds sustain going into the amp — the classic "studio" upgrade for clean and edge-of-breakup tones. A peak-follower detector drives a hard-knee gain computer; auto makeup keeps the level steady as you add compression.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Sustain</td><td>0–10</td><td>Compression amount — lowers the threshold (−6 dB → −40 dB) and raises the ratio (2:1 → 10:1). Higher = more squash and sustain.</td></tr>
+          <tr><td>Attack</td><td>0–10</td><td>How fast the compressor clamps a transient (0.5 ms → 50 ms). Low = snappy/tight, high = lets the pick attack through.</td></tr>
+          <tr><td>Level</td><td>0–10</td><td>Output makeup gain (≈0–2×). 5 = unity with auto makeup.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── fuzz ────────────────────────────────────────────────────────── -->
+  <section id="fuzz">
+    <h2><span class="pfx">## </span><span style="color:var(--magenta)">●</span> Fuzz <span class="muted">(Big Muff style)</span></h2>
+    <p>Runs first in the drive chain so it sees the rawest pickup signal. Two cascaded clipping stages give the long, singing sustain and near-square saturation of a vintage fuzz — much heavier than the TS or DS-1. The voice is mid-scooped at 700 Hz for the classic "wall of sound" timbre.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Fuzz</td><td>0–10</td><td>Sustain/gain into the two cascaded soft-clip stages. High values drive the waveform toward a gated square wave.</td></tr>
+          <tr><td>Tone</td><td>0–10</td><td>Low-pass after the scoop. 0 = dark/woolly (~400 Hz), 10 = bright/buzzy (~6 kHz).</td></tr>
+          <tr><td>Level</td><td>0–10</td><td>Output volume of the pedal into the next stage.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── ts-808 ──────────────────────────────────────────────────────── -->
+  <section id="ts">
+    <h2><span class="pfx">## </span><span style="color:var(--green)">●</span> TS-808 Tube Screamer</h2>
+    <p>The legendary mid-hump boost — asymmetric diode clipping that tightens the low end and pushes an amp into focused saturation. Great as a clean boost into an already-driven amp.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Drive</td><td>0–10</td><td>Pre-clip gain (1×–51×). High values push the asymmetric diode clippers into saturation.</td></tr>
+          <tr><td>Tone</td><td>0–10</td><td>Low-pass cutoff after clipping. 0 = dark (~500 Hz), 10 = bright (~7 kHz).</td></tr>
+          <tr><td>Level</td><td>0–10</td><td>Output volume of the pedal into the next stage.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── ds-1 ────────────────────────────────────────────────────────── -->
+  <section id="ds1">
+    <h2><span class="pfx">## </span><span style="color:#e08840">●</span> DS-1 Distortion</h2>
+    <p>More aggressive than the TS, with a cubic clip stage and a seesaw "tilt" tone control that trades bass for treble around 1 kHz.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Drive</td><td>0–10</td><td>Gain into the cubic clip stage (1×–61×). More aggressive than the TS.</td></tr>
+          <tr><td>Tone</td><td>0–10</td><td>Tilt control (bass↔treble seesaw around ~1 kHz). 0 = dark &amp; full, 5 = flat, 10 = bright &amp; cutting.</td></tr>
+          <tr><td>Level</td><td>0–10</td><td>Output volume of the pedal into the next stage.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── pre-amp eq ──────────────────────────────────────────────────── -->
+  <section id="preeq">
+    <h2><span class="pfx">## </span><span style="color:var(--lime)">●</span> Pre-amp EQ</h2>
+    <p>Sits <b>before the amp</b>, so it shapes the signal that the gain stage actually clips — a different job from the post-cab Parametric EQ below, which colours the final mix. Scoop the mids going in for a tighter chug, or push them for lead sustain. All three bands map 0–10 to −12 dB → 0 dB → +12 dB. Centre (5.0) is flat.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Frequency</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td>Low</td><td>100 Hz</td><td>Low shelf</td></tr>
+          <tr><td>Mid</td><td>650 Hz</td><td>Peak (Q 1.0)</td></tr>
+          <tr><td>High</td><td>3 kHz</td><td>High shelf</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── parametric eq ───────────────────────────────────────────────── -->
+  <section id="peq">
+    <h2><span class="pfx">## </span><span style="color:var(--teal)">●</span> Parametric EQ</h2>
+    <p>Post-cabinet — shapes the final stereo tone after distortion. All three bands map 0–10 to −15 dB → 0 dB → +15 dB. Centre (5.0) is unity gain.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Frequency</th><th>Type</th></tr></thead>
+        <tbody>
+          <tr><td>Low</td><td>120 Hz</td><td>Low shelf</td></tr>
+          <tr><td>Mid</td><td>800 Hz</td><td>Peak (Q 1.5)</td></tr>
+          <tr><td>High</td><td>5 kHz</td><td>High shelf</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── delay ───────────────────────────────────────────────────────── -->
+  <section id="delay">
+    <h2><span class="pfx">## </span><span style="color:var(--purple)">●</span> Delay <span class="muted">(stereo ping-pong)</span></h2>
+    <p>Feedback cross-feeds the two channels so repeats bounce left ↔ right.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Time</td><td>0–10</td><td>Delay time 0–500 ms.</td></tr>
+          <tr><td>Feedback</td><td>0–10</td><td>Repeat level. Capped at 85% internally to prevent runaway.</td></tr>
+          <tr><td>Mix</td><td>0–10</td><td>Dry/wet blend.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ── reverb ──────────────────────────────────────────────────────── -->
+  <section id="reverb">
+    <h2><span class="pfx">## </span><span style="color:var(--blue)">●</span> Stereo Reverb</h2>
+    <p>Two decorrelated Freeverb cores (the right channel's delay lines are offset) produce a wide, deep stereo tail.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Knob</th><th>Range</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td>Room</td><td>0–10</td><td>Decay time (Freeverb room size).</td></tr>
+          <tr><td>Damp</td><td>0–10</td><td>High-frequency absorption in the feedback path.</td></tr>
+          <tr><td>Mix</td><td>0–10</td><td>Dry/wet blend (0 = fully dry, 10 = fully wet).</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="pager">
+    <a href="getting-started.html"><div class="dir">← Back</div><div class="ttl">Get started</div></a>
+    <a class="next" href="amps-cabs.html"><div class="dir">Next →</div><div class="ttl">Amps, cabinets &amp; IRs</div></a>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>🎸 rusty-amp · a guitar amp &amp; pedalboard rig in your <span style="color:var(--rust)">terminal</span></span>
+    <span>Apache 2.0 · <a href="https://github.com/danylokravchenko/rusty-amp">GitHub</a> · <a href="https://github.com/danylokravchenko/rusty-amp/releases/latest">Releases</a></span>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>

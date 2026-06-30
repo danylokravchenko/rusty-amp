@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>How it works · rusty-amp</title>
+<meta name="description" content="Under the hood of rusty-amp: the full sample-by-sample signal chain, 8× oversampled amp stages, passive FMV tone stacks, and partitioned-FFT cabinet convolution." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav__brand" href="index.html">rusty-amp</a>
+    <button class="nav__burger" aria-label="Menu">≡</button>
+    <div class="nav__links">
+      <a href="getting-started.html">Get Started</a>
+      <a href="pedals.html">Pedals</a>
+      <a href="amps-cabs.html">Amps &amp; Cabs</a>
+      <a href="presets.html">Presets</a>
+      <a href="plugins.html">Plugins</a>
+      <a href="how-it-works.html">How It Works</a>
+      <a class="nav__gh" href="https://github.com/danylokravchenko/rusty-amp">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+<main class="wrap">
+  <div class="page-head">
+    <p class="eyebrow">Under the hood</p>
+    <h1>How rusty-amp works</h1>
+    <p class="lead">Your guitar runs through a full signal chain — pedals, amp, cabinet, and a stereo effects rack — sample by sample. Here's every stage.</p>
+    <div class="toc">
+      <a href="#summary">The short version</a>
+      <a href="#chain">Full signal chain</a>
+      <a href="#amp">Amp stages</a>
+      <a href="#cabinet">Cabinet convolution</a>
+    </div>
+  </div>
+
+  <!-- ── summary ─────────────────────────────────────────────────────── -->
+  <section id="summary">
+    <h2><span class="pfx">## </span>The short version</h2>
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="ico">⚡</div>
+        <h3>8× oversampled drive</h3>
+        <p>The amp's distortion stages run at 8× oversampling (linear-phase polyphase-FIR) for smooth, alias-free high-gain saturation.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🎚️</div>
+        <h3>Real FMV tone stack</h3>
+        <p>The tube amps use a passive FMV tone stack — interacting controls and inherent mid scoop — plus modelled power-amp ↔ speaker interaction.</p>
+      </div>
+      <div class="card">
+        <div class="ico">📐</div>
+        <h3>IR convolution cabs</h3>
+        <p>Cabinets are rendered by multi-mic impulse-response convolution via a partitioned-FFT engine, for three-dimensional depth.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── chain ───────────────────────────────────────────────────────── -->
+  <section id="chain">
+    <h2><span class="pfx">## </span>Full signal chain</h2>
+    <p>Every block below is processed per sample. Bracketed stages are <code>[bypassable]</code> — remove or bypass them and they drop out of the path entirely.</p>
+    <pre class="chain-art" data-lang="signal flow"><code>Guitar
+  │
+  ▼
+Noise Gate  [bypassable]
+  Envelope follower → gain ramp (smooth open/close to avoid clicks)
+  │
+  ▼
+Compressor  [bypassable]
+  Peak-follower detector → hard-knee gain computer (2:1–10:1) → smoothed gain + auto makeup
+  │
+  ▼
+Fuzz  [bypassable · Big Muff style]
+  DC block → 70 Hz HP → [4× OS: two cascaded asymmetric soft-clip stages] → DC block → 700 Hz mid scoop → variable tone LP
+  │
+  ▼
+TS-808 Tube Screamer  [bypassable]
+  DC block → 340 Hz HP → 720 Hz mid-peak → [4× OS: asymmetric diode soft-clip] → output coupling cap (DC block) → variable tone LP
+  │
+  ▼
+DS-1 Distortion  [bypassable]
+  DC block → 80 Hz HP → 800 Hz mid-emphasis → [4× OS: pre-clip HP → near-symmetric cubic diode clip] → post-clip HP → tilt tone → 6.5 kHz post-clip LP
+  │
+  ▼
+Pre-amp EQ  [bypassable]
+  Low shelf (100 Hz) → Mid peak (650 Hz) → High shelf (3 kHz) — each ±12 dB — shapes what the amp clips
+  │
+  ▼
+Amp  [Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — switchable in real time]
+  8× oversampled nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias "bloom" for touch sensitivity
+  JCM800:   dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom
+  Mesa DR:  triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom
+  Randall:  FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load
+  │
+  ▼  (mono → STEREO)
+Cabinet  [Mesa 4×12 V30 | Marshall 4×12 Greenback | Orange PPC412 V30 — switchable in real time]
+  Blended multi-mic impulse-response convolution of a 4×12 cabinet:
+  close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced EQ
+  skeleton + early-reflection comb + late room reflections + deep cone-resonance
+  ring, decorrelated L/R → natural stereo width and depth · mic-position shelf
+  │
+  ▼  (stereo from here on)
+Parametric EQ  [bypassable]
+  Low shelf (120 Hz) → Mid peak (800 Hz, Q 1.5) → High shelf (5 kHz) — each ±15 dB
+  │
+  ▼
+Delay  [bypassable]
+  Stereo ping-pong delay — repeats bounce L↔R — TIME 0–500 ms, FEEDBACK 0–85%, dry/wet MIX
+  │
+  ▼
+Stereo Reverb  [bypassable]
+  Dual decorrelated Freeverb cores (8 parallel combs → 4 series allpasses each) → dry/wet mix
+  │
+  ▼
+Master-bus mid/side stereo widener (mono center preserved)
+  │
+  ▼
+Per-channel output soft limiter → stereo (L, R)</code></pre>
+    <p class="muted small">For the per-knob behaviour of each pedal, see <a href="pedals.html">Pedals &amp; effects</a>.</p>
+  </section>
+
+  <!-- ── amp ─────────────────────────────────────────────────────────── -->
+  <section id="amp">
+    <h2><span class="pfx">## </span>The amp stages</h2>
+    <p>All three amps share an <b>8× oversampled</b> nonlinear core with a linear-phase polyphase-FIR anti-alias filter, plus a dynamic grid-bias "bloom" that makes the gain respond to how hard you play. Beyond that, each model diverges:</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Model</th><th>Character</th><th>Tone stack</th><th>Rectifier / power</th><th>Gain stages</th></tr></thead>
+        <tbody>
+          <tr><td><b>Marshall JCM800</b></td><td>Punchy, dynamic, touch-sensitive</td><td>Passive FMV (Marshall values)</td><td>Tube sag (5 ms / 200 ms) + dynamic speaker-load bloom</td><td>2 × 12AX7 atan soft-clip</td></tr>
+          <tr><td><b>Mesa Dual Rectifier</b></td><td>Compressed, aggressive, modern</td><td>Passive FMV (Fender values)</td><td>Silicon sag (0.5 ms / 80 ms) + dynamic speaker-load bloom</td><td>3-stage: atan → atan → exponential</td></tr>
+          <tr><td><b>Randall Warhead</b></td><td>Tight, crushing, solid-state</td><td>Active, independent bands + fixed +3 dB presence</td><td>No sag — stiff solid-state rails + static speaker resonance</td><td>FET (x/√(1+x²)) → BJT (tanh) → rail-clip</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>The <b>passive FMV tone stack</b> is a single RC network where bass, mid, and treble interact and the mids inherently scoop — exactly like a real amp — followed by a <b>power-amp ↔ speaker interaction</b> model: the speaker's impedance resonance blooms the low end dynamically as the supply sags under hard playing. The Randall keeps an active, independent-band stack and a small static speaker resonance, true to its stiff solid-state design. See <a href="amps-cabs.html#amp">Amps &amp; cabinets</a> for the per-knob breakdown.</p>
+  </section>
+
+  <!-- ── cabinet ─────────────────────────────────────────────────────── -->
+  <section id="cabinet">
+    <h2><span class="pfx">## </span>Cabinet convolution</h2>
+    <p>Each cabinet is rendered by <b>impulse-response convolution</b> rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download — though you can also <a href="amps-cabs.html#irs">load your own <code>.wav</code> IR</a>): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab.</p>
+    <p>Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.</p>
+
+    <h3>The convolution engine</h3>
+    <p>The convolution is computed with a <b>partitioned-FFT (uniformly-partitioned overlap-save)</b> engine rather than a direct tap-by-tap loop. At ~1100 taps per channel this is the single heaviest DSP stage, and the frequency-domain approach cuts its cost several-fold while producing the exact same linear convolution — so the tone is unchanged. The only trade-off is a fixed ~2.7 ms of latency (128 samples at 48 kHz), shared equally by both channels so the stereo image stays aligned.</p>
+
+    <h3>Three mics, one blend</h3>
+    <p>Each cabinet is captured by <b>three mics</b> — a close SM57 dynamic, a close R121 ribbon, and a room mic — each with its own voicing and reflection texture (the room mic carries extra pre-delay and denser late reflections for air). The <b>Blend</b> and <b>Room</b> knobs mix these captures. Because convolution is linear, the blend is just a weighted <b>sum of the three IRs</b>, recombined into the live convolver only when a knob moves — so any mic mix costs exactly two convolutions per sample, no more.</p>
+    <p class="muted small">The <b>Mic</b> knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis close-mic placement. See <a href="amps-cabs.html#cabs">cabinet models</a> for the per-cab voicing.</p>
+  </section>
+
+  <div class="pager">
+    <a href="plugins.html"><div class="dir">← Back</div><div class="ttl">CLAP plugins</div></a>
+    <a class="next" href="https://github.com/danylokravchenko/rusty-amp/blob/main/CONTRIBUTING.md"><div class="dir">Next →</div><div class="ttl">Contributing on GitHub ↗</div></a>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>🎸 rusty-amp · a guitar amp &amp; pedalboard rig in your <span style="color:var(--rust)">terminal</span></span>
+    <span>Apache 2.0 · <a href="https://github.com/danylokravchenko/rusty-amp">GitHub</a> · <a href="https://github.com/danylokravchenko/rusty-amp/releases/latest">Releases</a></span>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
