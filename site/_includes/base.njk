@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+<meta name="theme-color" content="#0a0806" />
+<title>{{ title }}</title>
+<meta name="description" content="{{ description }}" />
+<meta property="og:title" content="{{ ogTitle or title }}" />
+<meta property="og:description" content="{{ description }}" />
+<meta property="og:image" content="assets/social-preview.png" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/site.css" />
+</head>
+<body>
+
+<nav class="nav">
+  <div class="wrap">
+    <a class="nav__brand" href="index.html">rusty-amp</a>
+    <button class="nav__burger" aria-label="Menu">≡</button>
+    <div class="nav__links">
+      <a href="getting-started.html">Get Started</a>
+      <a href="pedals.html">Pedals</a>
+      <a href="amps-cabs.html">Amps &amp; Cabs</a>
+      <a href="presets.html">Presets</a>
+      <a href="plugins.html">Plugins</a>
+      <a href="tools.html">Tools</a>
+      <a href="how-it-works.html">How It Works</a>
+      <a class="nav__gh" href="https://github.com/danylokravchenko/rusty-amp">GitHub ↗</a>
+    </div>
+  </div>
+</nav>
+
+{{ content | safe }}
+
+<footer>
+  <div class="wrap">
+    <span>🎸 rusty-amp · a guitar amp &amp; pedalboard rig in your <span style="color:var(--rust)">terminal</span></span>
+    <span>Apache 2.0 · <a href="https://github.com/danylokravchenko/rusty-amp">GitHub</a> · <a href="https://github.com/danylokravchenko/rusty-amp/releases/latest">Releases</a></span>
+  </div>
+</footer>
+
+<script src="assets/site.js"></script>
+</body>
+</html>
