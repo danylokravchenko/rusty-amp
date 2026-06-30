@@ -200,9 +200,11 @@ h1, h2, h3, h4 { line-height: 1.25; color: #fff; font-weight: 700; }
 h1 { font-size: 30px; margin: 0 0 10px; }
 h2 {
   font-size: 23px;
-  margin: 0 0 18px;
+  margin: 36px 0 18px;
   color: var(--rust-light);
 }
+/* Markdown `## Heading` → terminal-style "## " prefix (matches the app's vibe). */
+main h2::before { content: "## "; color: var(--faint); font-weight: 400; }
 h2 .pfx { color: var(--faint); font-weight: 400; }
 h3 { font-size: 18px; margin: 28px 0 10px; color: var(--text); }
 h4 { font-size: 15px; margin: 18px 0 6px; color: var(--muted); }

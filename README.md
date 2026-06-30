@@ -4,7 +4,7 @@
 
 Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and solid-state amplifiers, a full board of stompbox effects, and multi-mic'd 4×12 cabinets — all driven from a fast, keyboard-only interface with live metering. It ships with artist-inspired presets, so you can dial in a great tone in seconds and tweak from there.
 
-![Screenshot](/assets/screenshot.png)
+![Screenshot](/site/assets/screenshot.png)
 
 > 📖 **Full documentation:** **[danylokravchenko.github.io/rusty-amp](https://danylokravchenko.github.io/rusty-amp/)** — install guide, every pedal and knob, amps & cabinets, presets, plugins, and how it all works under the hood.
 
@@ -16,7 +16,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
-- 🎵 **Built-in tuner** — press `T` for a chromatic tuner with a ±cents needle and a live note spectrum
+- 🎵 **Built-in tuner** — a chromatic tuner with a ±cents needle and a live note spectrum
 - ⏺️ **One-key recording** straight to a stereo WAV file
 - 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
 

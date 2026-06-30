@@ -1,0 +1,24 @@
+---
+layout: base.njk
+---
+<main class="wrap">
+  <div class="page-head">
+    {% if eyebrow %}<p class="eyebrow">{{ eyebrow }}</p>{% endif %}
+    <h1>{{ heading }}</h1>
+    {% if lead %}<p class="lead">{{ lead | safe }}</p>{% endif %}
+    {% if toc %}
+    <div class="toc">
+      {% for t in toc %}<a href="{{ t.href }}">{{ t.label }}</a>{% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {{ content | safe }}
+
+  {% if prev or next %}
+  <div class="pager">
+    {% if prev %}<a href="{{ prev.href }}"><div class="dir">← Back</div><div class="ttl">{{ prev.label | safe }}</div></a>{% else %}<span></span>{% endif %}
+    {% if next %}<a class="next" href="{{ next.href }}"><div class="dir">Next →</div><div class="ttl">{{ next.label | safe }}</div></a>{% endif %}
+  </div>
+  {% endif %}
+</main>
