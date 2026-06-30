@@ -23,6 +23,7 @@ pub(super) fn draw(
     blink: bool,
     status: Option<&str>,
     plugin: Option<&str>,
+    ext_cab: Option<&str>,
 ) {
     let area = f.area();
 
@@ -46,7 +47,7 @@ pub(super) fn draw(
         ])
         .split(inner);
 
-    render_header(f, rows[0], params, recording, blink, plugin);
+    render_header(f, rows[0], params, recording, blink, plugin, ext_cab);
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
     render_amp(f, rows[3], params, focus);
@@ -61,6 +62,7 @@ fn render_header(
     recording: bool,
     blink: bool,
     plugin: Option<&str>,
+    ext_cab: Option<&str>,
 ) {
     let block = Block::default()
         .borders(Borders::BOTTOM)
@@ -76,7 +78,11 @@ fn render_header(
         .split(inner);
 
     let amp_name = params.amp_model().name().to_uppercase();
-    let cab_name = params.cab_model().name().to_uppercase();
+    // An active external IR replaces the built-in cab label in the header.
+    let cab_name = match ext_cab {
+        Some(name) => format!("IR: {}", name.to_uppercase()),
+        None => params.cab_model().name().to_uppercase(),
+    };
 
     let mut title_spans = vec![
         Span::styled(
@@ -863,6 +869,8 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
             Span::styled(" amp  ", Style::default().fg(DIM)),
             Span::styled("C", Style::default().fg(AMBER)),
             Span::styled(" cab  ", Style::default().fg(DIM)),
+            Span::styled("I", Style::default().fg(AMBER)),
+            Span::styled(" IR  ", Style::default().fg(DIM)),
             Span::styled("P", Style::default().fg(AMBER)),
             Span::styled(" presets  ", Style::default().fg(DIM)),
             Span::styled("T", Style::default().fg(AMBER)),

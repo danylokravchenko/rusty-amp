@@ -7,6 +7,7 @@ use rtrb::{Consumer, Producer, RingBuffer};
 use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
+use crate::dsp::cab::ExternalIrCab;
 use crate::dsp::tuner::{Tuner, TunerDetector};
 use crate::dsp::{DspChain, Levels, Params, StereoInsert};
 use crate::recording::RecordingState;
@@ -14,6 +15,10 @@ use crate::recording::RecordingState;
 /// A swappable plugin insert handed to the audio thread (`Some` to install, `None`
 /// to clear). Boxed so the audio thread only ever moves a pointer.
 type InsertCommand = Option<Box<dyn StereoInsert>>;
+
+/// A swappable external-IR cab handed to the audio thread (`Some` to install, `None`
+/// to clear). Boxed for the same reason as [`InsertCommand`].
+type ExtCabCommand = Option<Box<ExternalIrCab>>;
 
 /// How many pending insert swaps / disposals the lock-free rings can hold. Swaps
 /// are rare (a user loading/clearing a plugin), so a small buffer is plenty.
@@ -34,6 +39,10 @@ pub struct AudioEngine {
     /// Receives inserts the audio thread displaced, so they are dropped here on a
     /// non-audio thread rather than freed in the realtime callback.
     dropped_rx: Consumer<Box<dyn StereoInsert>>,
+    /// Sends external-IR cab swaps to the audio thread.
+    ext_cab_tx: Producer<ExtCabCommand>,
+    /// Receives external-IR cabs the audio thread displaced, for off-thread disposal.
+    ext_dropped_rx: Consumer<Box<ExternalIrCab>>,
 }
 
 impl AudioEngine {
@@ -55,6 +64,21 @@ impl AudioEngine {
         self.insert_tx
             .push(insert)
             .map_err(|_| anyhow!("plugin-insert command queue is full"))
+    }
+
+    /// Install (`Some`) or clear (`None`) the external-IR cab.
+    ///
+    /// Call from the UI/control thread. The swap happens lock-free in the audio
+    /// callback; any displaced cab is disposed of here, on the caller's thread, so
+    /// its IR/FFT buffers are never freed in the realtime path. Build the
+    /// [`ExternalIrCab`] (decode + resample) before calling — that work is offline.
+    pub fn set_external_cab(&mut self, cab: ExtCabCommand) -> Result<()> {
+        while let Ok(old) = self.ext_dropped_rx.pop() {
+            drop(old);
+        }
+        self.ext_cab_tx
+            .push(cab)
+            .map_err(|_| anyhow!("external-cab command queue is full"))
     }
 }
 
@@ -196,6 +220,9 @@ fn build_engine(
     // dropped off the audio thread.
     let (insert_tx, mut insert_rx) = RingBuffer::<InsertCommand>::new(INSERT_QUEUE_CAP);
     let (mut dropped_tx, dropped_rx) = RingBuffer::<Box<dyn StereoInsert>>::new(INSERT_QUEUE_CAP);
+    let (ext_cab_tx, mut ext_cab_rx) = RingBuffer::<ExtCabCommand>::new(INSERT_QUEUE_CAP);
+    let (mut ext_dropped_tx, ext_dropped_rx) =
+        RingBuffer::<Box<ExternalIrCab>>::new(INSERT_QUEUE_CAP);
 
     let attack = 1.0 - (-1.0 / (0.001 * sr)).exp();
     let release = 1.0 - (-1.0 / (0.300 * sr)).exp();
@@ -218,6 +245,12 @@ fn build_engine(
             while let Ok(cmd) = insert_rx.pop() {
                 if let Some(old) = chain.replace_insert(cmd) {
                     let _ = dropped_tx.push(old);
+                }
+            }
+            // Same lock-free discipline for external-IR cab swaps.
+            while let Ok(cmd) = ext_cab_rx.pop() {
+                if let Some(old) = chain.replace_external_cab(cmd) {
+                    let _ = ext_dropped_tx.push(old);
                 }
             }
 
@@ -307,5 +340,7 @@ fn build_engine(
         sample_rate: sr,
         insert_tx,
         dropped_rx,
+        ext_cab_tx,
+        ext_dropped_rx,
     })
 }

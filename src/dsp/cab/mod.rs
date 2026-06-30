@@ -1,3 +1,4 @@
+pub mod external;
 pub mod ir;
 pub mod marshall;
 pub mod mesa;
@@ -6,6 +7,7 @@ pub mod orange;
 use crate::dsp::biquad::Biquad;
 use crate::dsp::conv::FftConvolver;
 
+pub use external::{ExternalIrCab, LoadedIr, MAX_IR_LEN, load_ir};
 pub use marshall::MarshallCab;
 pub use mesa::MesaCab;
 pub use orange::OrangeCab;

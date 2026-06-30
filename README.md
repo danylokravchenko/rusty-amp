@@ -9,7 +9,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 ## Highlights
 
 - 🔊 **3 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, and Randall Warhead, switchable while you play
-- 📦 **3 cabinets** — Mesa, Marshall, and Orange 4×12s, each captured with three mics you can blend
+- 📦 **3 cabinets** — Mesa, Marshall, and Orange 4×12s, each captured with three mics you can blend, plus **load your own `.wav` IR** and A/B it live against the built-ins
 - 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, ping-pong delay, and stereo reverb. Add, remove, and bypass pedals on the fly; the board shows only what you're using
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
@@ -80,6 +80,8 @@ The app launches immediately with default values. Press **`P`** at any time to o
 | `↓` / `-` | Decrease focused knob by 5 % — or cycle amp model backward when on the selector row |
 | `A` | Cycle amp model forward (works from any section) |
 | `C` | Cycle cabinet model (Mesa V30 → Marshall Greenback → Orange PPC412) |
+| `I` | Open the cabinet-IR browser to load/clear an external `.wav` IR ([see below](#cabinet-irs)) |
+| `X` | A/B between a loaded external IR and the built-in cab (only once an IR is loaded) |
 | `Space` | Toggle (bypass) the focused pedal — or open the **Add pedal** picker when on the `+ ADD` tile |
 | `Enter` | Open the **Add pedal** picker when the `+ ADD` tile is focused |
 | `D` | Remove the focused pedal from the board (it is bypassed and hidden — re-add it any time from `+ ADD`) |
@@ -342,7 +344,7 @@ Per-channel output soft limiter → stereo (L, R)
 | Marshall 4×12 (Greenback) | Warm, mid-forward, smooth top end | +4 dB body at 800 Hz, +5 dB presence at 2.5 kHz, soft rolloff above 5 kHz |
 | Orange PPC412 (Vintage 30) | Thick, chunky, mid-forward (closed-back birch) | +5 dB low-mid "wall" at 600 Hz, +3 dB grind at 1.2 kHz, +5 dB presence at 3.2 kHz |
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The IRs are synthesized in-code (no external `.wav` files): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download — though you can also [load your own `.wav` IR](#cabinet-irs)): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
 The convolution is computed with a **partitioned-FFT (uniformly-partitioned overlap-save)** engine rather than a direct tap-by-tap loop. At ~1100 taps per channel this is the single heaviest DSP stage, and the frequency-domain approach cuts its cost several-fold while producing the exact same linear convolution — so the tone is unchanged. The only trade-off is a fixed ~2.7 ms of latency (128 samples at 48 kHz), shared equally by both channels so the stereo image stays aligned.
 
@@ -351,6 +353,31 @@ Each cabinet is captured by **three mics** — a close SM57 dynamic, a close R12
 Cycle between cabinet models with `C` at any time. The cabinet state is preserved when switching amp models.
 
 The **Mic** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis close-mic placement.
+
+## Cabinet IRs
+
+Beyond the three built-in cabs, rusty-amp can load your own **impulse-response `.wav` file** as the cabinet. A loaded IR replaces the multi-mic blend with a single captured response (the mono drive still passes through the same speaker cone-breakup + thermal power-compression model, so it stays alive and dynamic). Because the file is already a finished, miked capture, the **Mic / Blend / Room** knobs are inert while an external IR is active.
+
+Press **`I`** to open the IR browser, which scans these locations for `.wav` files:
+
+| Order | Location |
+| ----- | -------- |
+| 1 | The directory in the **`RUSTY_AMP_IR_DIR`** environment variable, if set |
+| 2 | `./irs/` next to where you launched the app |
+| 3 | `~/.config/rusty-amp/irs/` |
+
+Each is searched a few levels deep, so packs in subfolders are found too.
+
+| Key | Action |
+| ----- | -------- |
+| `↑` / `↓` | Navigate the IR list |
+| `Enter` | Load the selected IR (or **Built-in cabs (no IR)** to clear it) |
+| `X` | A/B between the loaded IR and the built-in cab |
+| `Esc` / `I` | Close the browser |
+
+The loaded IR's name appears in the header in place of the cabinet label (`IR: …`) while it is active. Outside the browser, **`X`** toggles the same A/B at any time. Loading and clearing take effect live — the audio stream is never interrupted (the IR is decoded and resampled off the audio thread, then swapped in on a lock-free handoff, and the displaced cab is freed off the audio thread).
+
+On load the IR is rate-matched to your interface (windowed-sinc resampler), trimmed to ~2048 taps with a raised-cosine tail fade, DC-removed, and energy-normalised so swapping IRs doesn't jump the level. Mono files feed both channels; stereo files keep their L/R. **No IRs are bundled** — load files you are licensed to use; the app never ships or redistributes third-party captures.
 
 ## Presets
 
