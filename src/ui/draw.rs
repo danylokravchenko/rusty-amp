@@ -50,7 +50,7 @@ pub(super) fn draw(
     render_header(f, rows[0], params, recording, blink, plugin, ext_cab);
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
-    render_amp(f, rows[3], params, focus);
+    render_amp(f, rows[3], params, focus, ext_cab);
     render_rig(f, rows[4], params, board, focus);
     render_help(f, rows[5], status);
 }
@@ -354,16 +354,20 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
     f.render_widget(Paragraph::new(Line::from(amp_spans)), cols[0]);
 
     // ── Cabinet model selector ────────────────────────────────────────────────
+    // When an external IR is the active cab the built-in model is bypassed, so the
+    // whole selector is dimmed to signal it has no effect until `C` returns to it.
     let cab_model = params.cab_model();
+    let ext_active = params.cab_external_active.load(Relaxed);
+    let label_fg = if ext_active { OFF } else { label_color };
     let mut cab_spans = vec![Span::styled(
         "  CAB  ",
-        Style::default()
-            .fg(label_color)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(label_fg).add_modifier(Modifier::BOLD),
     )];
     for m in [CabModel::Mesa, CabModel::Marshall, CabModel::Orange] {
         let selected = m == cab_model;
-        let style = if selected {
+        let style = if ext_active {
+            Style::default().fg(OFF)
+        } else if selected {
             Style::default()
                 .fg(ORANGE)
                 .add_modifier(Modifier::BOLD | Modifier::REVERSED)
@@ -375,20 +379,37 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         } else {
             ("[ ", " ]")
         };
-        let bc = if selected { AMBER } else { DIM };
+        let bc = if ext_active {
+            OFF
+        } else if selected {
+            AMBER
+        } else {
+            DIM
+        };
         cab_spans.push(Span::styled(bl, Style::default().fg(bc)));
         cab_spans.push(Span::styled(m.short_name(), style));
         cab_spans.push(Span::styled(br, Style::default().fg(bc)));
         cab_spans.push(Span::raw("  "));
     }
     if focused {
-        cab_spans.push(Span::styled("C to toggle", Style::default().fg(DIM)));
+        let hint = if ext_active {
+            "C → built-in"
+        } else {
+            "C to toggle"
+        };
+        cab_spans.push(Span::styled(hint, Style::default().fg(DIM)));
     }
     f.render_widget(Paragraph::new(Line::from(cab_spans)), cols[1]);
 }
 
 // ── Amplifier head + cabinet/mic ──────────────────────────────────────────────
-fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) {
+fn render_amp(
+    f: &mut Frame,
+    area: Rect,
+    params: &Params,
+    focus: Option<usize>,
+    ext_cab: Option<&str>,
+) {
     let amp_active = focus.is_some_and(|i| (AMP_START..AMP_END).contains(&i));
     let mic_active = focus.is_some_and(|i| (MIC_START..MIC_END).contains(&i));
     let border_color = if amp_active || mic_active {
@@ -398,7 +419,12 @@ fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
     };
 
     let amp_name = params.amp_model().name().to_uppercase();
-    let cab_name = params.cab_model().short_name();
+    // The cabinet/mic panel reflects the active cab: the loaded IR's name (with the
+    // mic knobs inert) or the built-in cab model.
+    let cab_name = match ext_cab {
+        Some(name) => format!("IR: {name}"),
+        None => params.cab_model().short_name().to_owned(),
+    };
 
     let left_title = Line::from(vec![
         Span::styled("┤ ", Style::default().fg(border_color)),
@@ -472,6 +498,9 @@ fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
                 .collect::<Vec<_>>(),
         )
         .split(panel[1]);
+    // The mic knobs only colour the built-in cab's multi-mic blend; a loaded IR is
+    // a finished capture, so they are dimmed (inactive) while an external IR is up.
+    let mic_live = ext_cab.is_none();
     for (i, ki) in (MIC_START..MIC_END).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
         render_compact_knob(
@@ -480,7 +509,7 @@ fn render_amp(f: &mut Frame, area: Rect, params: &Params, focus: Option<usize>) 
             KNOBS[ki].label,
             val,
             focus == Some(ki),
-            true,
+            mic_live,
             CHROME,
         );
     }

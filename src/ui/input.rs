@@ -84,6 +84,13 @@ pub(super) fn cycle_amp(params: &Params, dir: i8) {
 }
 
 pub(super) fn cycle_cab(params: &Params) {
+    // While an external IR is the active cab, `C` returns to the built-in
+    // (simulated) cab rather than cycling the inert model selector. The IR stays
+    // loaded, so `X` can re-engage it.
+    if params.cab_external_active.load(Relaxed) {
+        params.cab_external_active.store(false, Relaxed);
+        return;
+    }
     let current = CabModel::from_u8(params.cab_model.load(Relaxed));
     params.cab_model.store(current.toggle() as u8, Relaxed);
 }
