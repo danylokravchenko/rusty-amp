@@ -109,6 +109,7 @@ To add one:
    place the pedal on the board — `sync_board` reads the enabled flags after load).
 9. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
    (finite/bounded output, and that each knob moves the band/level it should).
+10. Document the pedal on the docs site — see [Documenting a new pedal](#documenting-a-new-pedal).
 
 ### Adding a new amp model
 
@@ -127,6 +128,41 @@ Register in the `CabinetModel` enum and cycle logic.
 Drop a `.toml` file in `presets/`. Follow the schema in the README — all fields are optional except `name`. Test it by running the app and pressing `P`.
 
 Bundled presets cannot be deleted by users, so only add presets that are genuinely useful and well-tuned.
+
+## Documentation site
+
+The user-facing docs live in `site/` and publish to GitHub Pages
+(<https://danylokravchenko.github.io/rusty-amp/>). Pages are **Markdown** with a
+little inline HTML for the interactive components, rendered through a shared layout
+by [Eleventy](https://www.11ty.dev/). See [`site/README.md`](site/README.md) for the
+build, local preview (`npm run dev`), and authoring conventions.
+
+Anything that changes a pedal, amp, cabinet, control, or preset should update the
+docs in the same PR.
+
+### Documenting a new pedal
+
+The pedal docs are data-driven HTML blocks inside Markdown — no new page is needed.
+Add the effect in three places, all reusing classes already defined in
+`site/assets/site.css`:
+
+1. **`site/pedals.md`** — in the *All pedals* selector (`<div class="selector"
+   data-tabs data-tabs-hash>`), add a `<button class="tile" data-tab="<id>"
+   style="--c:var(--<colour>)">` and a matching `<div class="tab-panel"
+   data-panel="<id>" style="--c:var(--<colour>)">` with the intro paragraph and one
+   `.kv` row per knob. Keep the tile in signal-chain order; the `data-tab` id
+   becomes a shareable deep link (`pedals.html#<id>`).
+2. **`site/index.md`** — add a `<div class="pedal" style="--c:var(--<colour>)">`
+   card to the board grid so the pedal appears in the landing-page overview.
+3. **`site/how-it-works.md`** — add a `<div class="flow__stage"
+   style="--c:var(--<colour>)">` to the signal-chain flow at the correct point in
+   the chain, with a one-line DSP summary.
+
+Use the **same livery colour** in all three. Each pedal colour in
+`src/ui/styles.rs` has a web twin defined as a CSS variable in the `:root` block of
+`site/assets/site.css` (e.g. `--green`, `--teal`); add a matching one there if the
+pedal needs a new colour. Then run `npm run build` (or `npm run dev`) and confirm
+the pedal shows up in the selector, the landing grid, and the flow diagram.
 
 ## Testing
 

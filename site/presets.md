@@ -32,23 +32,63 @@ Bundled presets are marked as system presets and cannot be deleted from within t
 
 ## Preset browser <span class="muted">(<kbd>P</kbd>)</span> {#browser}
 
-| Key | Action |
-| --- | ------ |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate the preset list |
-| <kbd>Enter</kbd> | Apply the selected preset (takes effect immediately, audio is uninterrupted) |
-| <kbd>S</kbd> | Open the save dialog to capture the current state as a new preset |
-| <kbd>D</kbd> | Delete the selected preset (user presets only — bundled presets cannot be deleted) |
-| <kbd>Esc</kbd> / <kbd>P</kbd> | Close without changing anything |
+Press <kbd>P</kbd> while playing to open the browser overlay. Move the cursor with <kbd>↑</kbd>/<kbd>↓</kbd> and press <kbd>Enter</kbd> to apply — the change takes effect immediately, with the audio uninterrupted.
+
+<div class="overlay">
+  <div class="overlay__bar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Presets</span></div>
+  <div class="plist">
+    <div class="prow"><span class="prow__name">metallica</span><span class="prow__meta">Marshall JCM800 · Marshall Greenback</span></div>
+    <div class="prow is-sel"><span class="prow__name">pantera</span><span class="prow__meta">Randall Warhead · Mesa V30</span></div>
+    <div class="prow"><span class="prow__name">slipknot</span><span class="prow__meta">Mesa Dual Rectifier · Mesa V30</span></div>
+    <div class="prow"><span class="prow__name">my lead tone</span><span class="prow__meta">Mesa Dual Rectifier · Mesa V30</span><span class="prow__tag">user</span></div>
+  </div>
+  <div class="overlay__foot">
+    <span><kbd>↑</kbd>/<kbd>↓</kbd> navigate</span>
+    <span><kbd>Enter</kbd> apply</span>
+    <span><kbd>S</kbd> save</span>
+    <span><kbd>D</kbd> delete</span>
+    <span><kbd>Esc</kbd> close</span>
+  </div>
+</div>
+
+<div class="keymap">
+  <div><kbd>↑</kbd> / <kbd>↓</kbd> Navigate the preset list</div>
+  <div><kbd>Enter</kbd> Apply the selected preset (audio uninterrupted)</div>
+  <div><kbd>S</kbd> Open the save dialog for the current state</div>
+  <div><kbd>D</kbd> Delete the selected preset (user presets only)</div>
+  <div><kbd>Esc</kbd> / <kbd>P</kbd> Close without changing anything</div>
+</div>
 
 User presets are marked with a `[user]` tag in the list. The <kbd>D</kbd> hint appears in the footer only when the cursor is on a deletable preset.
 
 ## Save dialog <span class="muted">(<kbd>S</kbd>)</span> {#save}
 
-| Key | Action |
-| --- | ------ |
-| <kbd>Tab</kbd> | Switch between Name and Description fields |
-| <kbd>Enter</kbd> | Save the preset and return to the browser |
-| <kbd>Esc</kbd> | Cancel without saving |
+Press <kbd>S</kbd> from anywhere to capture the current rig as a new preset. <kbd>Tab</kbd> moves between the two fields; <kbd>Enter</kbd> writes the file.
+
+<div class="overlay overlay--narrow">
+  <div class="overlay__bar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl">Save preset</span></div>
+  <div class="dform">
+    <div class="field field--focus">
+      <div class="field__label">Name</div>
+      <div class="field__box">My Lead Tone<span class="caret"></span></div>
+    </div>
+    <div class="field">
+      <div class="field__label">Description</div>
+      <div class="field__box"><span class="field__ph">Sustain-focused, delay + reverb…</span></div>
+    </div>
+  </div>
+  <div class="overlay__foot">
+    <span><kbd>Tab</kbd> switch field</span>
+    <span><kbd>Enter</kbd> save</span>
+    <span><kbd>Esc</kbd> cancel</span>
+  </div>
+</div>
+
+<div class="keymap">
+  <div><kbd>Tab</kbd> Switch between Name and Description</div>
+  <div><kbd>Enter</kbd> Save the preset and return to the browser</div>
+  <div><kbd>Esc</kbd> Cancel without saving</div>
+</div>
 
 The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears in the browser immediately — no restart required.
 
