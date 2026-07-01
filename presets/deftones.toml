@@ -1,0 +1,95 @@
+name        = "Deftones — Around the Fur"
+description = "Stephen Carpenter's thick, warm nu-metal wall — un-scooped Mesa Rectifier with a hint of ambient wash."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# Down-tuned sustain still needs a gate to control string noise, but Carpenter's
+# riffs are sustained swells rather than staccato chugs — a gentler threshold and
+# slower release keep the tail breathing instead of choking it off.
+[noise_gate]
+enabled   = true
+threshold = 0.22   # looser than a staccato nu-metal gate — preserves sustain
+release   = 0.28   # slow — lets the wall-of-sound tail decay naturally
+
+# ── Compressor ────────────────────────────────────────────────────────────────
+# A touch of compression smooths the pick attack into that dense, even "wall"
+# rather than a percussive snap — part of what makes the tone feel massive.
+[compressor]
+enabled = true
+sustain = 0.55
+attack  = 0.35
+level   = 0.55
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Carpenter's EMG active pickups already hit the front end hot; the TS here
+# stands in for that — nearly clean, just enough level to drive the preamp.
+[tube_screamer]
+enabled = true
+drive = 0.18   # nearly clean — the pickups/amp supply the real dirt
+tone  = 0.55   # neutral, not scooped-bright like a thrash boost
+level = 0.78   # hot input level, standing in for hot active-pickup output
+
+# DS-1 off — no extra clipping stage, same as the amp's own saturation.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Mesa Dual Rectifier — heavy but voiced far less scooped than the typical
+# nu-metal preset: Carpenter's tone is thick and present in the mids, not
+# hollow, and the top end stays warm rather than bright and percussive.
+[amp]
+model  = "mesa"
+gain   = 0.80  # heavy, but leaves headroom for a sustained wall rather than max compression
+bass   = 0.70  # thick low end for the down-tuned riffs
+mid    = 0.52  # far less scooped than Disturbed/Slipknot — the tone stays present, not hollow
+treble = 0.55  # warm, rolled-off top instead of a bright pick-attack voicing
+presence = 0.45  # moderate-low — keeps the top end smooth rather than glassy
+master = 0.60
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Mesa 4×12 with V30s, but centered and blended darker/wetter than the bone-dry
+# thrash presets — more ribbon for low-mid thickness, more room for the
+# ambient wash that colours even Deftones' heaviest riffs.
+[cabinet]
+model = "mesa"
+mic_pos = 0.50   # centered — balanced, neither off-axis-dark nor on-axis-bright
+mic_blend = 0.28 # more ribbon than the scooped nu-metal presets — thickens the wall
+mic_room  = 0.22 # more room than bone-dry thrash — a touch of atmosphere
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# Reinforces the amp's un-scooped voicing rather than cutting further, and
+# gently trims the top so the tone stays warm instead of fizzy.
+[eq]
+enabled = true
+low  = 0.55
+mid  = 0.52   # keeps the mids present, in keeping with the amp's own voicing
+high = 0.45   # gentle trim — warm, not bright
+
+# ── Chorus ────────────────────────────────────────────────────────────────────
+# A subtle shimmer under the riff — the textured, atmospheric wash that's part
+# of Deftones' signature wall of sound, even on the heaviest rhythm parts.
+[chorus]
+enabled = true
+rate  = 0.20
+depth = 0.35
+mix   = 0.12
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Off for the rhythm tone — the ambience comes from the chorus and reverb, not
+# a discrete repeat that would smear the riff's low end.
+[delay]
+enabled  = false
+time     = 0.25
+feedback = 0.30
+mix      = 0.00
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# More than the bone-dry thrash presets — a hint of space and air, part of the
+# atmospheric wash under the wall-of-sound riffing.
+[reverb]
+enabled = true
+room = 0.35
+damp = 0.55
+mix  = 0.15
