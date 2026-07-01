@@ -44,7 +44,8 @@ pub(super) fn draw(
             Constraint::Length(3), // amp / cab selector
             Constraint::Length(7), // amplifier + cabinet/mic
             Constraint::Min(0),    // guitar rig
-            Constraint::Length(1), // help
+            Constraint::Length(2), // help (two rows — one line overflows once every
+                                    // hint, including the optional plugin ones, is on)
         ])
         .split(inner);
 
@@ -915,58 +916,72 @@ fn render_compact_knob(
     );
 }
 
+/// Two-row key hint footer. One row overflows once every hint — including the
+/// optional plugin ones — is enabled, so editing/navigation keys sit on the first row
+/// and section/plugin/transport keys on the second.
 fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
-    let line = if let Some(msg) = status {
-        Line::from(vec![Span::styled(
+    if let Some(msg) = status {
+        let help = Paragraph::new(Line::from(vec![Span::styled(
             format!(" {msg} "),
             Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
-        )])
-    } else {
-        let mut spans = vec![
-            Span::styled(" Tab ", Style::default().fg(AMBER)),
-            Span::styled("section  ", Style::default().fg(DIM)),
-            Span::styled("←/→", Style::default().fg(AMBER)),
-            Span::styled(" knob  ", Style::default().fg(DIM)),
-            Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
-            Span::styled(" adjust  ", Style::default().fg(DIM)),
-            Span::styled("Space", Style::default().fg(AMBER)),
-            Span::styled(" toggle  ", Style::default().fg(DIM)),
-            Span::styled("D", Style::default().fg(AMBER)),
-            Span::styled(" remove  ", Style::default().fg(DIM)),
-            Span::styled("A", Style::default().fg(AMBER)),
-            Span::styled(" amp  ", Style::default().fg(DIM)),
-            Span::styled("C", Style::default().fg(AMBER)),
-            Span::styled(" cab  ", Style::default().fg(DIM)),
-            Span::styled("I", Style::default().fg(AMBER)),
-            Span::styled(" IR  ", Style::default().fg(DIM)),
-            Span::styled("P", Style::default().fg(AMBER)),
-            Span::styled(" presets  ", Style::default().fg(DIM)),
-            Span::styled("T", Style::default().fg(AMBER)),
-            Span::styled(" tuner  ", Style::default().fg(DIM)),
-        ];
-        #[cfg(feature = "clap")]
-        {
-            spans.push(Span::styled("V", Style::default().fg(AMBER)));
-            spans.push(Span::styled(" plugins  ", Style::default().fg(DIM)));
-        }
-        // Keyed on the feature (not the OS) so the footer renders identically on every
-        // platform — matching the `V plugins` hint above and keeping the golden
-        // snapshots portable. The key itself only does anything on macOS, where AU
-        // hosting is compiled in.
-        #[cfg(feature = "au")]
-        {
-            spans.push(Span::styled("U", Style::default().fg(AMBER)));
-            spans.push(Span::styled(" amp plugin  ", Style::default().fg(DIM)));
-        }
-        spans.extend([
-            Span::styled("R", Style::default().fg(AMBER)),
-            Span::styled(" record  ", Style::default().fg(DIM)),
-            Span::styled("Q", Style::default().fg(AMBER)),
-            Span::styled(" quit", Style::default().fg(DIM)),
-        ]);
-        Line::from(spans)
-    };
-    let help = Paragraph::new(line)
+        )]))
+        .alignment(Alignment::Center)
+        .style(Style::default().bg(Color::Black));
+        f.render_widget(help, area);
+        return;
+    }
+
+    let row1 = Line::from(vec![
+        Span::styled(" Tab ", Style::default().fg(AMBER)),
+        Span::styled("section  ", Style::default().fg(DIM)),
+        Span::styled("←/→", Style::default().fg(AMBER)),
+        Span::styled(" knob  ", Style::default().fg(DIM)),
+        Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
+        Span::styled(" adjust  ", Style::default().fg(DIM)),
+        Span::styled("Space", Style::default().fg(AMBER)),
+        Span::styled(" toggle  ", Style::default().fg(DIM)),
+        Span::styled("D", Style::default().fg(AMBER)),
+        Span::styled(" remove  ", Style::default().fg(DIM)),
+        Span::styled("A", Style::default().fg(AMBER)),
+        Span::styled(" amp  ", Style::default().fg(DIM)),
+        Span::styled("C", Style::default().fg(AMBER)),
+        Span::styled(" cab  ", Style::default().fg(DIM)),
+        Span::styled("I", Style::default().fg(AMBER)),
+        Span::styled(" IR", Style::default().fg(DIM)),
+    ]);
+
+    let mut row2 = vec![
+        Span::styled("X", Style::default().fg(AMBER)),
+        Span::styled(" IR A/B  ", Style::default().fg(DIM)),
+    ];
+    // Live A/B against a loaded AU (`Z`) only exists on macOS with `au` enabled — keyed
+    // on the feature (not the OS) so the footer renders identically on every platform
+    // and the golden snapshots stay portable.
+    #[cfg(feature = "au")]
+    {
+        row2.push(Span::styled("Z", Style::default().fg(AMBER)));
+        row2.push(Span::styled(" amp A/B  ", Style::default().fg(DIM)));
+    }
+    row2.push(Span::styled("P", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" presets  ", Style::default().fg(DIM)));
+    row2.push(Span::styled("T", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" tuner  ", Style::default().fg(DIM)));
+    #[cfg(feature = "clap")]
+    {
+        row2.push(Span::styled("V", Style::default().fg(AMBER)));
+        row2.push(Span::styled(" plugins  ", Style::default().fg(DIM)));
+    }
+    #[cfg(feature = "au")]
+    {
+        row2.push(Span::styled("U", Style::default().fg(AMBER)));
+        row2.push(Span::styled(" amp plugin  ", Style::default().fg(DIM)));
+    }
+    row2.push(Span::styled("R", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" record  ", Style::default().fg(DIM)));
+    row2.push(Span::styled("Q", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" quit", Style::default().fg(DIM)));
+
+    let help = Paragraph::new(vec![row1, Line::from(row2)])
         .alignment(Alignment::Center)
         .style(Style::default().bg(Color::Black));
     f.render_widget(help, area);
