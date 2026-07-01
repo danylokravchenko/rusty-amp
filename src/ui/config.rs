@@ -312,3 +312,98 @@ pub(super) const ADD_TILE: usize = KNOBS.len();
 pub(super) fn pedal_of(knob: usize) -> Option<usize> {
     PEDALS.iter().position(|p| (p.start..p.end).contains(&knob))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // These tests pin the hand-maintained contract between the KNOBS array and
+    // the PEDALS table (see the module comment): the ←/→ navigation walks KNOBS
+    // linearly, so pedal ranges must tile the pedal region contiguously with no
+    // gaps or overlaps. The `add-pedal` skill edits these tables, so a slip here
+    // would silently break navigation — fail loudly instead.
+
+    #[test]
+    fn pedal_ranges_are_contiguous_and_end_at_knobs_len() {
+        // The first pedal starts right after the amp+mic block.
+        assert_eq!(
+            PEDALS[0].start, MIC_END,
+            "first pedal must follow the mic knobs"
+        );
+        // Each pedal has a non-empty range that abuts the next with no gap/overlap.
+        for w in PEDALS.windows(2) {
+            assert!(
+                w[0].start < w[0].end,
+                "{} has an empty knob range",
+                w[0].name
+            );
+            assert_eq!(
+                w[0].end, w[1].start,
+                "gap or overlap between {} and {}",
+                w[0].name, w[1].name
+            );
+        }
+        let last = PEDALS.last().expect("PEDALS is non-empty");
+        assert!(
+            last.start < last.end,
+            "{} has an empty knob range",
+            last.name
+        );
+        assert_eq!(
+            last.end,
+            KNOBS.len(),
+            "KNOBS has trailing knobs that no pedal owns"
+        );
+    }
+
+    #[test]
+    fn amp_and_mic_ranges_cover_the_head_of_knobs() {
+        assert_eq!(AMP_START, 0);
+        assert_eq!(AMP_END, MIC_START, "amp and mic sections must abut");
+        assert!(MIC_END <= KNOBS.len());
+    }
+
+    #[test]
+    fn pedal_of_maps_every_pedal_knob_back_to_its_pedal() {
+        for (pi, p) in PEDALS.iter().enumerate() {
+            for k in p.start..p.end {
+                assert_eq!(pedal_of(k), Some(pi), "{} knob {k} misrouted", p.name);
+            }
+        }
+    }
+
+    #[test]
+    fn amp_and_mic_knobs_belong_to_no_pedal() {
+        for k in AMP_START..MIC_END {
+            assert_eq!(
+                pedal_of(k),
+                None,
+                "amp/mic knob {k} wrongly claimed by a pedal"
+            );
+        }
+    }
+
+    #[test]
+    fn add_tile_is_out_of_the_knob_range() {
+        // The +ADD sentinel must never index KNOBS.
+        assert_eq!(ADD_TILE, KNOBS.len());
+        assert_eq!(pedal_of(ADD_TILE), None);
+    }
+
+    #[test]
+    fn pedal_names_are_unique() {
+        for (i, a) in PEDALS.iter().enumerate() {
+            for b in &PEDALS[i + 1..] {
+                assert_ne!(a.name, b.name, "duplicate pedal name {}", a.name);
+            }
+        }
+    }
+
+    #[test]
+    fn table_sizes_are_stable() {
+        // Deliberate tripwire: bump these when you add or remove a pedal/knob so
+        // the change is a conscious, reviewed edit rather than an accident.
+        assert_eq!(PEDALS.len(), 10, "pedal count changed");
+        assert_eq!(KNOBS.len(), 39, "knob count changed");
+    }
+}

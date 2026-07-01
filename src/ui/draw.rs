@@ -1077,3 +1077,334 @@ fn amp_to_db(amp: f32) -> f32 {
         20.0 * amp.log10()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::dsp::{AmpModel, CabModel, Levels};
+    use ratatui::{Terminal, backend::TestBackend};
+
+    /// A comfortably large canvas so nothing the tests assert on is clipped by a
+    /// small terminal. The layout is responsive, so exact dimensions only matter
+    /// for the golden snapshot (which is re-blessed with `cargo insta review`).
+    const W: u16 = 170;
+    const H: u16 = 55;
+
+    /// Flatten the rendered cells into plain text, one row per line. Styles are
+    /// dropped — layout invariants live in the config tests, this checks the
+    /// visible glyphs.
+    fn screen_text(term: &Terminal<TestBackend>) -> String {
+        let buf = term.backend().buffer();
+        let area = buf.area();
+        let mut out = String::new();
+        for y in 0..area.height {
+            for x in 0..area.width {
+                out.push_str(buf[(x, y)].symbol());
+            }
+            out.push('\n');
+        }
+        out
+    }
+
+    /// Render the main screen with the given board/focus and return its glyphs.
+    fn render(board: &[bool], focus: Option<usize>) -> (Terminal<TestBackend>, String) {
+        let params = Params::new();
+        let text = render_with(&params, board, focus, |_| {});
+        (
+            Terminal::new(TestBackend::new(W, H)).expect("test backend"),
+            text,
+        )
+    }
+
+    /// Render the main screen for `params`, then let `overlay` draw a modal on top
+    /// (exactly as the event loop composites modals over the board), and return the
+    /// flattened glyphs.
+    fn render_with(
+        params: &Params,
+        board: &[bool],
+        focus: Option<usize>,
+        overlay: impl FnOnce(&mut Frame),
+    ) -> String {
+        let levels = Levels::new();
+        let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
+        term.draw(|f| {
+            draw(
+                f, params, &levels, focus, board, false, false, None, None, None,
+            );
+            overlay(f);
+        })
+        .expect("draw");
+        screen_text(&term)
+    }
+
+    fn board_all(on: bool) -> Vec<bool> {
+        vec![on; PEDALS.len()]
+    }
+
+    /// The board the app actually boots with, derived from the default enabled
+    /// flags (TS-808 + Noise Gate on) exactly like `sync_board` does at startup.
+    /// Only the `clap`-gated golden tests use it.
+    #[cfg(feature = "clap")]
+    fn default_board(params: &Params) -> Vec<bool> {
+        use std::sync::atomic::Ordering::Relaxed;
+        PEDALS
+            .iter()
+            .map(|p| (p.enabled)(params).load(Relaxed))
+            .collect()
+    }
+
+    /// Golden snapshot of a realistic default screen — the board the app boots
+    /// with (TS-808 + Noise Gate tiles), focused on the first on-board pedal so
+    /// the detail editor's dials are captured too. This is the tripwire for the
+    /// overall layout: any unintended change to spacing, labels, tiles, or dials
+    /// shows up as a diff; intentional changes are re-blessed with
+    /// `cargo insta accept`.
+    ///
+    /// Gated on `clap`: the help footer's `V plugins` key is `clap`-only, so the
+    /// rendered chrome (and thus every golden below) is specific to the default
+    /// build the snapshots were captured in. CI runs default features.
+    #[cfg(feature = "clap")]
+    #[test]
+    fn snapshot_default_screen() {
+        let params = Params::new();
+        let board = default_board(&params);
+        let first_on = board.iter().position(|&on| on).expect("a default pedal");
+        let text = render_with(&params, &board, Some(PEDALS[first_on].start), |_| {});
+        insta::assert_snapshot!("default_screen", text);
+    }
+
+    /// Rendering must never panic across a spread of states: empty board, full
+    /// board, focus on a pedal knob, focus on the +ADD tile, and recording on.
+    #[test]
+    fn rendering_is_panic_free_across_states() {
+        let params = Params::new();
+        let levels = Levels::new();
+        let cases: [(Vec<bool>, Option<usize>, bool); 4] = [
+            (board_all(false), None, false),
+            (board_all(true), Some(PEDALS[0].start), false),
+            (board_all(true), Some(ADD_TILE), true),
+            (board_all(false), Some(AMP_START), true),
+        ];
+        for (board, focus, rec) in cases {
+            let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
+            term.draw(|f| {
+                draw(
+                    f,
+                    &params,
+                    &levels,
+                    focus,
+                    &board,
+                    rec,
+                    true,
+                    Some("REC…"),
+                    None,
+                    None,
+                );
+            })
+            .expect("draw");
+        }
+    }
+
+    /// Every pedal must render intact: focusing each one shows the detail editor
+    /// titled with that pedal's full name and every one of its knob labels.
+    #[test]
+    fn every_pedal_renders_with_its_name_and_knob_labels() {
+        for (pi, pedal) in PEDALS.iter().enumerate() {
+            let mut board = board_all(false);
+            board[pi] = true;
+            let (_term, text) = render(&board, Some(pedal.start));
+            assert!(
+                text.contains(pedal.name),
+                "{} name missing from the detail editor",
+                pedal.name
+            );
+            for knob in KNOBS.iter().take(pedal.end).skip(pedal.start) {
+                assert!(
+                    text.contains(knob.label),
+                    "{}: knob label {:?} missing",
+                    pedal.name,
+                    knob.label
+                );
+            }
+        }
+    }
+
+    /// Every amp model must be reachable and shown in the header/selector.
+    #[test]
+    fn every_amp_model_renders_its_name() {
+        for model in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
+            let params = Params::new();
+            params
+                .amp_model
+                .store(model as u8, std::sync::atomic::Ordering::Relaxed);
+            let levels = Levels::new();
+            let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
+            term.draw(|f| {
+                draw(
+                    f,
+                    &params,
+                    &levels,
+                    None,
+                    &board_all(false),
+                    false,
+                    false,
+                    None,
+                    None,
+                    None,
+                );
+            })
+            .expect("draw");
+            let text = screen_text(&term);
+            assert!(
+                text.contains(model.short_name()),
+                "amp {:?} not shown on screen",
+                model.short_name()
+            );
+        }
+    }
+
+    /// Every built-in cabinet must be reachable and shown in the selector.
+    #[test]
+    fn every_cab_model_renders_its_name() {
+        for model in [CabModel::Mesa, CabModel::Marshall, CabModel::Orange] {
+            let params = Params::new();
+            params
+                .cab_model
+                .store(model as u8, std::sync::atomic::Ordering::Relaxed);
+            let levels = Levels::new();
+            let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
+            term.draw(|f| {
+                draw(
+                    f,
+                    &params,
+                    &levels,
+                    None,
+                    &board_all(false),
+                    false,
+                    false,
+                    None,
+                    None,
+                    None,
+                );
+            })
+            .expect("draw");
+            let text = screen_text(&term);
+            assert!(
+                text.contains(model.short_name()),
+                "cab {:?} not shown on screen",
+                model.short_name()
+            );
+        }
+    }
+
+    /// The +ADD pedal modal lists every off-board pedal by name.
+    #[test]
+    fn add_pedal_modal_lists_available_pedals() {
+        let params = Params::new();
+        let levels = Levels::new();
+        let board = board_all(false);
+        let available: Vec<usize> = (0..PEDALS.len()).collect();
+        let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
+        term.draw(|f| {
+            draw(
+                f, &params, &levels, None, &board, false, false, None, None, None,
+            );
+            render_add_pedal_modal(f, &available, 0);
+        })
+        .expect("draw");
+        let text = screen_text(&term);
+        for &pi in &available {
+            assert!(
+                text.contains(PEDALS[pi].name),
+                "{} missing from the add-pedal modal",
+                PEDALS[pi].name
+            );
+        }
+    }
+
+    // ── modal golden snapshots ──────────────────────────────────────────────────
+    // Each modal is composited over the realistic default board, just like the
+    // event loop draws it. Inputs are fixed in-test (no filesystem), so the goldens
+    // are deterministic across machines and CI.
+
+    /// The +ADD picker, over the default board (so its list is the off-board
+    /// pedals), cursor on the first entry.
+    #[cfg(feature = "clap")]
+    #[test]
+    fn snapshot_add_pedal_modal() {
+        let params = Params::new();
+        let board = default_board(&params);
+        let available: Vec<usize> = (0..PEDALS.len()).filter(|&i| !board[i]).collect();
+        let text = render_with(&params, &board, None, |f| {
+            render_add_pedal_modal(f, &available, 0);
+        });
+        insta::assert_snapshot!("add_pedal_modal", text);
+    }
+
+    /// The preset picker with a fixed System + User preset, cursor on the user
+    /// entry (which reveals the `D delete` footer hint and the `[user]` tag).
+    #[cfg(feature = "clap")]
+    #[test]
+    fn snapshot_preset_modal() {
+        use crate::preset::{Preset, PresetSource};
+        let params = Params::new();
+        let mut system = Preset::from_params(
+            "Clean Combo".to_string(),
+            Some("sparkly cleans".to_string()),
+            &params,
+        );
+        system.source = PresetSource::System;
+        let mut user = Preset::from_params(
+            "My Lead".to_string(),
+            Some("saved rig".to_string()),
+            &params,
+        );
+        user.source = PresetSource::User;
+        let presets = vec![system, user];
+        let board = default_board(&params);
+        // Entries: [Default values, Clean Combo, My Lead] → cursor 2 = the user one.
+        let text = render_with(&params, &board, None, |f| {
+            crate::ui::presets::render_preset_modal(f, &presets, 2);
+        });
+        insta::assert_snapshot!("preset_modal", text);
+    }
+
+    /// The save-preset dialog with both fields filled, focus on the name field.
+    #[cfg(feature = "clap")]
+    #[test]
+    fn snapshot_save_preset_dialog() {
+        let params = Params::new();
+        let board = default_board(&params);
+        let text = render_with(&params, &board, None, |f| {
+            crate::ui::presets::render_save_dialog(f, "My Lead", "warm mid-gain", 0, None);
+        });
+        insta::assert_snapshot!("save_preset_dialog", text);
+    }
+
+    /// The CLAP plugin browser (Browse view). The list is left empty on purpose —
+    /// `open = true` shows the modal WITHOUT calling `open()`, which would scan the
+    /// filesystem and make the golden machine-dependent.
+    #[cfg(feature = "clap")]
+    #[test]
+    fn snapshot_plugin_browser_modal() {
+        let params = Params::new();
+        let mut browser = crate::ui::plugins::PluginBrowser::new(48_000.0, 512);
+        browser.open = true;
+        let board = default_board(&params);
+        let text = render_with(&params, &board, None, |f| browser.render(f));
+        insta::assert_snapshot!("plugin_browser_modal", text);
+    }
+
+    /// The external-IR browser. As with the plugin browser, the file list is left
+    /// empty (no scan) so the golden captures the deterministic empty state.
+    #[cfg(feature = "clap")]
+    #[test]
+    fn snapshot_ir_browser_modal() {
+        let params = Params::new();
+        let mut browser = crate::ui::ir_browser::IrBrowser::new(48_000.0);
+        browser.open = true;
+        let board = default_board(&params);
+        let text = render_with(&params, &board, None, |f| browser.render(f));
+        insta::assert_snapshot!("ir_browser_modal", text);
+    }
+}

@@ -20,7 +20,7 @@ use effects::{
     TubeScreamer,
 };
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum AmpModel {
     Marshall = 0,
@@ -70,7 +70,7 @@ impl AmpModel {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 #[repr(u8)]
 pub enum CabModel {
     Mesa = 0,

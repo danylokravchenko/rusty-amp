@@ -30,6 +30,9 @@ Signal-path code must be **allocation-free and panic-free** at runtime; process 
 7. **`src/ui/input.rs`** — add the pedal's `enabled` flag to the `toggle_pedal` match so `Space` can bypass it on the board.
 8. **`src/preset.rs`** — add the preset section/fields (including the on/off state, so a preset can place the pedal on the board — `sync_board` reads the enabled flags after load). Mirror an existing optional section like `FuzzSection`.
 9. **Tests** — a `#[cfg(test)]` module in the effect file: finite/bounded output, and that each knob moves the band/level it should.
+10. **UI tests** — your `config.rs` edit deliberately trips the UI table tests; update them in the same commit:
+    - `src/ui/config.rs` → `table_sizes_are_stable`: bump the `PEDALS.len()` and `KNOBS.len()` expected counts. This tripwire exists so a table change is always a conscious edit — the contiguity/`pedal_of` invariant tests will confirm your new knob range tiles correctly.
+    - `src/ui/draw.rs` → the golden **snapshot** (`snapshot_default_screen`) now renders your new pedal, so it no longer matches the committed `.snap`. Re-render and re-bless it: run `INSTA_UPDATE=always cargo test --lib 'ui::'` (or `cargo insta review` to inspect the diff first), then **commit the updated `src/ui/snapshots/*.snap`** — CI compares against that committed file, so an un-blessed change fails `cargo test`. The `every_pedal_renders_*` / `add_pedal_modal_*` tests pick your pedal up automatically from the `PEDALS` table; no edit needed.
 
 ## Part B — the docs (required, same PR)
 
@@ -46,7 +49,8 @@ Data-driven HTML blocks inside Markdown — no new page. Use the **same livery c
 ```bash
 cargo fmt
 cargo clippy --all-targets -- -D warnings
-cargo test                      # new effect tests + preset round-trip
+cargo nextest run                      # new effect tests + preset round-trip + UI tables
+INSTA_UPDATE=always cargo test --lib 'ui::'   # re-bless the UI snapshot, then commit src/ui/snapshots/*.snap
 cd site && npm run build        # or: npm run dev  to preview
 ```
 
@@ -59,6 +63,7 @@ cd site && npm run build        # or: npm run dev  to preview
 - [ ] `toggle_pedal` match arm in `input.rs`
 - [ ] preset section in `preset.rs` (with enabled state)
 - [ ] `#[cfg(test)]` tests in the effect file
+- [ ] UI tests updated: `table_sizes_are_stable` counts bumped + `src/ui/snapshots/*.snap` re-blessed and committed
 - [ ] docs: `pedals.md` tile + panel, `index.md` card, `how-it-works.md`, `presets.md` stage
 - [ ] all four `cargo`/`npm` checks pass; manual audio pass done
 - [ ] code + docs in the same PR

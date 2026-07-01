@@ -110,7 +110,12 @@ To add one:
    place the pedal on the board — `sync_board` reads the enabled flags after load).
 10. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
    (finite/bounded output, and that each knob moves the band/level it should).
-11. Document the pedal on the docs site — see [Documenting a new pedal](#documenting-a-new-pedal).
+11. Update the UI tests your `config.rs` edit touches: bump the counts in
+   `table_sizes_are_stable` (`src/ui/config.rs`), then re-bless the golden
+   snapshots (`INSTA_UPDATE=always cargo nextest run`) and commit the updated
+   `src/ui/snapshots/*.snap` — the new pedal appears in the default board and the
+   add-pedal modal. See [Testing](#testing).
+12. Document the pedal on the docs site — see [Documenting a new pedal](#documenting-a-new-pedal).
 
 ### Adding a new amp model
 
@@ -174,17 +179,59 @@ the pedal shows up in the selector, the landing grid, and the flow diagram.
 
 ## Testing
 
-The DSP path has a unit-test suite — every effect, amp and cabinet model carries
-`#[cfg(test)]` tests covering stability (finite, bounded output) and behaviour
-(each control moves the band/level it should). Run them with:
+Run the whole suite with:
 
 ```bash
-cargo test
+cargo nextest run
 ```
 
-New DSP code must come with tests in the same file, and they run on every commit in
-CI. There are no automated tests for rendering and controls yet, so the UI still
-needs manual testing:
+It runs on every commit in CI (`cargo clippy --all-targets --all-features -D
+warnings` then `cargo nextest run`).
+
+### DSP tests
+
+Every effect, amp and cabinet model carries `#[cfg(test)]` tests covering
+stability (finite, bounded output) and behaviour (each control moves the
+band/level it should). New DSP code must come with tests in the same file.
+
+### UI tests
+
+The terminal UI is tested at three levels, all as `#[cfg(test)]` modules inside
+`src/ui/` (they need the modules' `pub(super)` internals):
+
+- **Table invariants** (`config.rs`) — the `KNOBS` ↔ `PEDALS` contract: pedal
+  knob-ranges tile contiguously, `pedal_of` round-trips, and a deliberate
+  `table_sizes_are_stable` tripwire pins the pedal/knob counts so a table change
+  is always a conscious edit.
+- **Navigation & state** (`input.rs`) — Tab/`←→` cycling, off-board pedals being
+  skipped, knob clamping, amp/cab cycling, and add/remove/toggle board logic.
+- **Rendering** (`draw.rs`) — the screen is drawn to an in-memory
+  [ratatui](https://ratatui.rs) `TestBackend`. Assertion tests confirm every
+  pedal/amp/cabinet renders its name and controls; **golden snapshots**
+  ([insta](https://insta.rs)) lock the exact glyphs of the default screen and each
+  modal (add-pedal, presets, save, plugin browser, external-IR browser).
+
+#### Working with snapshots
+
+Snapshots are committed under `src/ui/snapshots/*.snap` — that file *is* the
+expected output, and CI diffs the freshly rendered screen against it. When a change
+alters the UI on purpose, regenerate and review the golden, then commit it:
+
+```bash
+cargo insta test --review     # or: INSTA_UPDATE=always cargo nextest run
+```
+
+Two things to know:
+
+- **Never set `INSTA_UPDATE` in CI** — that would auto-accept and mask regressions.
+  A stray pending `*.snap.new` also fails CI, so finish the re-bless and commit the
+  `.snap`.
+- The golden tests are gated on the default `clap` feature, because the help footer
+  renders a `clap`-only key. Regenerate with default features on.
+
+### Manual audio pass
+
+The automated tests don't listen, so an audio change still needs an ear:
 
 1. `cargo run --release` with an audio interface connected
 2. Verify the effect under test across the full gain range

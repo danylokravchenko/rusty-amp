@@ -1,0 +1,29 @@
+[store]
+dir = "target/nextest"
+
+[profile.default]
+retries = 0
+fail-fast = false
+slow-timeout = { period = "180s", terminate-after = 3 }
+
+# Test threads - use all available cores
+test-threads = "num-cpus"
+
+# Status level for output
+status-level = "pass"
+final-status-level = "flaky"
+
+# Show output for failed tests
+failure-output = "immediate-final"
+success-output = "never"
+
+[profile.quick]
+# Fast profile for quick local checks
+retries = 0
+fail-fast = true
+test-threads = "num-cpus"
+status-level = "skip"
+
+# Test groups for better organization
+[test-groups]
+unit = { max-threads = "num-cpus" }
