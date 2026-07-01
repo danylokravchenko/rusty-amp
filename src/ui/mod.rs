@@ -1,3 +1,5 @@
+#[cfg(all(feature = "au", target_os = "macos"))]
+mod amp_plugins;
 mod config;
 mod draw;
 mod input;
@@ -86,6 +88,11 @@ pub fn run(
     // ── Cabinet-IR browser (external .wav IRs) ────────────────────────────────
     let mut ir_browser = ir_browser::IrBrowser::new(engine.sample_rate());
 
+    // ── Amp-plugin browser (AU amp-position override, macOS) ──────────────────
+    #[cfg(all(feature = "au", target_os = "macos"))]
+    let mut amp_browser =
+        amp_plugins::AmpBrowser::new(engine.sample_rate(), crate::audio::MAX_BLOCK as u32);
+
     // ── Main UI loop ──────────────────────────────────────────────────────────
     let mut focus: Option<usize> = None;
     // Board membership: a pedal is on the board iff it is enabled. Off-board
@@ -137,6 +144,20 @@ pub fn run(
             None
         };
 
+        // The active external amp name replaces the built-in amp label in the header,
+        // mirroring the external IR. Only meaningful on the AU-capable build.
+        #[cfg(all(feature = "au", target_os = "macos"))]
+        let ext_amp_name = if params
+            .amp_external_active
+            .load(std::sync::atomic::Ordering::Relaxed)
+        {
+            amp_browser.loaded_name()
+        } else {
+            None
+        };
+        #[cfg(not(all(feature = "au", target_os = "macos")))]
+        let ext_amp_name: Option<&str> = None;
+
         terminal.draw(|f| {
             draw(
                 f,
@@ -149,6 +170,7 @@ pub fn run(
                 status,
                 plugin_name,
                 ext_cab_name,
+                ext_amp_name,
             );
             if add_open {
                 let available: Vec<usize> = (0..PEDALS.len()).filter(|&i| !board[i]).collect();
@@ -165,7 +187,21 @@ pub fn run(
                 browser.render(f);
             }
             if ir_browser.open {
-                ir_browser.render(f);
+                use std::sync::atomic::Ordering::Relaxed;
+                // The IR is inert only when an AU is active *and* supplying its own cab
+                // (amp+cab mode); in amp-only mode the built-in cab/IR is in the path.
+                let amp_bypasses_cab = params.amp_external_active.load(Relaxed)
+                    && !params.amp_external_amp_only.load(Relaxed);
+                ir_browser.render(f, amp_bypasses_cab);
+            }
+            #[cfg(all(feature = "au", target_os = "macos"))]
+            if amp_browser.open {
+                amp_browser.render(
+                    f,
+                    params
+                        .amp_external_amp_only
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                );
             }
             if tuner_open {
                 tuner::render_tuner(f, &tuner);
@@ -183,6 +219,12 @@ pub fn run(
 
             if ir_browser.open {
                 ir_browser.handle_key(key.code, &mut engine, &params);
+                continue;
+            }
+
+            #[cfg(all(feature = "au", target_os = "macos"))]
+            if amp_browser.open {
+                amp_browser.handle_key(key.code, &mut engine, &params);
                 continue;
             }
 
@@ -350,6 +392,17 @@ pub fn run(
                     }
                     #[cfg(feature = "clap")]
                     KeyCode::Char('v') | KeyCode::Char('V') => browser.open(),
+                    #[cfg(all(feature = "au", target_os = "macos"))]
+                    KeyCode::Char('u') | KeyCode::Char('U') => amp_browser.open(),
+                    // Live A/B between the loaded AU amp and the built-in amp (no modal).
+                    #[cfg(all(feature = "au", target_os = "macos"))]
+                    KeyCode::Char('z') | KeyCode::Char('Z') => {
+                        use std::sync::atomic::Ordering::Relaxed;
+                        if params.amp_external_loaded.load(Relaxed) {
+                            let now = !params.amp_external_active.load(Relaxed);
+                            params.amp_external_active.store(now, Relaxed);
+                        }
+                    }
                     KeyCode::Char('i') | KeyCode::Char('I') => ir_browser.open(),
                     // Live A/B between the loaded IR and the built-in cab (no modal).
                     KeyCode::Char('x') | KeyCode::Char('X') => {

@@ -11,7 +11,7 @@ pub use tuner::Tuner;
 
 use atomic_float::AtomicF32;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering::Relaxed};
 
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
@@ -123,6 +123,10 @@ const DEFAULT_MIC_ROOM: f32 = 0.15;
 // it starts inactive (the engine boots on a built-in cab).
 const DEFAULT_CAB_EXTERNAL_ACTIVE: bool = false;
 
+// Same story for an external amp (a hosted AU amp sim): it can be toggled against the
+// built-in amp+cab live and starts inactive (the engine boots on the built-in amp).
+const DEFAULT_AMP_EXTERNAL_ACTIVE: bool = false;
+
 const DEFAULT_NG_ENABLED: bool = true;
 const DEFAULT_NG_THRESHOLD: f32 = 0.20;
 const DEFAULT_NG_RELEASE: f32 = 0.30;
@@ -205,6 +209,20 @@ pub struct Params {
     // is meaningful.
     pub cab_external_active: Arc<AtomicBool>,
     pub cab_external_loaded: Arc<AtomicBool>,
+
+    // External-amp override. `amp_external_active` selects a loaded AU amp sim over the
+    // built-in amp+cab (flipped live by the UI, instant, no reload). `amp_external_loaded`
+    // is set by the control thread so the UI knows an AU is installed and the toggle is
+    // meaningful. When active, the built-in amp *and* cab are bypassed (an amp-sim AU
+    // brings its own cabinet).
+    pub amp_external_active: Arc<AtomicBool>,
+    pub amp_external_loaded: Arc<AtomicBool>,
+    // `true` = the loaded AU is amp-only, so the built-in cab (or active external IR)
+    // still runs on its output; `false` (default) = the AU brings its own cab and the
+    // built-in cab is bypassed. `amp_external_latency` is the AU's reported latency in
+    // frames, used to delay the built-in path so built-in↔AU stays time-coherent.
+    pub amp_external_amp_only: Arc<AtomicBool>,
+    pub amp_external_latency: Arc<AtomicUsize>,
 
     // Noise gate
     pub ng_enabled: Arc<AtomicBool>,
@@ -308,6 +326,11 @@ impl Params {
             cab_external_active: b!(DEFAULT_CAB_EXTERNAL_ACTIVE),
             cab_external_loaded: b!(false),
 
+            amp_external_active: b!(DEFAULT_AMP_EXTERNAL_ACTIVE),
+            amp_external_loaded: b!(false),
+            amp_external_amp_only: b!(false),
+            amp_external_latency: Arc::new(AtomicUsize::new(0)),
+
             ng_enabled: b!(DEFAULT_NG_ENABLED),
             ng_threshold: p!(DEFAULT_NG_THRESHOLD),
             ng_release: p!(DEFAULT_NG_RELEASE),
@@ -382,6 +405,12 @@ impl Params {
         // the chain — only its active/inactive selection is a default-able param.
         self.cab_external_active
             .store(DEFAULT_CAB_EXTERNAL_ACTIVE, Relaxed);
+        // Fall back to the built-in amp and its cab pairing. The loaded AU (if any)
+        // stays installed — only the active selection and amp-only routing are reset;
+        // the AU's reported latency is intrinsic to the loaded plugin, so it is left.
+        self.amp_external_active
+            .store(DEFAULT_AMP_EXTERNAL_ACTIVE, Relaxed);
+        self.amp_external_amp_only.store(false, Relaxed);
 
         self.ng_enabled.store(DEFAULT_NG_ENABLED, Relaxed);
         self.ng_threshold.store(DEFAULT_NG_THRESHOLD, Relaxed);
@@ -537,6 +566,15 @@ pub struct DspChain {
     /// `params.cab_external_active`, it replaces the built-in [`CabBank`] at the cab
     /// stage. Built off the audio thread and swapped in lock-free, like `insert`.
     ext_cab: Option<Box<ExternalIrCab>>,
+    /// Optional user-loaded external amp (a hosted AU amp sim). When present *and*
+    /// `params.amp_external_active`, it replaces the built-in amp (and, unless the AU is
+    /// flagged amp-only, the cab too): the mono pre-amp signal is fed to it (duplicated
+    /// to stereo) and its output goes to the rack. A [`StereoInsert`] like `insert`,
+    /// swapped in lock-free.
+    ext_amp: Option<Box<dyn StereoInsert>>,
+    /// Delays the built-in amp path by the loaded AU's reported latency so switching
+    /// built-in↔AU stays time-coherent. Only engaged while an AU is loaded.
+    comp_delay: CompDelay,
 }
 
 impl DspChain {
@@ -558,12 +596,20 @@ impl DspChain {
             params,
             insert: None,
             ext_cab: None,
+            ext_amp: None,
+            // Cap the compensation delay at 1 s — far beyond any real plugin latency.
+            comp_delay: CompDelay::new(sr as usize),
         }
     }
 
     /// Install (or clear, with `None`) the stereo plugin insert.
     pub fn set_insert(&mut self, insert: Option<Box<dyn StereoInsert>>) {
         self.insert = insert;
+    }
+
+    /// Install (or clear, with `None`) the external amp override.
+    pub fn set_ext_amp(&mut self, amp: Option<Box<dyn StereoInsert>>) {
+        self.ext_amp = amp;
     }
 
     /// Swap the external-IR cab, returning the displaced one (if any) for disposal
@@ -576,6 +622,18 @@ impl DspChain {
         cab: Option<Box<ExternalIrCab>>,
     ) -> Option<Box<ExternalIrCab>> {
         std::mem::replace(&mut self.ext_cab, cab)
+    }
+
+    /// Swap the external amp, returning the displaced one (if any) for disposal off the
+    /// audio thread. Same lock-free pointer-move discipline as
+    /// [`replace_insert`](Self::replace_insert): a hosted plugin must not be dropped in
+    /// the realtime callback.
+    #[must_use = "the displaced external amp must be dropped off the audio thread"]
+    pub fn replace_ext_amp(
+        &mut self,
+        amp: Option<Box<dyn StereoInsert>>,
+    ) -> Option<Box<dyn StereoInsert>> {
+        std::mem::replace(&mut self.ext_amp, amp)
     }
 
     /// Swap the stereo plugin insert, returning the displaced one (if any).
@@ -604,11 +662,19 @@ impl DspChain {
     /// [`process`](Self::process) wrapper applies the master bus directly.
     #[inline]
     fn process_core(&mut self, sample: f32) -> (f32, f32) {
-        let p = &self.params;
+        let x = self.pre_amp(sample);
+        let (l, r) = self.amp_cab(x);
+        self.rack(l, r)
+    }
 
-        // Mono pedal chain (gate → compressor → fuzz → TS → DS → pre-amp EQ).
-        // Fuzz comes first so it sees the rawest signal; the pre-amp EQ comes last
-        // so it shapes exactly what the amp's gain stage clips.
+    /// Mono pre-amp path: gate → compressor → fuzz → TS → DS → pre-amp EQ.
+    ///
+    /// Fuzz comes first so it sees the rawest signal; the pre-amp EQ comes last so it
+    /// shapes exactly what the amp's gain stage clips. This is the mono signal fed to
+    /// either the built-in amp or a hosted external amp.
+    #[inline]
+    fn pre_amp(&mut self, sample: f32) -> f32 {
+        let p = &self.params;
         let x = sample;
         let x = mono_stage!(self, p, x, ng_enabled, ng, ng_threshold, ng_release);
         let x = mono_stage!(
@@ -624,10 +690,22 @@ impl DspChain {
         let x = mono_stage!(self, p, x, fz_enabled, fz, fz_fuzz, fz_tone, fz_level);
         let x = mono_stage!(self, p, x, ts_enabled, ts, ts_drive, ts_tone, ts_level);
         let x = mono_stage!(self, p, x, ds_enabled, ds, ds_drive, ds_tone, ds_level);
-        let x = mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high);
+        mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high)
+    }
 
-        // Amp
-        let x = self.amp.process(
+    /// Built-in amp then cabinet: mono in, stereo out.
+    #[inline]
+    fn amp_cab(&mut self, x: f32) -> (f32, f32) {
+        let x = self.amp_stage(x);
+        self.cab_stage(x)
+    }
+
+    /// The built-in amp gain/tone stage (mono → mono). Bypassed when an external amp is
+    /// active (that path runs the hosted AU instead).
+    #[inline]
+    fn amp_stage(&mut self, x: f32) -> f32 {
+        let p = &self.params;
+        self.amp.process(
             p.amp_model(),
             x,
             p.amp_gain.load(Relaxed),
@@ -636,12 +714,17 @@ impl DspChain {
             p.amp_treble.load(Relaxed),
             p.amp_presence.load(Relaxed),
             p.amp_master.load(Relaxed),
-        );
+        )
+    }
 
-        // Cabinet simulation — mono in, stereo out. A loaded external IR overrides
-        // the built-in cab when active; otherwise the multi-mic blend renders. The
-        // external path ignores the mic knobs (the capture is already miked).
-        let (l, r) = match self.ext_cab.as_mut() {
+    /// The cabinet stage (mono → stereo). A loaded external IR overrides the built-in
+    /// cab when active; otherwise the multi-mic blend renders (the external IR path
+    /// ignores the mic knobs — the capture is already miked). Reused by the amp-only
+    /// external-amp path, which feeds it the AU's (summed-to-mono) output.
+    #[inline]
+    fn cab_stage(&mut self, x: f32) -> (f32, f32) {
+        let p = &self.params;
+        match self.ext_cab.as_mut() {
             Some(ext) if p.cab_external_active.load(Relaxed) => {
                 use cab::Cabinet;
                 ext.process(x, 0.0, 0.0, 0.0)
@@ -653,11 +736,15 @@ impl DspChain {
                 p.mic_blend.load(Relaxed),
                 p.mic_room.load(Relaxed),
             ),
-        };
+        }
+    }
 
-        // Stereo rack (parametric EQ → flanger → chorus → ping-pong delay → reverb).
-        // The flanger and chorus modulate the finished tone ahead of the time-based
-        // ambience.
+    /// Stereo rack (parametric EQ → flanger → chorus → ping-pong delay → reverb).
+    /// The flanger and chorus modulate the finished tone ahead of the time-based
+    /// ambience. Runs after both the built-in and external amp paths.
+    #[inline]
+    fn rack(&mut self, l: f32, r: f32) -> (f32, f32) {
+        let p = &self.params;
         let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);
         let (l, r) = stereo_stage!(
             self,
@@ -683,7 +770,7 @@ impl DspChain {
             delay_feedback,
             delay_mix
         );
-        let (l, r) = stereo_stage!(
+        stereo_stage!(
             self,
             p,
             l,
@@ -693,9 +780,7 @@ impl DspChain {
             rev_room,
             rev_damp,
             rev_mix
-        );
-
-        (l, r)
+        )
     }
 
     /// Process one mono input sample, returning a stereo (L, R) pair.
@@ -711,25 +796,74 @@ impl DspChain {
 
     /// Process a block of mono input samples into stereo output buffers.
     ///
-    /// Per sample: the core chain (pedals → amp → cab → stereo rack). Then, once
-    /// per block, the optional plugin insert runs across the whole buffer in the
-    /// stereo domain. Finally the master bus (widen + soft-limit) is applied per
-    /// sample. The master bus is stateless, so splitting it out of the core loop is
-    /// exact — and with no insert loaded the whole block is bit-identical to calling
+    /// Normal path, per sample: the core chain (pedals → amp → cab → stereo rack).
+    /// When an **external amp** is loaded and active, the amp stage is replaced by a
+    /// block-based override: the mono pre-amp signal is duplicated to stereo and run
+    /// through the hosted plugin (this is why the amp position needs a block boundary —
+    /// a plugin processes whole buffers, not samples). By default the AU also supplies
+    /// the cab, so its output goes straight to the rack; if the AU is flagged amp-only,
+    /// its output is summed to mono and run through the built-in [`cab_stage`] first.
+    ///
+    /// While an AU is *loaded* but the built-in path runs (AU inactive), that path is
+    /// delayed by the AU's reported latency ([`comp_delay`]) so toggling built-in↔AU is
+    /// time-coherent. Either way, the optional post-rack plugin insert then runs once
+    /// over the block, and the stateless master bus is applied per sample. With no
+    /// external amp and no insert loaded, the block is bit-identical to calling
     /// [`process`](Self::process) on each sample.
     ///
     /// `out_l`/`out_r` must each be at least `input.len()` long; processing stops at
     /// the shortest of the three slices.
     pub fn process_block(&mut self, input: &[f32], out_l: &mut [f32], out_r: &mut [f32]) {
         let n = input.len().min(out_l.len()).min(out_r.len());
+        let input = &input[..n];
         let out_l = &mut out_l[..n];
         let out_r = &mut out_r[..n];
 
-        // Core chain, per sample (mono → stereo internally).
-        for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
-            let (lv, rv) = self.process_core(x);
-            *l = lv;
-            *r = rv;
+        let p = &self.params;
+        let amp_loaded = self.ext_amp.is_some();
+        let use_ext_amp = amp_loaded && p.amp_external_active.load(Relaxed);
+        if use_ext_amp {
+            let amp_only = p.amp_external_amp_only.load(Relaxed);
+            // External amp path: pre-amp (mono) → duplicate to stereo → hosted plugin.
+            // Separate loops so the `ext_amp` borrow doesn't overlap `self` method calls.
+            for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
+                let pre = self.pre_amp(x);
+                *l = pre;
+                *r = pre;
+            }
+            if let Some(ext_amp) = self.ext_amp.as_mut() {
+                ext_amp.process_block(out_l, out_r);
+            }
+            for (l, r) in out_l.iter_mut().zip(out_r.iter_mut()) {
+                // amp-only: the AU replaced only the amp, so run the built-in cab (or
+                // active IR) on its output, summed to mono. Otherwise the AU brought its
+                // own cab and its stereo output goes straight to the rack.
+                let (cl, cr) = if amp_only {
+                    self.cab_stage(0.5 * (*l + *r))
+                } else {
+                    (*l, *r)
+                };
+                let (lv, rv) = self.rack(cl, cr);
+                *l = lv;
+                *r = rv;
+            }
+        } else {
+            // Normal path: the full built-in core chain, per sample.
+            for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
+                let (lv, rv) = self.process_core(x);
+                *l = lv;
+                *r = rv;
+            }
+            // Keep the built-in path time-aligned with the AU while one is loaded, so
+            // the built-in↔AU A/B doesn't jump. No AU loaded → untouched (bit-identical).
+            if amp_loaded {
+                let delay = self.params.amp_external_latency.load(Relaxed);
+                for (l, r) in out_l.iter_mut().zip(out_r.iter_mut()) {
+                    let (dl, dr) = self.comp_delay.process(*l, *r, delay);
+                    *l = dl;
+                    *r = dr;
+                }
+            }
         }
 
         // Optional third-party stereo insert, one block at a time.
@@ -776,6 +910,41 @@ fn soft_limit(x: f32) -> f32 {
     } else {
         let excess = a - 0.95;
         x.signum() * (0.95 + excess / (1.0 + excess * 5.0))
+    }
+}
+
+/// A fixed-capacity stereo delay line used to time-align the built-in amp path with a
+/// hosted AU's reported latency. The delay length is set per block (0 = passthrough);
+/// changing it self-heals within `cap` samples. Ring buffers are pre-allocated so the
+/// audio thread never allocates.
+struct CompDelay {
+    buf_l: Vec<f32>,
+    buf_r: Vec<f32>,
+    pos: usize,
+}
+
+impl CompDelay {
+    fn new(cap: usize) -> Self {
+        let cap = cap.max(1);
+        Self {
+            buf_l: vec![0.0; cap],
+            buf_r: vec![0.0; cap],
+            pos: 0,
+        }
+    }
+
+    /// Push `(l, r)` and return the pair from `delay` samples ago (clamped to capacity).
+    /// `delay == 0` returns the input unchanged (write-then-read at the same index).
+    #[inline]
+    fn process(&mut self, l: f32, r: f32, delay: usize) -> (f32, f32) {
+        let cap = self.buf_l.len();
+        let d = delay.min(cap - 1);
+        self.buf_l[self.pos] = l;
+        self.buf_r[self.pos] = r;
+        let read = (self.pos + cap - d) % cap;
+        let out = (self.buf_l[read], self.buf_r[read]);
+        self.pos = (self.pos + 1) % cap;
+        out
     }
 }
 
@@ -876,6 +1045,146 @@ mod tests {
                 || bare_r.iter().zip(&ins_r).any(|(a, b)| a != b),
             "insert had no effect on the output"
         );
+    }
+
+    /// An active external amp must override the built-in amp+cab (its output feeds the
+    /// rack instead), and a *loaded but inactive* external amp must leave the built-in
+    /// path bit-identical — the live built-in↔external toggle depends on both.
+    #[test]
+    fn external_amp_overrides_builtin_only_when_active() {
+        // A recognisable stereo signature so we can tell the override actually ran.
+        struct ConstAmp;
+        impl StereoInsert for ConstAmp {
+            fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
+                for (l, r) in left.iter_mut().zip(right.iter_mut()) {
+                    *l = 0.3;
+                    *r = -0.3;
+                }
+            }
+        }
+
+        let sr = 48_000.0;
+        let input: Vec<f32> = (0..1000)
+            .map(|n| (2.0 * PI * 220.0 * n as f32 / sr).sin() * 0.6)
+            .collect();
+        let bufs = || (vec![0.0f32; input.len()], vec![0.0f32; input.len()]);
+
+        // Built-in reference path (no external amp).
+        let mut builtin = DspChain::new(sr, Arc::new(Params::new()));
+        let (mut bl, mut br) = bufs();
+        builtin.process_block(&input, &mut bl, &mut br);
+
+        // External amp loaded *and active*: must diverge from the built-in path.
+        let params = Arc::new(Params::new());
+        params.amp_external_active.store(true, Relaxed);
+        let mut active = DspChain::new(sr, params);
+        active.set_ext_amp(Some(Box::new(ConstAmp)));
+        let (mut al, mut ar) = bufs();
+        active.process_block(&input, &mut al, &mut ar);
+        assert!(
+            bl.iter().zip(&al).any(|(a, b)| a != b) || br.iter().zip(&ar).any(|(a, b)| a != b),
+            "active external amp had no effect (built-in amp+cab not bypassed)"
+        );
+
+        // External amp loaded but *inactive*: must match the built-in path exactly.
+        let mut inactive = DspChain::new(sr, Arc::new(Params::new()));
+        inactive.set_ext_amp(Some(Box::new(ConstAmp)));
+        let (mut il, mut ir) = bufs();
+        inactive.process_block(&input, &mut il, &mut ir);
+        assert_eq!(
+            il, bl,
+            "inactive external amp altered the built-in path (L)"
+        );
+        assert_eq!(
+            ir, br,
+            "inactive external amp altered the built-in path (R)"
+        );
+    }
+
+    /// In amp-only mode the AU replaces only the amp, so its output must be run through
+    /// the built-in cab before the rack — audibly different from the default amp+cab
+    /// mode where the AU's output goes straight to the rack.
+    #[test]
+    fn amp_only_external_amp_runs_through_builtin_cab() {
+        // A fake amp that just passes its (duplicated pre-amp) input at a fixed gain.
+        struct GainAmp;
+        impl StereoInsert for GainAmp {
+            fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
+                for (l, r) in left.iter_mut().zip(right.iter_mut()) {
+                    *l *= 0.8;
+                    *r *= 0.8;
+                }
+            }
+        }
+
+        let sr = 48_000.0;
+        let input: Vec<f32> = (0..2000)
+            .map(|n| (2.0 * PI * 110.0 * n as f32 / sr).sin() * 0.5)
+            .collect();
+        let bufs = || (vec![0.0f32; input.len()], vec![0.0f32; input.len()]);
+
+        // Default (amp+cab): AU output goes straight to the rack.
+        let p1 = Arc::new(Params::new());
+        p1.amp_external_active.store(true, Relaxed);
+        let mut full = DspChain::new(sr, p1);
+        full.set_ext_amp(Some(Box::new(GainAmp)));
+        let (mut fl, mut fr) = bufs();
+        full.process_block(&input, &mut fl, &mut fr);
+
+        // Amp-only: AU output is summed to mono and run through the built-in cab.
+        let p2 = Arc::new(Params::new());
+        p2.amp_external_active.store(true, Relaxed);
+        p2.amp_external_amp_only.store(true, Relaxed);
+        let mut amp_only = DspChain::new(sr, p2);
+        amp_only.set_ext_amp(Some(Box::new(GainAmp)));
+        let (mut ol, mut or) = bufs();
+        amp_only.process_block(&input, &mut ol, &mut or);
+
+        assert!(
+            fl.iter().zip(&ol).any(|(a, b)| (a - b).abs() > 1e-6)
+                || fr.iter().zip(&or).any(|(a, b)| (a - b).abs() > 1e-6),
+            "amp-only mode did not route the AU output through the built-in cab"
+        );
+    }
+
+    /// With an AU loaded, the built-in path must be delayed by the AU's reported latency
+    /// so a built-in↔AU A/B stays time-coherent: the delayed output is the zero-latency
+    /// output shifted right by exactly N samples, with N leading zero samples.
+    #[test]
+    fn latency_comp_delays_builtin_path_by_reported_frames() {
+        struct Silent;
+        impl StereoInsert for Silent {
+            fn process_block(&mut self, _l: &mut [f32], _r: &mut [f32]) {}
+        }
+        const N: usize = 32;
+        let sr = 48_000.0;
+        let input: Vec<f32> = (0..800)
+            .map(|n| (2.0 * PI * 196.0 * n as f32 / sr).sin() * 0.5)
+            .collect();
+        let bufs = || (vec![0.0f32; input.len()], vec![0.0f32; input.len()]);
+
+        // AU loaded but inactive, latency 0 → built-in path runs undelayed.
+        let p0 = Arc::new(Params::new());
+        let mut c0 = DspChain::new(sr, p0);
+        c0.set_ext_amp(Some(Box::new(Silent)));
+        let (mut l0, mut r0) = bufs();
+        c0.process_block(&input, &mut l0, &mut r0);
+
+        // AU loaded but inactive, latency N → built-in path delayed by N samples.
+        let pn = Arc::new(Params::new());
+        pn.amp_external_latency.store(N, Relaxed);
+        let mut cn = DspChain::new(sr, pn);
+        cn.set_ext_amp(Some(Box::new(Silent)));
+        let (mut ln, mut rn) = bufs();
+        cn.process_block(&input, &mut ln, &mut rn);
+
+        for i in 0..N {
+            assert_eq!((ln[i], rn[i]), (0.0, 0.0), "leading sample {i} not zero");
+        }
+        for i in N..input.len() {
+            assert_eq!(ln[i], l0[i - N], "L not delayed by {N} at {i}");
+            assert_eq!(rn[i], r0[i - N], "R not delayed by {N} at {i}");
+        }
     }
 
     /// `replace_insert` must hand back exactly the insert it displaced — the engine

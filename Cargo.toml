@@ -1,6 +1,6 @@
 [package]
 name = "rusty-amp"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.96"
 description = "A guitar amplifier and effects simulator in your terminal"
@@ -34,13 +34,24 @@ clack-extensions = { version = "0.1.0", features = [
     "log",
 ], optional = true }
 
+# Audio Unit hosting (macOS only) — raw CoreAudio/AudioToolbox bindings. It also
+# re-exports the CoreFoundation string calls we need to read component/parameter
+# names (with a matching CFStringRef type), so no separate core-foundation crate is
+# required. Only pulled in with the `au` feature, and only on macOS where the
+# frameworks exist.
+[target.'cfg(target_os = "macos")'.dependencies]
+coreaudio-sys = { version = "0.2.18", optional = true }
+
 [features]
 # Plugin hosting is on by default so it works out of the box (and ships in the
 # release binaries). Build with `--no-default-features` for a minimal amp with no
 # CLAP dependencies / no plugin-loading FFI.
-default = ["clap"]
+default = ["clap", "au"]
 # Host third-party CLAP effect plugins as a stereo insert in the signal chain.
 clap = ["dep:clack-host", "dep:clack-extensions"]
+# Host macOS Audio Unit plugins as an amp-position override. A no-op on non-macOS
+# targets (the dependencies are gated to macOS), so it's safe to leave in `default`.
+au = ["dep:coreaudio-sys"]
 
 [dev-dependencies]
 # Golden-snapshot testing for the terminal UI: render to an in-memory buffer and

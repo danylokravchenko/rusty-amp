@@ -20,6 +20,10 @@ type InsertCommand = Option<Box<dyn StereoInsert>>;
 /// to clear). Boxed for the same reason as [`InsertCommand`].
 type ExtCabCommand = Option<Box<ExternalIrCab>>;
 
+/// A swappable external amp (a hosted plugin) handed to the audio thread (`Some` to
+/// install, `None` to clear). Boxed like [`InsertCommand`].
+type ExtAmpCommand = Option<Box<dyn StereoInsert>>;
+
 /// How many pending insert swaps / disposals the lock-free rings can hold. Swaps
 /// are rare (a user loading/clearing a plugin), so a small buffer is plenty.
 const INSERT_QUEUE_CAP: usize = 8;
@@ -43,6 +47,10 @@ pub struct AudioEngine {
     ext_cab_tx: Producer<ExtCabCommand>,
     /// Receives external-IR cabs the audio thread displaced, for off-thread disposal.
     ext_dropped_rx: Consumer<Box<ExternalIrCab>>,
+    /// Sends external-amp swaps to the audio thread.
+    ext_amp_tx: Producer<ExtAmpCommand>,
+    /// Receives external amps the audio thread displaced, for off-thread disposal.
+    ext_amp_dropped_rx: Consumer<Box<dyn StereoInsert>>,
 }
 
 impl AudioEngine {
@@ -79,6 +87,21 @@ impl AudioEngine {
         self.ext_cab_tx
             .push(cab)
             .map_err(|_| anyhow!("external-cab command queue is full"))
+    }
+
+    /// Install (`Some`) or clear (`None`) the external amp override (a hosted plugin).
+    ///
+    /// Call from the UI/control thread. The swap happens lock-free in the audio
+    /// callback; any displaced amp is disposed of here, on the caller's thread, so a
+    /// plugin is never freed in the realtime path. Build the plugin (via the `host`
+    /// module) before calling.
+    pub fn set_external_amp(&mut self, amp: ExtAmpCommand) -> Result<()> {
+        while let Ok(old) = self.ext_amp_dropped_rx.pop() {
+            drop(old);
+        }
+        self.ext_amp_tx
+            .push(amp)
+            .map_err(|_| anyhow!("external-amp command queue is full"))
     }
 }
 
@@ -223,6 +246,9 @@ fn build_engine(
     let (ext_cab_tx, mut ext_cab_rx) = RingBuffer::<ExtCabCommand>::new(INSERT_QUEUE_CAP);
     let (mut ext_dropped_tx, ext_dropped_rx) =
         RingBuffer::<Box<ExternalIrCab>>::new(INSERT_QUEUE_CAP);
+    let (ext_amp_tx, mut ext_amp_rx) = RingBuffer::<ExtAmpCommand>::new(INSERT_QUEUE_CAP);
+    let (mut ext_amp_dropped_tx, ext_amp_dropped_rx) =
+        RingBuffer::<Box<dyn StereoInsert>>::new(INSERT_QUEUE_CAP);
 
     let attack = 1.0 - (-1.0 / (0.001 * sr)).exp();
     let release = 1.0 - (-1.0 / (0.300 * sr)).exp();
@@ -251,6 +277,12 @@ fn build_engine(
             while let Ok(cmd) = ext_cab_rx.pop() {
                 if let Some(old) = chain.replace_external_cab(cmd) {
                     let _ = ext_dropped_tx.push(old);
+                }
+            }
+            // ...and for external-amp swaps.
+            while let Ok(cmd) = ext_amp_rx.pop() {
+                if let Some(old) = chain.replace_ext_amp(cmd) {
+                    let _ = ext_amp_dropped_tx.push(old);
                 }
             }
 
@@ -342,5 +374,7 @@ fn build_engine(
         dropped_rx,
         ext_cab_tx,
         ext_dropped_rx,
+        ext_amp_tx,
+        ext_amp_dropped_rx,
     })
 }

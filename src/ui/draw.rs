@@ -24,6 +24,7 @@ pub(super) fn draw(
     status: Option<&str>,
     plugin: Option<&str>,
     ext_cab: Option<&str>,
+    ext_amp: Option<&str>,
 ) {
     let area = f.area();
 
@@ -43,18 +44,22 @@ pub(super) fn draw(
             Constraint::Length(3), // amp / cab selector
             Constraint::Length(7), // amplifier + cabinet/mic
             Constraint::Min(0),    // guitar rig
-            Constraint::Length(1), // help
+            Constraint::Length(2), // help (two rows — one line overflows once every
+                                   // hint, including the optional plugin ones, is on)
         ])
         .split(inner);
 
-    render_header(f, rows[0], params, recording, blink, plugin, ext_cab);
+    render_header(
+        f, rows[0], params, recording, blink, plugin, ext_cab, ext_amp,
+    );
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
-    render_amp(f, rows[3], params, focus, ext_cab);
+    render_amp(f, rows[3], params, focus, ext_cab, ext_amp);
     render_rig(f, rows[4], params, board, focus);
     render_help(f, rows[5], status);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_header(
     f: &mut Frame,
     area: Rect,
@@ -63,6 +68,7 @@ fn render_header(
     blink: bool,
     plugin: Option<&str>,
     ext_cab: Option<&str>,
+    ext_amp: Option<&str>,
 ) {
     let block = Block::default()
         .borders(Borders::BOTTOM)
@@ -77,11 +83,20 @@ fn render_header(
         .constraints([Constraint::Length(1), Constraint::Length(1)])
         .split(inner);
 
-    let amp_name = params.amp_model().name().to_uppercase();
-    // An active external IR replaces the built-in cab label in the header.
-    let cab_name = match ext_cab {
-        Some(name) => format!("IR: {}", name.to_uppercase()),
-        None => params.cab_model().name().to_uppercase(),
+    // An active external amp (hosted AU) replaces the built-in amp label in the header.
+    let amp_name = match ext_amp {
+        Some(name) => format!("AU: {}", name.to_uppercase()),
+        None => params.amp_model().name().to_uppercase(),
+    };
+    // The cab label reflects the active cab: an AU supplying its own cab reads
+    // "PLUGIN CAB", else an active external IR reads "IR: …", else the built-in model.
+    let cab_name = if cab_bypassed_by_amp(params) {
+        "PLUGIN CAB".to_owned()
+    } else {
+        match ext_cab {
+            Some(name) => format!("IR: {}", name.to_uppercase()),
+            None => params.cab_model().name().to_uppercase(),
+        }
     };
 
     let mut title_spans = vec![
@@ -309,53 +324,22 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         .split(inner);
 
     // ── Amp model selector ────────────────────────────────────────────────────
+    // When an external AU is the active amp the built-in model is bypassed, so the
+    // whole selector is dimmed to signal it has no effect until `Z` returns to it.
     let amp_model = params.amp_model();
     let label_color = if focused { AMBER } else { DIM };
+    let amp_ext_active = params.amp_external_active.load(Relaxed);
+    let amp_label_fg = if amp_ext_active { OFF } else { label_color };
 
     let mut amp_spans = vec![Span::styled(
         "  AMP  ",
         Style::default()
-            .fg(label_color)
+            .fg(amp_label_fg)
             .add_modifier(Modifier::BOLD),
     )];
     for m in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
         let selected = m == amp_model;
-        let style = if selected {
-            Style::default()
-                .fg(ORANGE)
-                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
-        } else {
-            Style::default().fg(Color::Rgb(80, 60, 0))
-        };
-        let (bl, br) = if selected {
-            ("◀ ", " ▶")
-        } else {
-            ("[ ", " ]")
-        };
-        let bc = if selected { AMBER } else { DIM };
-        amp_spans.push(Span::styled(bl, Style::default().fg(bc)));
-        amp_spans.push(Span::styled(m.short_name(), style));
-        amp_spans.push(Span::styled(br, Style::default().fg(bc)));
-        amp_spans.push(Span::raw("  "));
-    }
-    if focused {
-        amp_spans.push(Span::styled("↑/↓  A", Style::default().fg(DIM)));
-    }
-    f.render_widget(Paragraph::new(Line::from(amp_spans)), cols[0]);
-
-    // ── Cabinet model selector ────────────────────────────────────────────────
-    // When an external IR is the active cab the built-in model is bypassed, so the
-    // whole selector is dimmed to signal it has no effect until `C` returns to it.
-    let cab_model = params.cab_model();
-    let ext_active = params.cab_external_active.load(Relaxed);
-    let label_fg = if ext_active { OFF } else { label_color };
-    let mut cab_spans = vec![Span::styled(
-        "  CAB  ",
-        Style::default().fg(label_fg).add_modifier(Modifier::BOLD),
-    )];
-    for m in [CabModel::Mesa, CabModel::Marshall, CabModel::Orange] {
-        let selected = m == cab_model;
-        let style = if ext_active {
+        let style = if amp_ext_active {
             Style::default().fg(OFF)
         } else if selected {
             Style::default()
@@ -369,7 +353,57 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         } else {
             ("[ ", " ]")
         };
-        let bc = if ext_active {
+        let bc = if amp_ext_active {
+            OFF
+        } else if selected {
+            AMBER
+        } else {
+            DIM
+        };
+        amp_spans.push(Span::styled(bl, Style::default().fg(bc)));
+        amp_spans.push(Span::styled(m.short_name(), style));
+        amp_spans.push(Span::styled(br, Style::default().fg(bc)));
+        amp_spans.push(Span::raw("  "));
+    }
+    if focused {
+        let hint = if amp_ext_active {
+            "Z → built-in"
+        } else {
+            "↑/↓  A"
+        };
+        amp_spans.push(Span::styled(hint, Style::default().fg(DIM)));
+    }
+    f.render_widget(Paragraph::new(Line::from(amp_spans)), cols[0]);
+
+    // ── Cabinet model selector ────────────────────────────────────────────────
+    // The built-in cab model has no effect when an external IR is the active cab, or
+    // when an external amp is supplying its own cab (amp+cab mode) — dim the selector
+    // in either case. (In amp-only mode the built-in cab is back in the path.)
+    let cab_model = params.cab_model();
+    let ext_active = params.cab_external_active.load(Relaxed);
+    let cab_inactive = ext_active || cab_bypassed_by_amp(params);
+    let label_fg = if cab_inactive { OFF } else { label_color };
+    let mut cab_spans = vec![Span::styled(
+        "  CAB  ",
+        Style::default().fg(label_fg).add_modifier(Modifier::BOLD),
+    )];
+    for m in [CabModel::Mesa, CabModel::Marshall, CabModel::Orange] {
+        let selected = m == cab_model;
+        let style = if cab_inactive {
+            Style::default().fg(OFF)
+        } else if selected {
+            Style::default()
+                .fg(ORANGE)
+                .add_modifier(Modifier::BOLD | Modifier::REVERSED)
+        } else {
+            Style::default().fg(Color::Rgb(80, 60, 0))
+        };
+        let (bl, br) = if selected {
+            ("◀ ", " ▶")
+        } else {
+            ("[ ", " ]")
+        };
+        let bc = if cab_inactive {
             OFF
         } else if selected {
             AMBER
@@ -382,7 +416,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         cab_spans.push(Span::raw("  "));
     }
     if focused {
-        let hint = if ext_active {
+        let hint = if cab_inactive {
             "C → built-in"
         } else {
             "C to toggle"
@@ -399,6 +433,7 @@ fn render_amp(
     params: &Params,
     focus: Option<usize>,
     ext_cab: Option<&str>,
+    ext_amp: Option<&str>,
 ) {
     let amp_active = focus.is_some_and(|i| (AMP_START..AMP_END).contains(&i));
     let mic_active = focus.is_some_and(|i| (MIC_START..MIC_END).contains(&i));
@@ -408,12 +443,23 @@ fn render_amp(
         WARM
     };
 
-    let amp_name = params.amp_model().name().to_uppercase();
-    // The cabinet/mic panel reflects the active cab: the loaded IR's name (with the
-    // mic knobs inert) or the built-in cab model.
-    let cab_name = match ext_cab {
-        Some(name) => format!("IR: {name}"),
-        None => params.cab_model().short_name().to_owned(),
+    // The amp panel reflects the active amp: a loaded AU's name (with the tone-stack
+    // knobs inert) or the built-in amp model.
+    let amp_name = match ext_amp {
+        Some(name) => format!("AU: {name}"),
+        None => params.amp_model().name().to_uppercase(),
+    };
+    // The cabinet/mic panel reflects the active cab. An external amp supplying its own
+    // cab (amp+cab mode) bypasses the whole cab stage; otherwise a loaded IR or the
+    // built-in cab model is shown.
+    let cab_bypassed = cab_bypassed_by_amp(params);
+    let cab_name = if cab_bypassed {
+        "PLUGIN CAB".to_owned()
+    } else {
+        match ext_cab {
+            Some(name) => format!("IR: {name}"),
+            None => params.cab_model().short_name().to_owned(),
+        }
     };
 
     let left_title = Line::from(vec![
@@ -465,6 +511,10 @@ fn render_amp(
                 .collect::<Vec<_>>(),
         )
         .split(panel[0]);
+    // The tone-stack knobs drive the built-in amp; a loaded AU brings its own gain and
+    // tone controls (edited in the AU modal), so they are dimmed while it is active —
+    // exactly as the mic knobs are while an external IR is up.
+    let amp_live = ext_amp.is_none();
     for (i, ki) in (AMP_START..AMP_END).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
         render_compact_knob(
@@ -473,7 +523,7 @@ fn render_amp(
             KNOBS[ki].label,
             val,
             focus == Some(ki),
-            true,
+            amp_live,
             AMBER,
         );
     }
@@ -488,9 +538,9 @@ fn render_amp(
                 .collect::<Vec<_>>(),
         )
         .split(panel[1]);
-    // The mic knobs only colour the built-in cab's multi-mic blend; a loaded IR is
-    // a finished capture, so they are dimmed (inactive) while an external IR is up.
-    let mic_live = ext_cab.is_none();
+    // The mic knobs only colour the built-in cab's multi-mic blend; they are inert when
+    // a finished IR is the cab, or when an external amp supplies its own cab.
+    let mic_live = ext_cab.is_none() && !cab_bypassed;
     for (i, ki) in (MIC_START..MIC_END).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
         render_compact_knob(
@@ -866,49 +916,72 @@ fn render_compact_knob(
     );
 }
 
+/// Two-row key hint footer. One row overflows once every hint — including the
+/// optional plugin ones — is enabled, so editing/navigation keys sit on the first row
+/// and section/plugin/transport keys on the second.
 fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
-    let line = if let Some(msg) = status {
-        Line::from(vec![Span::styled(
+    if let Some(msg) = status {
+        let help = Paragraph::new(Line::from(vec![Span::styled(
             format!(" {msg} "),
             Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
-        )])
-    } else {
-        let mut spans = vec![
-            Span::styled(" Tab ", Style::default().fg(AMBER)),
-            Span::styled("section  ", Style::default().fg(DIM)),
-            Span::styled("←/→", Style::default().fg(AMBER)),
-            Span::styled(" knob  ", Style::default().fg(DIM)),
-            Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
-            Span::styled(" adjust  ", Style::default().fg(DIM)),
-            Span::styled("Space", Style::default().fg(AMBER)),
-            Span::styled(" toggle  ", Style::default().fg(DIM)),
-            Span::styled("D", Style::default().fg(AMBER)),
-            Span::styled(" remove  ", Style::default().fg(DIM)),
-            Span::styled("A", Style::default().fg(AMBER)),
-            Span::styled(" amp  ", Style::default().fg(DIM)),
-            Span::styled("C", Style::default().fg(AMBER)),
-            Span::styled(" cab  ", Style::default().fg(DIM)),
-            Span::styled("I", Style::default().fg(AMBER)),
-            Span::styled(" IR  ", Style::default().fg(DIM)),
-            Span::styled("P", Style::default().fg(AMBER)),
-            Span::styled(" presets  ", Style::default().fg(DIM)),
-            Span::styled("T", Style::default().fg(AMBER)),
-            Span::styled(" tuner  ", Style::default().fg(DIM)),
-        ];
-        #[cfg(feature = "clap")]
-        {
-            spans.push(Span::styled("V", Style::default().fg(AMBER)));
-            spans.push(Span::styled(" plugins  ", Style::default().fg(DIM)));
-        }
-        spans.extend([
-            Span::styled("R", Style::default().fg(AMBER)),
-            Span::styled(" record  ", Style::default().fg(DIM)),
-            Span::styled("Q", Style::default().fg(AMBER)),
-            Span::styled(" quit", Style::default().fg(DIM)),
-        ]);
-        Line::from(spans)
-    };
-    let help = Paragraph::new(line)
+        )]))
+        .alignment(Alignment::Center)
+        .style(Style::default().bg(Color::Black));
+        f.render_widget(help, area);
+        return;
+    }
+
+    let row1 = Line::from(vec![
+        Span::styled(" Tab ", Style::default().fg(AMBER)),
+        Span::styled("section  ", Style::default().fg(DIM)),
+        Span::styled("←/→", Style::default().fg(AMBER)),
+        Span::styled(" knob  ", Style::default().fg(DIM)),
+        Span::styled("↑/↓  +/-", Style::default().fg(AMBER)),
+        Span::styled(" adjust  ", Style::default().fg(DIM)),
+        Span::styled("Space", Style::default().fg(AMBER)),
+        Span::styled(" toggle  ", Style::default().fg(DIM)),
+        Span::styled("D", Style::default().fg(AMBER)),
+        Span::styled(" remove  ", Style::default().fg(DIM)),
+        Span::styled("A", Style::default().fg(AMBER)),
+        Span::styled(" amp  ", Style::default().fg(DIM)),
+        Span::styled("C", Style::default().fg(AMBER)),
+        Span::styled(" cab  ", Style::default().fg(DIM)),
+        Span::styled("I", Style::default().fg(AMBER)),
+        Span::styled(" IR", Style::default().fg(DIM)),
+    ]);
+
+    let mut row2 = vec![
+        Span::styled("X", Style::default().fg(AMBER)),
+        Span::styled(" IR A/B  ", Style::default().fg(DIM)),
+    ];
+    // Live A/B against a loaded AU (`Z`) only exists on macOS with `au` enabled — keyed
+    // on the feature (not the OS) so the footer renders identically on every platform
+    // and the golden snapshots stay portable.
+    #[cfg(feature = "au")]
+    {
+        row2.push(Span::styled("Z", Style::default().fg(AMBER)));
+        row2.push(Span::styled(" amp A/B  ", Style::default().fg(DIM)));
+    }
+    row2.push(Span::styled("P", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" presets  ", Style::default().fg(DIM)));
+    row2.push(Span::styled("T", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" tuner  ", Style::default().fg(DIM)));
+    #[cfg(feature = "clap")]
+    {
+        row2.push(Span::styled("V", Style::default().fg(AMBER)));
+        row2.push(Span::styled(" plugins  ", Style::default().fg(DIM)));
+    }
+    #[cfg(feature = "au")]
+    {
+        row2.push(Span::styled("U", Style::default().fg(AMBER)));
+        row2.push(Span::styled(" amp plugin  ", Style::default().fg(DIM)));
+    }
+    row2.push(Span::styled("R", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" record  ", Style::default().fg(DIM)));
+    row2.push(Span::styled("Q", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" quit", Style::default().fg(DIM)));
+
+    let help = Paragraph::new(vec![row1, Line::from(row2)])
         .alignment(Alignment::Center)
         .style(Style::default().bg(Color::Black));
     f.render_widget(help, area);
@@ -1072,6 +1145,13 @@ fn shade(c: Color, factor: f32) -> Color {
     }
 }
 
+/// Whether an external amp is active *and* supplying its own cab (amp+cab mode), so the
+/// built-in cabinet stage — model selector and mic knobs — is bypassed. False in
+/// amp-only mode, where the built-in cab/IR stays in the path.
+fn cab_bypassed_by_amp(params: &Params) -> bool {
+    params.amp_external_active.load(Relaxed) && !params.amp_external_amp_only.load(Relaxed)
+}
+
 fn amp_to_db(amp: f32) -> f32 {
     if amp < 1e-6 {
         -120.0
@@ -1131,7 +1211,7 @@ mod tests {
         let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
         term.draw(|f| {
             draw(
-                f, params, &levels, focus, board, false, false, None, None, None,
+                f, params, &levels, focus, board, false, false, None, None, None, None,
             );
             overlay(f);
         })
@@ -1201,6 +1281,7 @@ mod tests {
                     Some("REC…"),
                     None,
                     None,
+                    None,
                 );
             })
             .expect("draw");
@@ -1253,6 +1334,7 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                 );
             })
             .expect("draw");
@@ -1263,6 +1345,44 @@ mod tests {
                 model.short_name()
             );
         }
+    }
+
+    /// An active external amp (hosted AU) must be surfaced in the header in place of
+    /// the built-in amp model — the visual counterpart to the external-IR "IR:" label.
+    #[test]
+    fn external_amp_name_shows_in_header() {
+        let params = Params::new();
+        params
+            .amp_external_active
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let levels = Levels::new();
+        let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
+        term.draw(|f| {
+            draw(
+                f,
+                &params,
+                &levels,
+                None,
+                &board_all(false),
+                false,
+                false,
+                None,
+                None,
+                None,
+                Some("Silver Jubilee"),
+            );
+        })
+        .expect("draw");
+        let text = screen_text(&term);
+        assert!(
+            text.contains("AU: SILVER JUBILEE"),
+            "external amp name not shown in the header"
+        );
+        // The built-in amp model label must not also be shown as the active amp.
+        assert!(
+            !text.contains("MARSHALL JCM800"),
+            "built-in amp label shown while an external amp is active"
+        );
     }
 
     /// Every built-in cabinet must be reachable and shown in the selector.
@@ -1284,6 +1404,7 @@ mod tests {
                     &board_all(false),
                     false,
                     false,
+                    None,
                     None,
                     None,
                     None,
@@ -1309,7 +1430,7 @@ mod tests {
         let mut term = Terminal::new(TestBackend::new(W, H)).expect("test backend");
         term.draw(|f| {
             draw(
-                f, &params, &levels, None, &board, false, false, None, None, None,
+                f, &params, &levels, None, &board, false, false, None, None, None, None,
             );
             render_add_pedal_modal(f, &available, 0);
         })
@@ -1406,7 +1527,23 @@ mod tests {
         let mut browser = crate::ui::ir_browser::IrBrowser::new(48_000.0);
         browser.open = true;
         let board = default_board(&params);
-        let text = render_with(&params, &board, None, |f| browser.render(f));
+        let text = render_with(&params, &board, None, |f| browser.render(f, false));
         insta::assert_snapshot!("ir_browser_modal", text);
+    }
+
+    /// With an external amp active, the IR browser must warn that IRs have no effect
+    /// (the AU replaces the built-in amp+cab) rather than silently doing nothing.
+    #[test]
+    fn ir_browser_warns_when_external_amp_active() {
+        let params = Params::new();
+        let mut browser = crate::ui::ir_browser::IrBrowser::new(48_000.0);
+        browser.open = true;
+        let text = render_with(&params, &board_all(false), None, |f| {
+            browser.render(f, true)
+        });
+        assert!(
+            text.contains("External amp active"),
+            "IR browser should warn while an external amp is active"
+        );
     }
 }
