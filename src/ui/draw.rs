@@ -87,10 +87,15 @@ fn render_header(
         Some(name) => format!("AU: {}", name.to_uppercase()),
         None => params.amp_model().name().to_uppercase(),
     };
-    // An active external IR replaces the built-in cab label in the header.
-    let cab_name = match ext_cab {
-        Some(name) => format!("IR: {}", name.to_uppercase()),
-        None => params.cab_model().name().to_uppercase(),
+    // The cab label reflects the active cab: an AU supplying its own cab reads
+    // "PLUGIN CAB", else an active external IR reads "IR: …", else the built-in model.
+    let cab_name = if cab_bypassed_by_amp(params) {
+        "PLUGIN CAB".to_owned()
+    } else {
+        match ext_cab {
+            Some(name) => format!("IR: {}", name.to_uppercase()),
+            None => params.cab_model().name().to_uppercase(),
+        }
     };
 
     let mut title_spans = vec![
