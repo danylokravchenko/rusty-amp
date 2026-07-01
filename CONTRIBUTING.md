@@ -129,6 +129,12 @@ Drop a `.toml` file in `presets/`. Follow the schema in the README — all field
 
 Bundled presets cannot be deleted by users, so only add presets that are genuinely useful and well-tuned.
 
+**Update the docs site in the same PR.** Add a row for the new preset to the
+bundled presets table in [`site/presets.md`](site/presets.md) (`## Bundled
+presets`) — file name, amp, cabinet, and a one-line description — then run
+`npm run build` in `site/` to confirm it renders. A bundled preset that isn't
+listed on the site is considered incomplete.
+
 ## Documentation site
 
 The user-facing docs live in `site/` and publish to GitHub Pages

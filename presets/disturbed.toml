@@ -1,0 +1,74 @@
+name        = "Disturbed — Down with the Sickness"
+description = "Dan Donegan's thick nu-metal chug — TS-boosted Rectifier, scooped but punchy, bone-dry rhythm."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# The Sickness is tracked in drop tuning with a percussive, staccato riff style —
+# the gaps between chugs need to be dead silent for that machine-gun tightness.
+# Moderate threshold with a fast release so each downstroke snaps in clean.
+[noise_gate]
+enabled   = true
+threshold = 0.26   # tight — kills string ring between the staccato hits
+release   = 0.16   # fast — lets every chug punch through uncompressed
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# TS as a tight clean boost in front of the Rectifier — low drive, hot level to
+# slam the preamp and firm up the low end so the drop-tuned chug stays defined.
+[tube_screamer]
+enabled = true
+drive = 0.25   # nearly clean — the amp does the dirt, the TS does the tightening
+tone  = 0.66   # bright-ish to keep pick attack cutting
+level = 0.86   # hot output drives the preamp hard
+
+# DS-1 off — Donegan's dirt is all amp, no extra clipping stage.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Mesa Dual Rectifier — the thick, saturated nu-metal wall. Slightly below Iowa's
+# extreme gain so the chug keeps its percussive punch; heavy bass for the drop
+# tuning, a controlled mid scoop for that hollow Disturbed grind, treble up for bite.
+[amp]
+model  = "mesa"
+gain   = 0.84  # heavy but still articulate — chug punch over pure saturation
+bass   = 0.74  # thick low end for the drop-tuned riffs
+mid    = 0.34  # scooped for the hollow nu-metal grind, but not fully gutted
+treble = 0.74  # keeps the pick attack and the staccato snap audible
+presence = 0.60  # moderate — bite without harshness on the top end
+master = 0.62
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Mesa 4×12 with V30s — the Rectifier's native pairing; the V30 presence peak
+# gives the chug its cut. Off-axis and a touch of ribbon to thicken the low-mids.
+[cabinet]
+model = "mesa"
+mic_pos = 0.44   # slightly off-axis — thickens the chug, rounds the top
+mic_blend = 0.12 # a hint of ribbon for a heavier low-mid wall
+mic_room  = 0.10 # nearly dry — room would blur the staccato tightness
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# A light shaping pass: trim a touch more mid for the scooped grind and lift the
+# highs for pick definition through a dense mix.
+[eq]
+enabled = true
+low  = 0.52   # slight low boost to reinforce the drop-tuned thud
+mid  = 0.38   # extra scoop on top of the amp's for the hollow Disturbed voicing
+high = 0.58   # presence lift — keeps the chug cutting through the mix
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Rhythm tone stays dry — delay would smear the staccato palm-mute attack.
+[delay]
+enabled  = false
+time     = 0.25
+feedback = 0.30
+mix      = 0.00
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Nearly dry — reverb would blur the machine-gun chug.
+[reverb]
+enabled = true
+room = 0.18
+damp = 0.82
+mix  = 0.05

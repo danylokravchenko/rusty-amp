@@ -11,16 +11,12 @@ use crate::dsp::{AmpModel, CabModel, Params};
 #[include = "*.toml"]
 struct BundledPresets;
 
-// ── Preset source ─────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PresetSource {
     System,
     #[default]
     User,
 }
-
-// ── TOML schema ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Preset {
