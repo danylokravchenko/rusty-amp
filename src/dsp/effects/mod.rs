@@ -14,6 +14,7 @@
 use crate::dsp::biquad::Biquad;
 use std::f32::consts::PI;
 
+pub mod chorus;
 pub mod compressor;
 pub mod delay;
 pub mod distortion;
@@ -25,6 +26,7 @@ pub mod preamp_eq;
 pub mod reverb;
 pub mod tube_screamer;
 
+pub use chorus::Chorus;
 pub use compressor::Compressor;
 pub use delay::Delay;
 pub use distortion::Distortion;

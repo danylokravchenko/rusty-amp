@@ -141,6 +141,7 @@ fn render_header(
     let peq_on = params.peq_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
     let fl_on = params.fl_enabled.load(Relaxed);
+    let ch_on = params.ch_enabled.load(Relaxed);
     let delay_on = params.delay_enabled.load(Relaxed);
     let rev_on = params.rev_enabled.load(Relaxed);
 
@@ -160,6 +161,7 @@ fn render_header(
     let post_pedals = [
         ("EQ", eq_on),
         ("FLANGER", fl_on),
+        ("CHORUS", ch_on),
         ("DELAY", delay_on),
         ("REVERB", rev_on),
     ];

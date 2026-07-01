@@ -5,8 +5,8 @@ use atomic_float::AtomicF32;
 use ratatui::style::Color;
 
 use super::styles::{
-    PEDAL_BLUE, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE, PEDAL_PURPLE,
-    PEDAL_RED, PEDAL_SILVER, PEDAL_TEAL,
+    PEDAL_BLUE, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE, PEDAL_PINK,
+    PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_TEAL,
 };
 use crate::dsp::Params;
 
@@ -57,6 +57,8 @@ pub(super) const EQ_START: usize = 32;
 pub(super) const EQ_END: usize = 35;
 pub(super) const FL_START: usize = 35;
 pub(super) const FL_END: usize = 39;
+pub(super) const CH_START: usize = 39;
+pub(super) const CH_END: usize = 42;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -227,6 +229,19 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.fl_mix,
     },
+    // 39–41: Chorus
+    Knob {
+        label: "RATE",
+        param: |p| &p.ch_rate,
+    },
+    Knob {
+        label: "DEPTH",
+        param: |p| &p.ch_depth,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.ch_mix,
+    },
 ];
 
 // Rig pedals in navigation order (mirrors the KNOBS slices above). The tile
@@ -301,6 +316,13 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: FL_START,
         end: FL_END,
         enabled: |p| &p.fl_enabled,
+    },
+    Pedal {
+        name: "CHORUS",
+        color: PEDAL_PINK,
+        start: CH_START,
+        end: CH_END,
+        enabled: |p| &p.ch_enabled,
     },
 ];
 
@@ -403,7 +425,7 @@ mod tests {
     fn table_sizes_are_stable() {
         // Deliberate tripwire: bump these when you add or remove a pedal/knob so
         // the change is a conscious, reviewed edit rather than an accident.
-        assert_eq!(PEDALS.len(), 10, "pedal count changed");
-        assert_eq!(KNOBS.len(), 39, "knob count changed");
+        assert_eq!(PEDALS.len(), 11, "pedal count changed");
+        assert_eq!(KNOBS.len(), 42, "knob count changed");
     }
 }
