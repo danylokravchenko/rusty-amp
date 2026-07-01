@@ -87,6 +87,16 @@ impl AmpBrowser {
                 self.view = View::Edit;
                 self.param_cursor = 0;
             }
+            // Toggle whether the AU supplies its own cab or feeds the built-in cab/IR.
+            KeyCode::Char('c') | KeyCode::Char('C') if self.loaded.is_some() => {
+                let amp_only = !params.amp_external_amp_only.load(Relaxed);
+                params.amp_external_amp_only.store(amp_only, Relaxed);
+                self.message = Some(if amp_only {
+                    "Cab: built-in / IR".to_owned()
+                } else {
+                    "Cab: plugin's own".to_owned()
+                });
+            }
             KeyCode::Esc | KeyCode::Char('u') | KeyCode::Char('U') => self.open = false,
             _ => {}
         }
@@ -111,7 +121,8 @@ impl AmpBrowser {
         }
     }
 
-    /// Adjust the selected parameter by one step in `dir` (±1), 1/20 of its range.
+    /// Adjust the selected parameter by one step in `dir` (±1). Continuous params move
+    /// 1/20 of their range; stepped/indexed params move one integer step.
     fn nudge_param(&mut self, dir: i32) {
         let Some(loaded) = self.loaded.as_mut() else {
             return;
@@ -119,7 +130,11 @@ impl AmpBrowser {
         let Some(param) = loaded.params().get(self.param_cursor) else {
             return;
         };
-        let step = (param.max - param.min) / 20.0;
+        let step = if param.is_stepped() {
+            1.0
+        } else {
+            (param.max - param.min) / 20.0
+        };
         let target = param.value + f64::from(dir) * step;
         loaded.set_param(self.param_cursor, target);
     }
@@ -131,6 +146,8 @@ impl AmpBrowser {
                     self.loaded = None;
                     params.amp_external_loaded.store(false, Relaxed);
                     params.amp_external_active.store(false, Relaxed);
+                    params.amp_external_amp_only.store(false, Relaxed);
+                    params.amp_external_latency.store(0, Relaxed);
                     Some("Amp override cleared".to_owned())
                 }
                 Err(e) => Some(format!("Clear failed: {e}")),
@@ -148,9 +165,15 @@ impl AmpBrowser {
                 Ok(()) => {
                     let name = loaded.name.clone();
                     let has_params = !loaded.params().is_empty();
-                    // Loading makes the AU the active amp (built-in amp+cab bypassed).
+                    // Loading makes the AU the active amp (built-in amp+cab bypassed by
+                    // default). Publish its latency so the built-in path can align, and
+                    // reset the amp-only routing to the default (AU brings its own cab).
                     params.amp_external_loaded.store(true, Relaxed);
                     params.amp_external_active.store(true, Relaxed);
+                    params.amp_external_amp_only.store(false, Relaxed);
+                    params
+                        .amp_external_latency
+                        .store(loaded.latency_frames, Relaxed);
                     self.loaded = Some(loaded);
                     if has_params {
                         self.view = View::Edit;
@@ -166,8 +189,9 @@ impl AmpBrowser {
         };
     }
 
-    /// Render the modal over the main UI.
-    pub(super) fn render(&self, f: &mut Frame) {
+    /// Render the modal over the main UI. `amp_only` is the current cab-routing mode
+    /// (true = the built-in cab/IR runs on the AU's output; false = the AU's own cab).
+    pub(super) fn render(&self, f: &mut Frame, amp_only: bool) {
         let area = centered_rect(60, f.area());
         f.render_widget(Clear, area);
 
@@ -211,6 +235,8 @@ impl AmpBrowser {
                 Span::styled(" load/clear  ", Style::default().fg(DIM)),
                 Span::styled("Tab", Style::default().fg(AMBER)),
                 Span::styled(" params  ", Style::default().fg(DIM)),
+                Span::styled("C", Style::default().fg(AMBER)),
+                Span::styled(" cab  ", Style::default().fg(DIM)),
                 Span::styled("Esc / U", Style::default().fg(AMBER)),
                 Span::styled(" close", Style::default().fg(DIM)),
             ],
@@ -235,10 +261,22 @@ impl AmpBrowser {
                 msg.clone(),
                 Style::default().fg(SAFE).add_modifier(Modifier::BOLD),
             )),
-            (None, Some(name)) => Line::from(vec![
-                Span::styled("active: ", Style::default().fg(DIM)),
-                Span::styled(name.to_owned(), Style::default().fg(CHROME)),
-            ]),
+            (None, Some(name)) => {
+                let latency_ms = self.loaded.as_ref().map_or(0.0, |l| l.latency_ms);
+                let cab = if amp_only {
+                    "built-in cab"
+                } else {
+                    "plugin cab"
+                };
+                Line::from(vec![
+                    Span::styled("active: ", Style::default().fg(DIM)),
+                    Span::styled(name.to_owned(), Style::default().fg(CHROME)),
+                    Span::styled(
+                        format!("   {latency_ms:.1} ms · {cab}"),
+                        Style::default().fg(DIM),
+                    ),
+                ])
+            }
             (None, None) => Line::from(Span::styled("no amp loaded", Style::default().fg(DIM))),
         };
         f.render_widget(
@@ -326,7 +364,10 @@ fn param_row(p: &AuParam, selected: bool) -> Line<'static> {
         ),
         Span::styled(format!("{:<22}", truncate(&p.name, 22)), name_style),
         Span::styled(bar, Style::default().fg(bar_color)),
-        Span::styled(format!("  {:.3}", p.value), Style::default().fg(AMBER)),
+        Span::styled(
+            format!("  {}", p.display_value()),
+            Style::default().fg(AMBER),
+        ),
     ])
 }
 

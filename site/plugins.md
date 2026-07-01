@@ -100,19 +100,29 @@ When an AU with parameters is loaded you drop straight into the **parameter edit
 | Key | Action |
 | --- | ------ |
 | <kbd>↑</kbd> / <kbd>↓</kbd> | Select a parameter |
-| <kbd>←</kbd> / <kbd>→</kbd> | Adjust the selected parameter (by 1/20 of its range) |
+| <kbd>←</kbd> / <kbd>→</kbd> | Adjust the selected parameter (1/20 of its range; one step for switches/lists) |
 | <kbd>Tab</kbd> | Return to the AU list |
 | <kbd>Esc</kbd> / <kbd>U</kbd> | Close |
 
-Loading an AU makes it the **active amp immediately**: the built-in amp and cabinet are bypassed, the header shows `AU: NAME` in place of the amp model, and the built-in tone-stack knobs and AMP selector dim to signal they no longer affect the sound (exactly as the mic knobs dim under an external IR). Press <kbd>Z</kbd> to A/B between the loaded AU and the built-in amp live — no reload.
+Parameter values are shown the way the plugin describes them: **enum/switch** parameters read as their names (e.g. `Bright` / `Normal`), and unit-bearing parameters carry a suffix (`-6.0 dB`, `2.50 kHz`, `50 %`, `12.0 ms`, `On`/`Off`). Continuous params fall back to a plain number. Adjusting a switch/list param snaps one entry at a time.
+
+Loading an AU makes it the **active amp immediately**: the built-in amp is bypassed, the header shows `AU: NAME` in place of the amp model, and the built-in tone-stack knobs and AMP selector dim to signal they no longer affect the sound. Press <kbd>Z</kbd> to A/B between the loaded AU and the built-in amp live — no reload.
+
+### Cab pairing <span class="muted">(<kbd>C</kbd>)</span>
+
+By default the AU is treated as a full **amp + cab** — it supplies its own cabinet, so the built-in cab (and any loaded IR) is bypassed and the cabinet/mic panel reads `PLUGIN CAB`. If your AU is an **amp-only** model that expects a separate cab, press <kbd>C</kbd> in the AU browser to switch to amp-only: the AU's output is then run through rusty-amp's built-in cabinet (or your loaded IR), and the mic knobs / IR loader come back to life. The AU modal's status line shows the current mode (`plugin cab` vs `built-in cab`).
+
+### Latency
+
+rusty-amp reads the AU's reported processing latency and shows it in the AU modal status line (e.g. `active: NAME   5.2 ms · plugin cab`). While an AU is loaded, the built-in amp path is delayed by the same amount, so switching built-in↔AU with <kbd>Z</kbd> stays time-coherent and recordings line up. (Processing latency itself can't be removed from a live monitoring signal — this only keeps the two amp sources aligned with each other.)
 
 ## AU limitations {#au-limits}
 
 <ul class="clean">
 <li><b>macOS only</b> — the feature is inert on Linux/Windows.</li>
-<li><b>Assumes an amp + cab AU</b> — while an AU is active the built-in cabinet (and any loaded IR) is bypassed. Amp-only AUs that expect a separate cab aren't paired with the built-in cab yet.</li>
-<li><b>Headless</b> — the AU's GUI is not opened; parameters are edited in the TUI as raw numeric values.</li>
+<li><b>Amp + cab by default</b> — the AU supplies its own cabinet and the built-in cab/IR is bypassed. Press <kbd>C</kbd> for <b>amp-only</b> mode to keep the built-in cab (or your loaded IR) in the path instead.</li>
+<li><b>Headless</b> — the AU's GUI is not opened; parameters are edited in the TUI (with unit/enum-aware value display).</li>
 <li><b>Effect components only</b> (<code>aufx</code> / <code>aumf</code>) using the main stereo (or mono) ports; instruments aren't driven.</li>
-<li>Reported plugin <b>latency is not compensated</b>.</li>
+<li><b>Parameters are driven one-way</b> — edits from the TUI reach the plugin, but changes the AU makes internally (its own presets/automation) aren't reflected back, and the AU's own presets can't be loaded.</li>
 <li>AU state is <b>not saved</b> in rusty-amp presets, and is not recalled across restarts.</li>
 </ul>

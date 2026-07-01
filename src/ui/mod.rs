@@ -187,16 +187,21 @@ pub fn run(
                 browser.render(f);
             }
             if ir_browser.open {
-                ir_browser.render(
-                    f,
-                    params
-                        .amp_external_active
-                        .load(std::sync::atomic::Ordering::Relaxed),
-                );
+                use std::sync::atomic::Ordering::Relaxed;
+                // The IR is inert only when an AU is active *and* supplying its own cab
+                // (amp+cab mode); in amp-only mode the built-in cab/IR is in the path.
+                let amp_bypasses_cab = params.amp_external_active.load(Relaxed)
+                    && !params.amp_external_amp_only.load(Relaxed);
+                ir_browser.render(f, amp_bypasses_cab);
             }
             #[cfg(all(feature = "au", target_os = "macos"))]
             if amp_browser.open {
-                amp_browser.render(f);
+                amp_browser.render(
+                    f,
+                    params
+                        .amp_external_amp_only
+                        .load(std::sync::atomic::Ordering::Relaxed),
+                );
             }
             if tuner_open {
                 tuner::render_tuner(f, &tuner);

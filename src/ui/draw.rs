@@ -370,18 +370,20 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
     f.render_widget(Paragraph::new(Line::from(amp_spans)), cols[0]);
 
     // ── Cabinet model selector ────────────────────────────────────────────────
-    // When an external IR is the active cab the built-in model is bypassed, so the
-    // whole selector is dimmed to signal it has no effect until `C` returns to it.
+    // The built-in cab model has no effect when an external IR is the active cab, or
+    // when an external amp is supplying its own cab (amp+cab mode) — dim the selector
+    // in either case. (In amp-only mode the built-in cab is back in the path.)
     let cab_model = params.cab_model();
     let ext_active = params.cab_external_active.load(Relaxed);
-    let label_fg = if ext_active { OFF } else { label_color };
+    let cab_inactive = ext_active || cab_bypassed_by_amp(params);
+    let label_fg = if cab_inactive { OFF } else { label_color };
     let mut cab_spans = vec![Span::styled(
         "  CAB  ",
         Style::default().fg(label_fg).add_modifier(Modifier::BOLD),
     )];
     for m in [CabModel::Mesa, CabModel::Marshall, CabModel::Orange] {
         let selected = m == cab_model;
-        let style = if ext_active {
+        let style = if cab_inactive {
             Style::default().fg(OFF)
         } else if selected {
             Style::default()
@@ -395,7 +397,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         } else {
             ("[ ", " ]")
         };
-        let bc = if ext_active {
+        let bc = if cab_inactive {
             OFF
         } else if selected {
             AMBER
@@ -408,7 +410,7 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         cab_spans.push(Span::raw("  "));
     }
     if focused {
-        let hint = if ext_active {
+        let hint = if cab_inactive {
             "C → built-in"
         } else {
             "C to toggle"
@@ -441,11 +443,17 @@ fn render_amp(
         Some(name) => format!("AU: {name}"),
         None => params.amp_model().name().to_uppercase(),
     };
-    // The cabinet/mic panel reflects the active cab: the loaded IR's name (with the
-    // mic knobs inert) or the built-in cab model.
-    let cab_name = match ext_cab {
-        Some(name) => format!("IR: {name}"),
-        None => params.cab_model().short_name().to_owned(),
+    // The cabinet/mic panel reflects the active cab. An external amp supplying its own
+    // cab (amp+cab mode) bypasses the whole cab stage; otherwise a loaded IR or the
+    // built-in cab model is shown.
+    let cab_bypassed = cab_bypassed_by_amp(params);
+    let cab_name = if cab_bypassed {
+        "PLUGIN CAB".to_owned()
+    } else {
+        match ext_cab {
+            Some(name) => format!("IR: {name}"),
+            None => params.cab_model().short_name().to_owned(),
+        }
     };
 
     let left_title = Line::from(vec![
@@ -524,9 +532,9 @@ fn render_amp(
                 .collect::<Vec<_>>(),
         )
         .split(panel[1]);
-    // The mic knobs only colour the built-in cab's multi-mic blend; a loaded IR is
-    // a finished capture, so they are dimmed (inactive) while an external IR is up.
-    let mic_live = ext_cab.is_none();
+    // The mic knobs only colour the built-in cab's multi-mic blend; they are inert when
+    // a finished IR is the cab, or when an external amp supplies its own cab.
+    let mic_live = ext_cab.is_none() && !cab_bypassed;
     for (i, ki) in (MIC_START..MIC_END).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
         render_compact_knob(
@@ -1115,6 +1123,13 @@ fn shade(c: Color, factor: f32) -> Color {
         ),
         other => other,
     }
+}
+
+/// Whether an external amp is active *and* supplying its own cab (amp+cab mode), so the
+/// built-in cabinet stage — model selector and mic knobs — is bypassed. False in
+/// amp-only mode, where the built-in cab/IR stays in the path.
+fn cab_bypassed_by_amp(params: &Params) -> bool {
+    params.amp_external_active.load(Relaxed) && !params.amp_external_amp_only.load(Relaxed)
 }
 
 fn amp_to_db(amp: f32) -> f32 {

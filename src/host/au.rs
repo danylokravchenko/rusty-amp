@@ -57,6 +57,70 @@ pub struct AuParam {
     pub max: f64,
     /// Current value (cached UI-side; updated as the user edits).
     pub value: f64,
+    /// The AU's parameter unit (`kAudioUnitParameterUnit_*`), used to format the value.
+    unit: u32,
+    /// For indexed/enum params, the display string per index (e.g. "Bright", "Normal").
+    /// Fetched once at load; `None` for continuous params.
+    value_strings: Option<Vec<String>>,
+}
+
+impl AuParam {
+    /// A discrete (stepped) parameter — booleans and indexed/enum lists — whose value
+    /// moves one integer step at a time rather than continuously.
+    pub fn is_stepped(&self) -> bool {
+        self.value_strings.is_some()
+            || self.unit == kAudioUnitParameterUnit_Indexed
+            || self.unit == kAudioUnitParameterUnit_Boolean
+    }
+
+    /// A human-readable rendering of the current value: an enum name when the AU
+    /// provides value strings, otherwise the number with a unit suffix (dB, Hz, %, …),
+    /// falling back to a plain 3-decimal number for generic/unknown units.
+    // The `kAudioUnitParameterUnit_*` bindgen constants aren't upper-case; matching on
+    // them as patterns is intentional here.
+    #[allow(non_upper_case_globals)]
+    pub fn display_value(&self) -> String {
+        if let Some(strings) = &self.value_strings {
+            let idx = self.value.round().clamp(0.0, (strings.len() as f64) - 1.0) as usize;
+            if let Some(s) = strings.get(idx) {
+                return s.clone();
+            }
+        }
+        let v = self.value;
+        match self.unit {
+            kAudioUnitParameterUnit_Boolean => {
+                if v >= 0.5 {
+                    "On".to_owned()
+                } else {
+                    "Off".to_owned()
+                }
+            }
+            kAudioUnitParameterUnit_Indexed => format!("{}", v.round() as i64),
+            kAudioUnitParameterUnit_Decibels => format!("{v:.1} dB"),
+            kAudioUnitParameterUnit_LinearGain => format!("{v:.3}×"),
+            kAudioUnitParameterUnit_Hertz => {
+                if v.abs() >= 1000.0 {
+                    format!("{:.2} kHz", v / 1000.0)
+                } else {
+                    format!("{v:.0} Hz")
+                }
+            }
+            kAudioUnitParameterUnit_Percent | kAudioUnitParameterUnit_EqualPowerCrossfade => {
+                format!("{v:.0} %")
+            }
+            kAudioUnitParameterUnit_Milliseconds => format!("{v:.1} ms"),
+            kAudioUnitParameterUnit_Seconds => format!("{v:.2} s"),
+            kAudioUnitParameterUnit_Cents | kAudioUnitParameterUnit_AbsoluteCents => {
+                format!("{v:.0} ¢")
+            }
+            kAudioUnitParameterUnit_Degrees | kAudioUnitParameterUnit_Phase => {
+                format!("{v:.0}°")
+            }
+            kAudioUnitParameterUnit_BPM => format!("{v:.0} BPM"),
+            kAudioUnitParameterUnit_Ratio => format!("{v:.2}:1"),
+            _ => format!("{v:.3}"),
+        }
+    }
 }
 
 /// An Audio Unit found on disk, before it is loaded. The `(type, subtype,
@@ -77,6 +141,10 @@ pub struct DiscoveredAu {
 pub struct LoadedAu {
     /// Display name of the loaded plugin.
     pub name: String,
+    /// The AU's reported processing latency, in frames at the engine sample rate.
+    pub latency_frames: usize,
+    /// Same latency expressed in milliseconds, for display.
+    pub latency_ms: f64,
     params: Vec<AuParam>,
     param_tx: Producer<AuParamChange>,
 }
@@ -87,14 +155,20 @@ impl LoadedAu {
         &self.params
     }
 
-    /// Set parameter `index` to `value` (clamped to its range), updating the cached
-    /// value and queueing the change for the audio thread. A full queue is ignored:
-    /// the next change carries the latest value anyway.
+    /// Set parameter `index` to `value` (clamped to its range, and rounded to an
+    /// integer for stepped/indexed params), updating the cached value and queueing the
+    /// change for the audio thread. A full queue is ignored: the next change carries the
+    /// latest value anyway.
     pub fn set_param(&mut self, index: usize, value: f64) {
         let Some(param) = self.params.get_mut(index) else {
             return;
         };
         let value = value.clamp(param.min, param.max);
+        let value = if param.is_stepped() {
+            value.round()
+        } else {
+            value
+        };
         param.value = value;
         let _ = self.param_tx.push(AuParamChange {
             id: param.id,
@@ -291,6 +365,10 @@ pub fn load(
     check(unsafe { AudioUnitInitialize(unit) }, "initialize")?;
 
     let params = query_params(unit);
+    // Reported processing latency (seconds) → frames at the running sample rate. Used
+    // by the engine to keep the built-in amp path time-aligned with the AU.
+    let latency_secs = read_latency_secs(unit);
+    let latency_frames = (latency_secs * f64::from(sample_rate)).round().max(0.0) as usize;
 
     // Everything succeeded: hand the live instance to the insert and defuse the guard.
     guard.defuse();
@@ -301,10 +379,33 @@ pub fn load(
 
     let loaded = LoadedAu {
         name: au.name.clone(),
+        latency_frames,
+        latency_ms: latency_secs * 1000.0,
         params,
         param_tx,
     };
     Ok((loaded, Box::new(insert)))
+}
+
+/// Read the AU's reported processing latency (seconds), or 0 if unsupported.
+fn read_latency_secs(unit: AudioUnit) -> f64 {
+    let mut latency: Float64 = 0.0;
+    let mut size = std::mem::size_of::<Float64>() as u32;
+    let st = unsafe {
+        AudioUnitGetProperty(
+            unit,
+            kAudioUnitProperty_Latency,
+            kAudioUnitScope_Global,
+            0,
+            (&mut latency as *mut Float64).cast::<c_void>(),
+            &mut size,
+        )
+    };
+    if st == 0 && latency.is_finite() && latency > 0.0 {
+        latency
+    } else {
+        0.0
+    }
 }
 
 /// Read the AU's global-scope parameter list (id, name, range, current value).
@@ -374,15 +475,58 @@ fn query_params(unit: AudioUnit) -> Vec<AuParam> {
             AudioUnitGetParameter(unit, id, kAudioUnitScope_Global, 0, &mut value);
         }
 
+        // Indexed/enum params (or any that flag having value strings) expose a display
+        // name per step; fetch them so the UI shows "Bright" rather than "1.000".
+        let value_strings = if info.unit == kAudioUnitParameterUnit_Indexed
+            || info.flags & kAudioUnitParameterFlag_ValuesHaveStrings != 0
+        {
+            read_value_strings(unit, id)
+        } else {
+            None
+        };
+
         out.push(AuParam {
             id,
             name,
             min: f64::from(info.minValue),
             max: f64::from(info.maxValue),
             value: f64::from(value),
+            unit: info.unit,
+            value_strings,
         });
     }
     out
+}
+
+/// Read the per-index display strings for an indexed parameter via
+/// `kAudioUnitProperty_ParameterValueStrings` (a `CFArray` of `CFString`s). Returns
+/// `None` if unsupported or empty. The array is owned by us and released here.
+fn read_value_strings(unit: AudioUnit, id: AudioUnitParameterID) -> Option<Vec<String>> {
+    let mut array: CFArrayRef = ptr::null();
+    let mut size = std::mem::size_of::<CFArrayRef>() as u32;
+    let st = unsafe {
+        AudioUnitGetProperty(
+            unit,
+            kAudioUnitProperty_ParameterValueStrings,
+            kAudioUnitScope_Global,
+            id,
+            (&mut array as *mut CFArrayRef).cast::<c_void>(),
+            &mut size,
+        )
+    };
+    if st != 0 || array.is_null() {
+        return None;
+    }
+    let count = unsafe { CFArrayGetCount(array) };
+    let mut out = Vec::with_capacity(count.max(0) as usize);
+    for i in 0..count {
+        let s = unsafe { CFArrayGetValueAtIndex(array, i) }.cast::<__CFString>();
+        if let Some(text) = cfstring_to_string(s) {
+            out.push(text);
+        }
+    }
+    unsafe { CFRelease(array.cast()) };
+    if out.is_empty() { None } else { Some(out) }
 }
 
 /// Read the fixed 52-byte C `name` field of an `AudioUnitParameterInfo`.
@@ -667,5 +811,66 @@ mod tests {
         for au in scan() {
             assert!(!au.name.is_empty(), "discovered AU with empty name");
         }
+    }
+
+    fn param(unit: u32, value: f64, value_strings: Option<Vec<String>>) -> AuParam {
+        AuParam {
+            id: 0,
+            name: "p".to_owned(),
+            min: 0.0,
+            max: 100.0,
+            value,
+            unit,
+            value_strings,
+        }
+    }
+
+    /// `display_value` must render enum names, unit suffixes, and a numeric fallback.
+    #[test]
+    fn display_value_formats_by_unit_and_strings() {
+        // Indexed with value strings → the name at the rounded index.
+        let p = param(
+            kAudioUnitParameterUnit_Indexed,
+            1.0,
+            Some(vec!["Normal".to_owned(), "Bright".to_owned()]),
+        );
+        assert_eq!(p.display_value(), "Bright");
+        assert!(p.is_stepped());
+
+        // Unit suffixes.
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Decibels, -6.0, None).display_value(),
+            "-6.0 dB"
+        );
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Hertz, 440.0, None).display_value(),
+            "440 Hz"
+        );
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Hertz, 2500.0, None).display_value(),
+            "2.50 kHz"
+        );
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Percent, 50.0, None).display_value(),
+            "50 %"
+        );
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Milliseconds, 12.0, None).display_value(),
+            "12.0 ms"
+        );
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Boolean, 1.0, None).display_value(),
+            "On"
+        );
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Boolean, 0.0, None).display_value(),
+            "Off"
+        );
+
+        // Generic/unknown units fall back to a plain 3-decimal number.
+        assert_eq!(
+            param(kAudioUnitParameterUnit_Generic, 0.5, None).display_value(),
+            "0.500"
+        );
     }
 }

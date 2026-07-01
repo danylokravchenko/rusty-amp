@@ -23,11 +23,17 @@ use crate::audio::AudioEngine;
 use crate::dsp::Params;
 use crate::dsp::cab::{ExternalIrCab, MAX_IR_LEN, load_ir};
 
-/// Shown when the user tries to load/toggle an IR while an external amp (AU) is the
-/// active amp — it replaces the built-in amp+cab, so an IR is inert until they switch
-/// back to the built-in amp (`Z`).
+/// Shown when the user tries to load/toggle an IR while an external amp (AU) is active
+/// *and* supplying its own cab — the built-in cab/IR is bypassed, so an IR is inert
+/// until they switch back to the built-in amp (`Z`) or the AU to amp-only (`C`).
 const AMP_ACTIVE_WARNING: &str =
-    "External amp active — IR has no effect (press Z for built-in amp)";
+    "External amp active — IR has no effect (Z: built-in amp · C: amp-only in amp modal)";
+
+/// Whether an external amp is active *and* replacing the cabinet (i.e. not amp-only),
+/// in which case a loaded IR has no audible effect.
+fn amp_bypasses_cab(params: &Params) -> bool {
+    params.amp_external_active.load(Relaxed) && !params.amp_external_amp_only.load(Relaxed)
+}
 
 /// One discovered IR file: full path plus a short label (its stem, with a parent
 /// hint so same-named files in different folders are distinguishable).
@@ -81,7 +87,7 @@ impl IrBrowser {
             KeyCode::Enter => self.activate_selection(engine, params),
             // Toggle the loaded IR active/inactive without leaving the modal.
             KeyCode::Char('x') | KeyCode::Char('X') if self.loaded.is_some() => {
-                if params.amp_external_active.load(Relaxed) {
+                if amp_bypasses_cab(params) {
                     self.message = Some(AMP_ACTIVE_WARNING.to_owned());
                 } else {
                     let now = !params.cab_external_active.load(Relaxed);
@@ -99,10 +105,11 @@ impl IrBrowser {
     }
 
     fn activate_selection(&mut self, engine: &mut AudioEngine, params: &Params) {
-        // While an external amp (AU) is active it replaces the built-in amp *and* cab,
-        // so an IR would have no effect. Block loading and say so rather than silently
-        // doing nothing. Clearing (cursor 0) is still allowed.
-        if self.cursor != 0 && params.amp_external_active.load(Relaxed) {
+        // While an external amp is active *and* supplying its own cab, an IR would have
+        // no effect. Block loading and say so rather than silently doing nothing. (In
+        // amp-only mode the built-in cab/IR is in the path, so loading is allowed.)
+        // Clearing (cursor 0) is still allowed.
+        if self.cursor != 0 && amp_bypasses_cab(params) {
             self.message = Some(AMP_ACTIVE_WARNING.to_owned());
             return;
         }

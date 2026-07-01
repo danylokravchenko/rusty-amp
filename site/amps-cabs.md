@@ -93,10 +93,12 @@ The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single R
 
 Beyond the three built-in amps, on macOS you can load a third-party **Audio Unit amp sim** — for example a Marshall plugin — and use it *in place of* the built-in amp. Press <kbd>U</kbd> to browse the Audio Units installed on your system and load one.
 
-A loaded AU is an **amp-position override**: your pedal chain feeds into it, and because an amp-sim AU brings its own cabinet it replaces the built-in amp **and** cabinet in one go — the built-in cab and any loaded IR are bypassed while it's active. The header shows <code>AU: …</code> in place of the amp model, the tone-stack knobs and the AMP selector dim (they no longer shape the sound), and <kbd>Z</kbd> A/Bs the AU against the built-in amp live — no reload.
+A loaded AU is an **amp-position override**: your pedal chain feeds into it. By default the AU is treated as a full **amp + cab** — it brings its own cabinet, so the built-in cab and any loaded IR are bypassed (the cabinet panel reads `PLUGIN CAB` and the mic knobs dim). The header shows <code>AU: …</code> in place of the amp model, the tone-stack knobs and the AMP selector dim, and <kbd>Z</kbd> A/Bs the AU against the built-in amp live — no reload.
+
+If your AU is **amp-only** (no built-in cabinet), press <kbd>C</kbd> in the AU browser to keep rusty-amp's cabinet in the chain: the AU's output is then run through the selected built-in cab (or your loaded IR), and the mic knobs come back to life. The AU's reported latency is shown in the modal, and while an AU is loaded the built-in amp path is delay-aligned to it so the <kbd>Z</kbd> A/B stays in time.
 
 <div class="note note--info">
-See <a href="plugins.html#au">Plugins → Audio Unit amps</a> for the full walkthrough: installation, the browser and parameter-editor keys, and limitations. AU hosting is macOS-only and compiles to nothing on Linux/Windows.
+See <a href="plugins.html#au">Plugins → Audio Unit amps</a> for the full walkthrough: installation, the browser and parameter-editor keys, cab pairing, latency, and limitations. AU hosting is macOS-only and compiles to nothing on Linux/Windows.
 </div>
 
 ## Cabinet mics {#mics}
