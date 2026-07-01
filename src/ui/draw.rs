@@ -45,7 +45,7 @@ pub(super) fn draw(
             Constraint::Length(7), // amplifier + cabinet/mic
             Constraint::Min(0),    // guitar rig
             Constraint::Length(2), // help (two rows — one line overflows once every
-                                    // hint, including the optional plugin ones, is on)
+                                   // hint, including the optional plugin ones, is on)
         ])
         .split(inner);
 
