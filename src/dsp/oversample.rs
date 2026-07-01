@@ -19,16 +19,6 @@
 //!     the previous Butterworth IIR it has *no phase smear*, and the round trip is
 //!     unity-gain and flat in the passband — so swapping it in does not recolour
 //!     the dry signal, only removes aliasing.
-//!
-//! Usage from a gain stage (factor inferred from the array length):
-//! ```ignore
-//! let up = self.os.upsample(x);          // [f32; N]
-//! let mut down = [0.0f32; N];
-//! for i in 0..N {
-//!     down[i] = self.nonlinear(up[i]);   // internal stage filters run at N× rate
-//! }
-//! let y = self.os.downsample(down);
-//! ```
 
 use std::f32::consts::PI;
 

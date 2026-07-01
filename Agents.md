@@ -6,7 +6,7 @@ rusty-amp is a real-time guitar amplifier emulator that runs in the terminal. It
 
 **Platform:** multiplatform (via cpal)
 **Language:** Rust
-**Minimum Rust:** 1.95+
+**Minimum Rust:** 1.96+
 
 ---
 
