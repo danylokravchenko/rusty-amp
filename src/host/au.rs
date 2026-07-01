@@ -113,7 +113,10 @@ fn cfstring_to_string(s: CFStringRef) -> Option<String> {
         // Fast path: a direct UTF-8 pointer if CoreFoundation has one.
         let ptr = CFStringGetCStringPtr(s, kCFStringEncodingUTF8);
         if !ptr.is_null() {
-            return std::ffi::CStr::from_ptr(ptr).to_str().ok().map(str::to_owned);
+            return std::ffi::CStr::from_ptr(ptr)
+                .to_str()
+                .ok()
+                .map(str::to_owned);
         }
         // Slow path: copy into a buffer sized from the length (× 4 for worst-case UTF-8).
         let len = CFStringGetLength(s);
@@ -214,7 +217,11 @@ fn stream_format(sample_rate: f32) -> AudioStreamBasicDescription {
 ///
 /// `max_block` is the largest block (in frames) the audio thread will ever ask the
 /// insert to process; the AU is configured with this as its maximum slice.
-pub fn load(au: &DiscoveredAu, sample_rate: f32, max_block: u32) -> Result<(LoadedAu, Box<dyn StereoInsert>)> {
+pub fn load(
+    au: &DiscoveredAu,
+    sample_rate: f32,
+    max_block: u32,
+) -> Result<(LoadedAu, Box<dyn StereoInsert>)> {
     let desc = AudioComponentDescription {
         componentType: au.type_,
         componentSubType: au.subtype,
@@ -228,18 +235,39 @@ pub fn load(au: &DiscoveredAu, sample_rate: f32, max_block: u32) -> Result<(Load
     }
 
     let mut unit: AudioUnit = ptr::null_mut();
-    check(unsafe { AudioComponentInstanceNew(comp, &mut unit) }, "instantiate")?;
+    check(
+        unsafe { AudioComponentInstanceNew(comp, &mut unit) },
+        "instantiate",
+    )?;
     // From here on, any early return must dispose the instance.
     let guard = InstanceGuard(unit);
 
     // Maximum slice, then the stream format on both scopes, then the input callback —
     // all before AudioUnitInitialize, as the AU API requires.
     let max = max_block;
-    set_prop(unit, kAudioUnitProperty_MaximumFramesPerSlice, kAudioUnitScope_Global, 0, &max)?;
+    set_prop(
+        unit,
+        kAudioUnitProperty_MaximumFramesPerSlice,
+        kAudioUnitScope_Global,
+        0,
+        &max,
+    )?;
 
     let fmt = stream_format(sample_rate);
-    set_prop(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Input, 0, &fmt)?;
-    set_prop(unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 0, &fmt)?;
+    set_prop(
+        unit,
+        kAudioUnitProperty_StreamFormat,
+        kAudioUnitScope_Input,
+        0,
+        &fmt,
+    )?;
+    set_prop(
+        unit,
+        kAudioUnitProperty_StreamFormat,
+        kAudioUnitScope_Output,
+        0,
+        &fmt,
+    )?;
 
     // The render context lives on the heap so its address is stable once captured by
     // the AU as the callback's refcon, regardless of where the AuInsert is moved.
@@ -252,7 +280,13 @@ pub fn load(au: &DiscoveredAu, sample_rate: f32, max_block: u32) -> Result<(Load
         inputProc: Some(input_render_cb),
         inputProcRefCon: (&mut *ctx as *mut RenderCtx).cast::<c_void>(),
     };
-    set_prop(unit, kAudioUnitProperty_SetRenderCallback, kAudioUnitScope_Input, 0, &cb)?;
+    set_prop(
+        unit,
+        kAudioUnitProperty_SetRenderCallback,
+        kAudioUnitScope_Input,
+        0,
+        &cb,
+    )?;
 
     check(unsafe { AudioUnitInitialize(unit) }, "initialize")?;
 
@@ -331,9 +365,7 @@ fn query_params(unit: AudioUnit) -> Vec<AuParam> {
             .or_else(|| c_name(&info.name))
             .unwrap_or_else(|| format!("param {id}"));
         // If the AU asked us to, release the CFString it handed back.
-        if !info.cfNameString.is_null()
-            && info.flags & kAudioUnitParameterFlag_CFNameRelease != 0
-        {
+        if !info.cfNameString.is_null() && info.flags & kAudioUnitParameterFlag_CFNameRelease != 0 {
             unsafe { CFRelease(info.cfNameString.cast()) };
         }
 
@@ -355,7 +387,8 @@ fn query_params(unit: AudioUnit) -> Vec<AuParam> {
 
 /// Read the fixed 52-byte C `name` field of an `AudioUnitParameterInfo`.
 fn c_name(name: &[c_char]) -> Option<String> {
-    let bytes: &[u8] = unsafe { std::slice::from_raw_parts(name.as_ptr().cast::<u8>(), name.len()) };
+    let bytes: &[u8] =
+        unsafe { std::slice::from_raw_parts(name.as_ptr().cast::<u8>(), name.len()) };
     let end = bytes.iter().position(|&b| b == 0).unwrap_or(bytes.len());
     if end == 0 {
         return None;

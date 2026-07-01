@@ -1006,8 +1006,14 @@ mod tests {
         inactive.set_ext_amp(Some(Box::new(ConstAmp)));
         let (mut il, mut ir) = bufs();
         inactive.process_block(&input, &mut il, &mut ir);
-        assert_eq!(il, bl, "inactive external amp altered the built-in path (L)");
-        assert_eq!(ir, br, "inactive external amp altered the built-in path (R)");
+        assert_eq!(
+            il, bl,
+            "inactive external amp altered the built-in path (L)"
+        );
+        assert_eq!(
+            ir, br,
+            "inactive external amp altered the built-in path (R)"
+        );
     }
 
     /// `replace_insert` must hand back exactly the insert it displaced — the engine

@@ -50,7 +50,19 @@ pub fn run(
     loop {
         let step_ref = &step;
         terminal.draw(|f| {
-            draw(f, params, levels, None, &[], false, false, None, None, None, None);
+            draw(
+                f,
+                params,
+                levels,
+                None,
+                &[],
+                false,
+                false,
+                None,
+                None,
+                None,
+                None,
+            );
             match step_ref {
                 Step::InputDevice { cursor } => {
                     render_list_modal(

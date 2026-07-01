@@ -48,7 +48,9 @@ pub(super) fn draw(
         ])
         .split(inner);
 
-    render_header(f, rows[0], params, recording, blink, plugin, ext_cab, ext_amp);
+    render_header(
+        f, rows[0], params, recording, blink, plugin, ext_cab, ext_amp,
+    );
     render_meters(f, rows[1], levels);
     render_amp_selector(f, rows[2], params, focus.is_none());
     render_amp(f, rows[3], params, focus, ext_cab, ext_amp);
@@ -358,7 +360,11 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
         amp_spans.push(Span::raw("  "));
     }
     if focused {
-        let hint = if amp_ext_active { "Z → built-in" } else { "↑/↓  A" };
+        let hint = if amp_ext_active {
+            "Z → built-in"
+        } else {
+            "↑/↓  A"
+        };
         amp_spans.push(Span::styled(hint, Style::default().fg(DIM)));
     }
     f.render_widget(Paragraph::new(Line::from(amp_spans)), cols[0]);

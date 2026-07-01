@@ -26,7 +26,8 @@ use crate::dsp::cab::{ExternalIrCab, MAX_IR_LEN, load_ir};
 /// Shown when the user tries to load/toggle an IR while an external amp (AU) is the
 /// active amp — it replaces the built-in amp+cab, so an IR is inert until they switch
 /// back to the built-in amp (`Z`).
-const AMP_ACTIVE_WARNING: &str = "External amp active — IR has no effect (press Z for built-in amp)";
+const AMP_ACTIVE_WARNING: &str =
+    "External amp active — IR has no effect (press Z for built-in amp)";
 
 /// One discovered IR file: full path plus a short label (its stem, with a parent
 /// hint so same-named files in different folders are distinguishable).
