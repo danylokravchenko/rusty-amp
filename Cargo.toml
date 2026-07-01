@@ -2,7 +2,7 @@
 name = "rusty-amp"
 version = "0.2.3"
 edition = "2024"
-rust-version = "1.95"
+rust-version = "1.96"
 description = "A guitar amplifier and effects simulator in your terminal"
 repository = "https://github.com/danylokravchenko/rusty-amp"
 authors = ["Danylo Kravchenko <danylo.kravchenko.r@gmail.com>"]
@@ -41,6 +41,12 @@ clack-extensions = { version = "0.1.0", features = [
 default = ["clap"]
 # Host third-party CLAP effect plugins as a stereo insert in the signal chain.
 clap = ["dep:clack-host", "dep:clack-extensions"]
+
+[dev-dependencies]
+# Golden-snapshot testing for the terminal UI: render to an in-memory buffer and
+# diff against a committed `.snap`. Re-bless intentional changes with
+# `cargo insta review` (or set `INSTA_UPDATE=always`).
+insta = "1.48.0"
 
 [profile.release]
 opt-level = 3

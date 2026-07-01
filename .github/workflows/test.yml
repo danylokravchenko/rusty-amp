@@ -15,7 +15,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: "1.95"
+          toolchain: "1.96"
           components: rustfmt, clippy
 
       - name: Cache dependencies
@@ -31,6 +31,11 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y libasound2-dev
 
+      - name: Install nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tools: cargo-nextest
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -38,4 +43,16 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Run tests
-        run: cargo test
+        run: cargo nextest run
+
+      - name: Check for un-blessed UI snapshots
+        # `cargo nextest run` already fails on a snapshot mismatch, but insta
+        # leaves a pending `.snap.new` beside it. Fail loudly if any slipped into
+        # the tree (a half-finished re-bless) so the diff is never silently ignored.
+        run: |
+          pending=$(find . -name '*.snap.new' -not -path './target/*')
+          if [ -n "$pending" ]; then
+            echo "::error::Un-blessed insta snapshots found. Run 'cargo insta review' and commit the .snap files:"
+            echo "$pending"
+            exit 1
+          fi
