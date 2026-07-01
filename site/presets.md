@@ -162,7 +162,7 @@ mid  = 0.50
 high = 0.50
 
 [amp]
-model  = "marshall"   # "marshall" (default), "mesa", or "randall"
+model  = "marshall"   # "marshall" (default), "mesa", "randall", or "vox"
 gain   = 0.65
 bass   = 0.50
 mid    = 0.45

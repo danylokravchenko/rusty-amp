@@ -119,9 +119,35 @@ To add one:
 
 ### Adding a new amp model
 
-Amp models live in `src/dsp/amp/`. Each model is a struct that implements the gain stages, tone stack call, sag, and speaker interaction. Use the existing Marshall or Mesa files as a template.
+Amp models live in `src/dsp/amp/`. Each model is a struct implementing the
+`Amplifier` trait (gain stages, tone stack call, sag, and speaker interaction).
+Use the existing `marshall.rs`/`mesa.rs` (tube) or `randall.rs` (solid-state)
+files as a template — the shared building blocks (`FrontEnd`, `Bloom`,
+`CathodeBias`, `BrightCap`, `OutputTransformer`, `SpeakerLoad`, `VoiceBalance`,
+`Cached`/`ToneCache`) live in `src/dsp/amp/mod.rs`.
 
-Register the new model in the `AmpModel` enum and match arms in `src/dsp/amp/mod.rs`, then add a `[C]` cycle entry in `src/ui/input.rs` and a label in `src/ui/draw.rs`.
+To add one:
+
+1. Create `src/dsp/amp/<model>.rs` and declare/re-export it in
+   `src/dsp/amp/mod.rs`; add a field to `AmpBank` and a match arm in each of
+   `AmpBank::new`/`AmpBank::process`.
+2. Register the model in the `AmpModel` enum in `src/dsp/mod.rs`: add the
+   variant, the `from_u8` discriminant, `name()`/`short_name()` display
+   strings, and splice it into the `next()`/`prev()` cycle ring.
+3. Add it to the amp-selector's literal array in `src/ui/draw.rs` (the amp
+   header row — cycling itself is generic over `AmpModel::next()`/`prev()`, live
+   on the **`A`** key, no `input.rs` match arm needed).
+4. Add the model's string in `src/preset.rs` — the `AmpSection.model` match arms
+   in both `Preset::from_params` and `Preset::apply`.
+5. Add the new model to `each_amp()` (and `tube_amps()`, if it's a tube model)
+   in `src/dsp/amp/mod.rs`'s test module, and to the `every_amp_model_renders_its_name`
+   literal array and the `cycle_amp_*` tests in `src/ui/draw.rs`/`src/ui/input.rs`.
+6. Re-bless the UI golden snapshot (see [Working with snapshots](#working-with-snapshots)).
+7. Document the model on the docs site — see [Documenting a new amp
+   model](#documenting-a-new-amp-model).
+
+The `add-amp-model` Claude Code skill (`.claude/skills/add-amp-model/`)
+operationalizes this whole checklist end to end.
 
 ### Adding a new cabinet model
 
@@ -176,6 +202,26 @@ Use the **same livery colour** in all three. Each pedal colour in
 `site/assets/site.css` (e.g. `--green`, `--teal`); add a matching one there if the
 pedal needs a new colour. Then run `npm run build` (or `npm run dev`) and confirm
 the pedal shows up in the selector, the landing grid, and the flow diagram.
+
+### Documenting a new amp model
+
+The amp docs are a data-driven HTML block inside
+[`site/amps-cabs.md`](site/amps-cabs.md) (`## Amplifiers {#amp}`) — no new page
+is needed. Add the model in two places, reusing classes already defined in
+`site/assets/site.css`:
+
+1. A `<button class="tile" data-tab="<id>">` in the `.tiles` selector row:
+   `.tile__name`, `.tile__sub` (one-line character blurb), and `.tile__amp`
+   with 6 decorative knob-icon spans (`--r:` rotation degrees).
+2. A matching `<div class="tab-panel" data-panel="<id>">`: a `.specs` block
+   (`Gain range`, `Tone stack`, `Rectifier & power`, `Gain stages`) and one
+   `.kv` row per knob (`Gain`, `Bass`, `Mid`, `Treble`, `Presence`, `Master`) —
+   short, technical sentences (frequencies, dB, component type), no marketing
+   fluff.
+
+If the model changes the tube-vs-solid-state split described in the section's
+closing paragraph, update that paragraph too. Then run `npm run build` (or
+`npm run dev`) in `site/` and confirm the new tile and panel render. Don't forget about `site/index.md`, `site/presets.md` and `site/how-it-works.md` chain to include the new model.
 
 ## Testing
 

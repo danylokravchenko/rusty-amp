@@ -337,7 +337,12 @@ fn render_amp_selector(f: &mut Frame, area: Rect, params: &Params, focused: bool
             .fg(amp_label_fg)
             .add_modifier(Modifier::BOLD),
     )];
-    for m in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
+    for m in [
+        AmpModel::Marshall,
+        AmpModel::Mesa,
+        AmpModel::Randall,
+        AmpModel::Vox,
+    ] {
         let selected = m == amp_model;
         let style = if amp_ext_active {
             Style::default().fg(OFF)
@@ -1315,7 +1320,12 @@ mod tests {
     /// Every amp model must be reachable and shown in the header/selector.
     #[test]
     fn every_amp_model_renders_its_name() {
-        for model in [AmpModel::Marshall, AmpModel::Mesa, AmpModel::Randall] {
+        for model in [
+            AmpModel::Marshall,
+            AmpModel::Mesa,
+            AmpModel::Randall,
+            AmpModel::Vox,
+        ] {
             let params = Params::new();
             params
                 .amp_model

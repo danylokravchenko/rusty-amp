@@ -3,10 +3,10 @@ layout: page.njk
 permalink: amps-cabs.html
 title: "Amps, cabinets & IRs · rusty-amp"
 ogTitle: "rusty-amp · amps, cabinets & IRs"
-description: "The three rusty-amp amp models and cabinets, the cabinet-mic controls, and how to load your own external .wav impulse responses."
+description: "The four rusty-amp amp models and cabinets, the cabinet-mic controls, and how to load your own external .wav impulse responses."
 eyebrow: "Amps, cabinets & IRs"
 heading: "The amp head & cabinet"
-lead: "Three switchable amps, three multi-mic'd 4×12 cabinets, and a loader for your own impulse responses."
+lead: "Four switchable amps, three multi-mic'd 4×12 cabinets, and a loader for your own impulse responses."
 toc:
   - { href: "#amp", label: "Amplifiers" }
   - { href: "#external-amp", label: "External amp plugins" }
@@ -20,7 +20,7 @@ next: { href: "presets.html", label: "Presets" }
 
 ## Amplifiers {#amp}
 
-Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓</kbd> on the selector row) — the cabinet state is preserved when you switch. Pick one to see its voicing and per-knob behaviour.
+Four amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓</kbd> on the selector row) — the cabinet state is preserved when you switch. Pick one to see its voicing and per-knob behaviour.
 
 <div class="selector" style="--c:var(--rust)" data-tabs>
   <div class="tiles" role="tablist" aria-label="Amplifier models">
@@ -38,6 +38,11 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
       <div class="tile__name">Randall Warhead</div>
       <div class="tile__sub">Tight · crushing · solid-state</div>
       <div class="tile__amp"><i style="--r:-30deg"></i><i style="--r:-5deg"></i><i style="--r:25deg"></i><i style="--r:50deg"></i><i style="--r:70deg"></i><i style="--r:90deg"></i></div>
+    </button>
+    <button class="tile" role="tab" aria-selected="false" data-tab="vox">
+      <div class="tile__name">Vox AC30</div>
+      <div class="tile__sub">Chimey · touch-sensitive · Class A</div>
+      <div class="tile__amp"><i style="--r:-45deg"></i><i style="--r:-15deg"></i><i style="--r:15deg"></i><i style="--r:40deg"></i><i style="--r:65deg"></i><i style="--r:88deg"></i></div>
     </button>
   </div>
 
@@ -85,9 +90,24 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
     <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 5 kHz (+3 dB fixed offset, ±6 dB).</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
+
+  <div class="tab-panel" role="tabpanel" data-panel="vox">
+    <div class="specs">
+      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–33× into dual 12AX7</div></div>
+      <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Vox values — lighter scoop, brighter)</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Class A sag (3.8 ms / 260 ms, no NFB) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
+    </div>
+    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–33× into dual 12AX7.</span></div>
+    <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV tone stack (Vox values — lighter mid scoop than the Marshall).</span></div>
+    <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Sets the depth of the stack's scoop, gentler than the JCM800's.</span></div>
+    <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Interacts with mid/bass; boosted further by the Top Boost bright cap.</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4.5 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
+  </div>
 </div>
 
-The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC network where the three controls interact and the mids inherently scoop, exactly like a real amp — followed by a **power-amp ↔ speaker interaction** model: the speaker's impedance resonance blooms the low end dynamically as the supply sags under hard playing. The Randall keeps an active (independent-band) stack and a small static speaker resonance, true to its stiff solid-state design.
+The tube amps (Marshall, Mesa, Vox) drive a **passive FMV tone stack** — a single RC network where the three controls interact and the mids inherently scoop, exactly like a real amp — followed by a **power-amp ↔ speaker interaction** model: the speaker's impedance resonance blooms the low end dynamically as the supply sags under hard playing. The Vox has no global negative-feedback loop, so it sags more readily and blooms harder than the Marshall/Mesa. The Randall keeps an active (independent-band) stack and a small static speaker resonance, true to its stiff solid-state design.
 
 ## External amp plugins <span class="muted">(macOS · <kbd>U</kbd> · <kbd>Z</kbd>)</span> {#external-amp}
 

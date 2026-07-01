@@ -26,6 +26,7 @@ pub enum AmpModel {
     Marshall = 0,
     Mesa = 1,
     Randall = 2,
+    Vox = 3,
 }
 
 impl AmpModel {
@@ -33,6 +34,7 @@ impl AmpModel {
         match v {
             1 => Self::Mesa,
             2 => Self::Randall,
+            3 => Self::Vox,
             _ => Self::Marshall,
         }
     }
@@ -42,6 +44,7 @@ impl AmpModel {
             Self::Marshall => "Marshall JCM800",
             Self::Mesa => "Mesa Dual Rectifier",
             Self::Randall => "Randall Warhead",
+            Self::Vox => "Vox AC30",
         }
     }
 
@@ -50,6 +53,7 @@ impl AmpModel {
             Self::Marshall => "JCM800",
             Self::Mesa => "DUAL RECT",
             Self::Randall => "RANDALL",
+            Self::Vox => "AC30",
         }
     }
 
@@ -57,15 +61,17 @@ impl AmpModel {
         match self {
             Self::Marshall => Self::Mesa,
             Self::Mesa => Self::Randall,
-            Self::Randall => Self::Marshall,
+            Self::Randall => Self::Vox,
+            Self::Vox => Self::Marshall,
         }
     }
 
     pub fn prev(self) -> Self {
         match self {
-            Self::Marshall => Self::Randall,
+            Self::Marshall => Self::Vox,
             Self::Mesa => Self::Marshall,
             Self::Randall => Self::Mesa,
+            Self::Vox => Self::Randall,
         }
     }
 }

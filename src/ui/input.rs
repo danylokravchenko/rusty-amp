@@ -242,6 +242,8 @@ mod tests {
             AmpModel::Randall
         );
         cycle_amp(&p, 1);
+        assert_eq!(AmpModel::from_u8(p.amp_model.load(Relaxed)), AmpModel::Vox);
+        cycle_amp(&p, 1);
         assert_eq!(
             AmpModel::from_u8(p.amp_model.load(Relaxed)),
             AmpModel::Marshall,
@@ -254,10 +256,7 @@ mod tests {
         let p = Params::new();
         p.amp_model.store(AmpModel::Marshall as u8, Relaxed);
         cycle_amp(&p, -1);
-        assert_eq!(
-            AmpModel::from_u8(p.amp_model.load(Relaxed)),
-            AmpModel::Randall
-        );
+        assert_eq!(AmpModel::from_u8(p.amp_model.load(Relaxed)), AmpModel::Vox);
     }
 
     #[test]

@@ -1,6 +1,7 @@
 pub mod marshall;
 pub mod mesa;
 pub mod randall;
+pub mod vox;
 
 use crate::dsp::AmpModel;
 use crate::dsp::biquad::Biquad;
@@ -8,6 +9,7 @@ use crate::dsp::biquad::Biquad;
 pub use marshall::Marshall;
 pub use mesa::Mesa;
 pub use randall::Randall;
+pub use vox::Vox;
 
 /// Models the way a real power amp "sees" the loudspeaker's impedance curve
 /// through its negative-feedback loop.
@@ -351,6 +353,7 @@ pub struct AmpBank {
     marshall: Marshall,
     mesa: Mesa,
     randall: Randall,
+    vox: Vox,
 }
 
 impl AmpBank {
@@ -359,6 +362,7 @@ impl AmpBank {
             marshall: Marshall::new(sr),
             mesa: Mesa::new(sr),
             randall: Randall::new(sr),
+            vox: Vox::new(sr),
         }
     }
 
@@ -385,6 +389,9 @@ impl AmpBank {
             AmpModel::Randall => self
                 .randall
                 .process(sample, gain, bass, mid, treble, presence, master),
+            AmpModel::Vox => self
+                .vox
+                .process(sample, gain, bass, mid, treble, presence, master),
         }
     }
 }
@@ -406,6 +413,7 @@ mod tests {
             ),
             ("Mesa", Box::new(Mesa::new(SR))),
             ("Randall", Box::new(Randall::new(SR))),
+            ("Vox", Box::new(Vox::new(SR))),
         ]
     }
 
@@ -820,7 +828,7 @@ mod tests {
 
     // — Integration: the features reach the player's controls ——————————————————
 
-    /// One instance per tube amp (Marshall + Mesa), the two models that carry the
+    /// One instance per tube amp (Marshall + Mesa + Vox), the models that carry the
     /// triode/transformer/bright-cap chain. The Randall is solid-state and is
     /// deliberately left out of these — it has no output transformer or triode stage
     /// to model.
@@ -831,6 +839,7 @@ mod tests {
                 Box::new(Marshall::new(SR)) as Box<dyn Amplifier>,
             ),
             ("Mesa", Box::new(Mesa::new(SR))),
+            ("Vox", Box::new(Vox::new(SR))),
         ]
     }
 

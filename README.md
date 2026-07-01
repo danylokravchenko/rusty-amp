@@ -10,7 +10,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 
 ## Highlights
 
-- 🔊 **3 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, and Randall Warhead, switchable while you play
+- 🔊 **4 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, Randall Warhead, and Vox AC30, switchable while you play
 - 📦 **3 cabinets + your own IRs** — Mesa, Marshall, and Orange 4×12s, each captured with three blendable mics; load your own `.wav` IR and A/B it live
 - 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, flanger, chorus, ping-pong delay, and stereo reverb; add, remove, and bypass on the fly
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb

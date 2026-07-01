@@ -54,6 +54,19 @@ impl Components {
         c2: 100e-9,
         c3: 47e-9,
     };
+
+    /// Vox-style stack (used for the AC30 Top Boost — smaller c1/r3 shrink the mid
+    /// scoop and keep more top end than the Marshall, matching the AC30's chimier,
+    /// less-scooped voicing).
+    pub const VOX: Components = Components {
+        r1: 220e3,
+        r2: 1e6,
+        r3: 12e3,
+        r4: 33e3,
+        c1: 250e-12,
+        c2: 22e-9,
+        c3: 22e-9,
+    };
 }
 
 pub struct ToneStack {
