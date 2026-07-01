@@ -11,16 +11,12 @@ use crate::dsp::{AmpModel, CabModel, Params};
 #[include = "*.toml"]
 struct BundledPresets;
 
-// ── Preset source ─────────────────────────────────────────────────────────────
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PresetSource {
     System,
     #[default]
     User,
 }
-
-// ── TOML schema ───────────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Preset {
@@ -39,6 +35,7 @@ pub struct Preset {
     pub amp: AmpSection,
     pub cabinet: Option<CabSection>,
     pub eq: Option<EqSection>,
+    pub flanger: Option<FlangerSection>,
     pub delay: Option<DelaySection>,
     pub reverb: ReverbSection,
 }
@@ -151,6 +148,15 @@ pub struct DelaySection {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct FlangerSection {
+    pub enabled: Option<bool>,
+    pub rate: f32,
+    pub depth: f32,
+    pub feedback: f32,
+    pub mix: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReverbSection {
     pub enabled: Option<bool>,
     pub room: f32,
@@ -256,6 +262,13 @@ impl Preset {
                 time: params.delay_time.load(Relaxed),
                 feedback: params.delay_feedback.load(Relaxed),
                 mix: params.delay_mix.load(Relaxed),
+            }),
+            flanger: Some(FlangerSection {
+                enabled: Some(params.fl_enabled.load(Relaxed)),
+                rate: params.fl_rate.load(Relaxed),
+                depth: params.fl_depth.load(Relaxed),
+                feedback: params.fl_feedback.load(Relaxed),
+                mix: params.fl_mix.load(Relaxed),
             }),
             reverb: ReverbSection {
                 enabled: Some(params.rev_enabled.load(Relaxed)),
@@ -392,6 +405,18 @@ impl Preset {
             params.delay_mix.store(dly.mix.clamp(0.0, 1.0), Relaxed);
         } else {
             params.delay_enabled.store(false, Relaxed);
+        }
+
+        if let Some(fl) = &self.flanger {
+            params.fl_enabled.store(fl.enabled.unwrap_or(true), Relaxed);
+            params.fl_rate.store(fl.rate.clamp(0.0, 1.0), Relaxed);
+            params.fl_depth.store(fl.depth.clamp(0.0, 1.0), Relaxed);
+            params
+                .fl_feedback
+                .store(fl.feedback.clamp(0.0, 1.0), Relaxed);
+            params.fl_mix.store(fl.mix.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.fl_enabled.store(false, Relaxed);
         }
 
         let rev = &self.reverb;

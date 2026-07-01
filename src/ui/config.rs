@@ -5,8 +5,8 @@ use atomic_float::AtomicF32;
 use ratatui::style::Color;
 
 use super::styles::{
-    PEDAL_BLUE, PEDAL_GOLD, PEDAL_GREEN, PEDAL_LIME, PEDAL_ORANGE, PEDAL_PURPLE, PEDAL_RED,
-    PEDAL_SILVER, PEDAL_TEAL,
+    PEDAL_BLUE, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE, PEDAL_PURPLE,
+    PEDAL_RED, PEDAL_SILVER, PEDAL_TEAL,
 };
 use crate::dsp::Params;
 
@@ -55,6 +55,8 @@ pub(super) const PEQ_START: usize = 29;
 pub(super) const PEQ_END: usize = 32;
 pub(super) const EQ_START: usize = 32;
 pub(super) const EQ_END: usize = 35;
+pub(super) const FL_START: usize = 35;
+pub(super) const FL_END: usize = 39;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -208,6 +210,23 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "HIGH",
         param: |p| &p.eq_high,
     },
+    // 35–38: Flanger
+    Knob {
+        label: "RATE",
+        param: |p| &p.fl_rate,
+    },
+    Knob {
+        label: "DEPTH",
+        param: |p| &p.fl_depth,
+    },
+    Knob {
+        label: "FEEDBACK",
+        param: |p| &p.fl_feedback,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.fl_mix,
+    },
 ];
 
 // Rig pedals in navigation order (mirrors the KNOBS slices above). The tile
@@ -275,6 +294,13 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: EQ_START,
         end: EQ_END,
         enabled: |p| &p.eq_enabled,
+    },
+    Pedal {
+        name: "FLANGER",
+        color: PEDAL_INDIGO,
+        start: FL_START,
+        end: FL_END,
+        enabled: |p| &p.fl_enabled,
     },
 ];
 

@@ -2,7 +2,7 @@
 
 ## Project overview
 
-rusty-amp is a real-time guitar amplifier emulator that runs in the terminal. It captures audio from an audio interface, processes it through a full signal chain (noise gate → overdrive pedals → amp model → cabinet simulation → EQ → delay → reverb), and writes the processed signal back out. The UI is a ratatui TUI with live VU meters, knob sections, and a preset browser.
+rusty-amp is a real-time guitar amplifier emulator that runs in the terminal. It captures audio from an audio interface, processes it through a full signal chain (noise gate → overdrive pedals → amp model → cabinet simulation → EQ → flanger → delay → reverb), and writes the processed signal back out. The UI is a ratatui TUI with live VU meters, knob sections, and a preset browser.
 
 **Platform:** multiplatform (via cpal)
 **Language:** Rust
@@ -25,6 +25,7 @@ Guitar input
   → Amp model           (switchable: Marshall JCM800 | Mesa Dual Rectifier | Randall Warhead — 8× oversampled)
   → Cabinet sim         (switchable: Mesa 4×12 Vintage 30 | Marshall 4×12 Greenback | Orange PPC412 Vintage 30 — multi-mic IR)
   → Parametric EQ       (low shelf 120 Hz / mid peak 800 Hz Q 1.5 / high shelf 5 kHz)
+  → Flanger             (stereo LFO-swept comb: 0.5–5 ms delay, 0.05–5 Hz rate, feedback capped at 90%, L/R a quarter-cycle apart)
   → Delay               (stereo ping-pong, 0–500 ms, feedback capped at 85%)
   → Stereo Reverb       (dual decorrelated Freeverb cores: 8 parallel combs → 4 series allpasses each)
   → Master-bus widener  (stereo mid/side enhancement)
@@ -42,6 +43,7 @@ Every bypassable stage can be toggled independently with `Space`.
 | Cabinet sim | Multi-stage biquad EQ chains that model close-mic'd 4×12 responses |
 | TUI | ratatui-based UI: selector row (amp + cabinet), pedals row, amp/FX row, VU meters, preset browser overlay |
 | Preset system | TOML files loaded from `./presets/` and `~/.config/rusty-amp/presets/` |
+| Docs website | `site/` — Markdown + inline HTML rendered by Eleventy, published to GitHub Pages |
 
 ---
 
@@ -56,94 +58,30 @@ Startup prompts for input device → input channel → output device. The proces
 
 ---
 
-## Preset format
+## Documentation website
 
-Presets are `.toml` files. All sections except `[tube_screamer]`, `[amp]`, and `[reverb]` are optional — omitting a section leaves the current state unchanged.
+The user-facing docs live in [`site/`](site/) and publish to GitHub Pages at
+<https://danylokravchenko.github.io/rusty-amp/>. Pages are **Markdown with inline
+HTML** for the interactive components, rendered through a shared layout by
+[Eleventy](https://www.11ty.dev/) (11ty). The pedal, amp, and cabinet docs are
+data-driven HTML blocks inside Markdown — no per-item pages.
 
-```toml
-name        = "My Preset"
-description = "Optional one-line description shown in the preset browser."
-
-# All sections except [tube_screamer], [amp], and [reverb] are optional.
-# Omitting a section leaves that effect's current state unchanged.
-
-[noise_gate]
-enabled   = true    # optional, defaults to true
-threshold = 0.20    # 0.0 – 1.0  (0 = barely open, 1 = always open)
-release   = 0.30    # 0.0 – 1.0  (0 = instant close, 1 = very slow)
-
-# Omit [compressor] entirely to leave it off,
-# or include it with enabled = false to store values but keep it bypassed.
-[compressor]
-enabled = false     # optional, defaults to true when the section is present
-sustain = 0.40      # 0.0 – 1.0  (compression amount)
-attack  = 0.30      # 0.0 – 1.0  (0.5 ms → 50 ms)
-level   = 0.50      # 0.0 – 1.0  (output makeup, 0.5 = unity)
-
-# Omit [fuzz] entirely to leave it off (the default for the bundled presets),
-# or include it with enabled = false to store values but keep it bypassed.
-[fuzz]
-enabled = false     # optional, defaults to true when the section is present
-fuzz  = 0.70        # 0.0 – 1.0  (sustain/gain)
-tone  = 0.50
-level = 0.60
-
-[tube_screamer]
-enabled = true      # optional, defaults to true
-drive = 0.40        # 0.0 – 1.0
-tone  = 0.60
-level = 0.70
-
-# Omit [distortion] entirely to leave it off,
-# or include it with enabled = false to store values but keep it bypassed.
-[distortion]
-enabled = true
-drive = 0.50
-tone  = 0.55
-level = 0.65
-
-# Pre-amp EQ — shapes the signal before the amp's gain stage.
-# Omit [preamp_eq] entirely to leave it off, or include it with enabled = false.
-[preamp_eq]
-enabled = false       # optional, defaults to true when the section is present
-low  = 0.50           # 0.0 = −12 dB, 0.5 = flat, 1.0 = +12 dB
-mid  = 0.50
-high = 0.50
-
-[amp]
-model  = "marshall"   # "marshall" (default), "mesa", or "randall"
-gain   = 0.65
-bass   = 0.50
-mid    = 0.45
-treble = 0.65
-master = 0.55
-
-[cabinet]
-model     = "mesa"    # "mesa" (default), "marshall", or "orange"
-mic_pos   = 0.5       # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (default 0.5)
-mic_blend = 0.15      # 0.0 = SM57 dynamic, 1.0 = R121 ribbon (default 0.15)
-mic_room  = 0.15      # 0.0 = dry close mic, 1.0 = full room mic (default 0.15)
-
-[eq]
-enabled = true        # optional, defaults to true
-low  = 0.50           # 0.0 = −15 dB, 0.5 = 0 dB, 1.0 = +15 dB
-mid  = 0.50
-high = 0.50
-
-[delay]
-enabled  = true       # optional, defaults to true
-time     = 0.30       # 0.0 = 0 ms, 1.0 = 500 ms
-feedback = 0.40       # 0.0 – 1.0 (internally capped at 85%)
-mix      = 0.30       # 0.0 = dry, 1.0 = fully wet
-
-[reverb]
-enabled = true        # optional, defaults to true
-room = 0.55
-damp = 0.40
-mix  = 0.25
+```bash
+cd site
+npm install
+npm run dev     # local preview with live reload
+npm run build   # render to ./_site (what CI publishes)
 ```
 
-Drop new presets in `~/.config/rusty-amp/presets/` — they appear in the browser on next launch.
+Pages: `index` (landing + board grid), `getting-started`, `pedals`, `amps-cabs`,
+`presets`, `plugins`, `how-it-works`. Each pedal has a **livery colour** whose web
+twin is a CSS variable in the `:root` block of `site/assets/site.css`, matching a
+`PEDAL_*` colour in `src/ui/styles.rs`.
+
+**Anything that changes a pedal, amp, cabinet, control, or preset must update the
+docs in the same PR.** See [`CONTRIBUTING.md`](CONTRIBUTING.md) ("Documentation
+site" / "Documenting a new pedal") and [`site/README.md`](site/README.md) for the
+authoring conventions.
 
 ---
 
@@ -154,26 +92,3 @@ Drop new presets in `~/.config/rusty-amp/presets/` — they appear in the browse
 - **Biquad state must be preserved across buffer boundaries.** Filter state lives outside the processing loop and is passed in by reference each call.
 - **Knob values are normalized 0.0–1.0 internally.** The TUI displays them as 0–10; conversion happens at the UI layer.
 - **Rectifier sag is stateful.** The sag envelope has attack and release times that differ per amp model; do not reset this state on model switch unless explicitly tested.
-
----
-
-## Adding a new amp model
-
-1. Define DSP constants (gain range, tone stack frequencies, sag parameters).
-2. Implement a processing function matching the signature of the existing models.
-3. Add a variant to the amp model enum and wire it into the dispatch in the audio engine.
-4. Add a `model = "<name>"` string to the preset parser.
-5. Update the selector row in the TUI to include the new label.
-6. Add a bundled preset that showcases the model.
-7. Document the model in `README.md` under "Amp models".
-
----
-
-## Adding a new effect
-
-1. Implement the DSP as a standalone struct with `process(&mut self, sample: f32) -> f32` (or buffer-based equivalent). Keep state inside the struct.
-2. Decide where in the signal chain it lives and insert it there.
-3. Add bypass logic (an `enabled: bool` field; when false, pass input through unchanged).
-4. Wire a new knob section into the TUI.
-5. Add the section to the preset format (optional section pattern — omitting leaves current state).
-6. Document it in `README.md`.

@@ -103,13 +103,14 @@ To add one:
    knob range, and `enabled`-flag accessor. The rig tile grid, the detail editor,
    the `+ ADD` picker, and `D`-to-remove all derive from this table — no `draw.rs`
    layout code is needed.
-7. Add the pedal's `enabled` flag to the `toggle_pedal` match in `src/ui/input.rs`
+7. Update chain of effects in the header in `src/ui/draw.rs` - `render_header`
+8. Add the pedal's `enabled` flag to the `toggle_pedal` match in `src/ui/input.rs`
    so `Space` can bypass it while it's on the board.
-8. Add preset fields in `src/preset.rs` (including the on/off state so a preset can
+9. Add preset fields in `src/preset.rs` (including the on/off state so a preset can
    place the pedal on the board — `sync_board` reads the enabled flags after load).
-9. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
+10. Add a `#[cfg(test)]` module in the effect file — every effect carries unit tests
    (finite/bounded output, and that each knob moves the band/level it should).
-10. Document the pedal on the docs site — see [Documenting a new pedal](#documenting-a-new-pedal).
+11. Document the pedal on the docs site — see [Documenting a new pedal](#documenting-a-new-pedal).
 
 ### Adding a new amp model
 
@@ -128,6 +129,12 @@ Register in the `CabinetModel` enum and cycle logic.
 Drop a `.toml` file in `presets/`. Follow the schema in the README — all fields are optional except `name`. Test it by running the app and pressing `P`.
 
 Bundled presets cannot be deleted by users, so only add presets that are genuinely useful and well-tuned.
+
+**Update the docs site in the same PR.** Add a row for the new preset to the
+bundled presets table in [`site/presets.md`](site/presets.md) (`## Bundled
+presets`) — file name, amp, cabinet, and a one-line description — then run
+`npm run build` in `site/` to confirm it renders. A bundled preset that isn't
+listed on the site is considered incomplete.
 
 ## Documentation site
 
@@ -157,6 +164,7 @@ Add the effect in three places, all reusing classes already defined in
 3. **`site/how-it-works.md`** — add a `<div class="flow__stage"
    style="--c:var(--<colour>)">` to the signal-chain flow at the correct point in
    the chain, with a one-line DSP summary.
+4. **`site/presets.md`** — add the new pedal to the bundled preset template.
 
 Use the **same livery colour** in all three. Each pedal colour in
 `src/ui/styles.rs` has a web twin defined as a CSS variable in the `:root` block of

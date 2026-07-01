@@ -115,6 +115,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--indigo)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Flanger</span><span class="flow__badge flow__badge--stereo">Stereo</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">LFO-swept short delay (~0.5–5 ms) mixed with the dry signal — moving comb notches · RATE 0.05–5 Hz · DEPTH · FEEDBACK 0–90% · dry/wet MIX · L/R read a quarter-cycle apart for stereo drift.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--purple)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Delay</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
