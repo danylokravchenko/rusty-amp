@@ -59,6 +59,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="card"><div class="ico">🎧</div><h3>Studio-grade stereo</h3><p>Wide, three-dimensional sound from the cab, delay, and reverb — a real L/R image, not a faked widener.</p></div>
       <div class="card"><div class="ico">💾</div><h3>Ready-made presets</h3><p>Instant tones inspired by Metallica, Pantera, Slayer, Death, Slipknot, and more.</p></div>
       <div class="card"><div class="ico">🔌</div><h3>CLAP plugin host</h3><p>Drop a third-party CLAP effect into the chain and tweak its parameters without leaving the TUI.</p></div>
+      <div class="card"><div class="ico">🎚️</div><h3>AU amp host <span class="muted">(macOS)</span></h3><p>Load an Audio Unit amp sim — e.g. a Marshall plugin — as an amp-position override that replaces the built-in amp &amp; cab, and A/B it live.</p></div>
       <div class="card"><div class="ico">🎵</div><h3>Built-in tuner</h3><p>Press <kbd>T</kbd> for a chromatic tuner with a ±cents needle and a live note spectrum.</p></div>
       <div class="card"><div class="ico">⏺️</div><h3>One-key recording</h3><p>Capture the fully-processed signal straight to a stereo WAV file with a single keystroke.</p></div>
       <div class="card"><div class="ico">🖥️</div><h3>Cross-platform</h3><p>Runs natively on macOS, Windows, and Linux via <a href="https://github.com/RustAudio/cpal">cpal</a>.</p></div>

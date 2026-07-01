@@ -16,6 +16,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
+- 🎚️ **AU amp host (macOS)** — load an Audio Unit amp sim (e.g. a Marshall plugin) as an amp-position override, bypassing the built-in amp+cab
 - 🎵 **Built-in tuner** — a chromatic tuner with a ±cents needle and a live note spectrum
 - ⏺️ **One-key recording** straight to a stereo WAV file
 - 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
@@ -65,6 +66,7 @@ The complete docs live at **[danylokravchenko.github.io/rusty-amp](https://danyl
 | [Amps & cabinets](https://danylokravchenko.github.io/rusty-amp/amps-cabs.html) | Amp models, cabinet mics, loading external `.wav` IRs |
 | [Presets](https://danylokravchenko.github.io/rusty-amp/presets.html) | Browser, save dialog, bundled tones, the TOML format |
 | [CLAP plugins](https://danylokravchenko.github.io/rusty-amp/plugins.html) | Installing, loading, and configuring plugins |
+| [AU amp plugins](https://danylokravchenko.github.io/rusty-amp/plugins.html) | Loading a macOS Audio Unit amp sim as an amp override |
 | [How it works](https://danylokravchenko.github.io/rusty-amp/how-it-works.html) | The full DSP signal chain, under the hood |
 
 The site source lives in [`site/`](site/) and is published to GitHub Pages automatically — see [`site/README.md`](site/README.md) for how to edit and preview it.

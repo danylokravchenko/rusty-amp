@@ -123,6 +123,10 @@ const DEFAULT_MIC_ROOM: f32 = 0.15;
 // it starts inactive (the engine boots on a built-in cab).
 const DEFAULT_CAB_EXTERNAL_ACTIVE: bool = false;
 
+// Same story for an external amp (a hosted AU amp sim): it can be toggled against the
+// built-in amp+cab live and starts inactive (the engine boots on the built-in amp).
+const DEFAULT_AMP_EXTERNAL_ACTIVE: bool = false;
+
 const DEFAULT_NG_ENABLED: bool = true;
 const DEFAULT_NG_THRESHOLD: f32 = 0.20;
 const DEFAULT_NG_RELEASE: f32 = 0.30;
@@ -205,6 +209,14 @@ pub struct Params {
     // is meaningful.
     pub cab_external_active: Arc<AtomicBool>,
     pub cab_external_loaded: Arc<AtomicBool>,
+
+    // External-amp override. `amp_external_active` selects a loaded AU amp sim over the
+    // built-in amp+cab (flipped live by the UI, instant, no reload). `amp_external_loaded`
+    // is set by the control thread so the UI knows an AU is installed and the toggle is
+    // meaningful. When active, the built-in amp *and* cab are bypassed (an amp-sim AU
+    // brings its own cabinet).
+    pub amp_external_active: Arc<AtomicBool>,
+    pub amp_external_loaded: Arc<AtomicBool>,
 
     // Noise gate
     pub ng_enabled: Arc<AtomicBool>,
@@ -308,6 +320,9 @@ impl Params {
             cab_external_active: b!(DEFAULT_CAB_EXTERNAL_ACTIVE),
             cab_external_loaded: b!(false),
 
+            amp_external_active: b!(DEFAULT_AMP_EXTERNAL_ACTIVE),
+            amp_external_loaded: b!(false),
+
             ng_enabled: b!(DEFAULT_NG_ENABLED),
             ng_threshold: p!(DEFAULT_NG_THRESHOLD),
             ng_release: p!(DEFAULT_NG_RELEASE),
@@ -382,6 +397,10 @@ impl Params {
         // the chain — only its active/inactive selection is a default-able param.
         self.cab_external_active
             .store(DEFAULT_CAB_EXTERNAL_ACTIVE, Relaxed);
+        // Fall back to the built-in amp. The loaded AU (if any) stays installed in the
+        // chain — only its active/inactive selection is a default-able param.
+        self.amp_external_active
+            .store(DEFAULT_AMP_EXTERNAL_ACTIVE, Relaxed);
 
         self.ng_enabled.store(DEFAULT_NG_ENABLED, Relaxed);
         self.ng_threshold.store(DEFAULT_NG_THRESHOLD, Relaxed);
@@ -537,6 +556,11 @@ pub struct DspChain {
     /// `params.cab_external_active`, it replaces the built-in [`CabBank`] at the cab
     /// stage. Built off the audio thread and swapped in lock-free, like `insert`.
     ext_cab: Option<Box<ExternalIrCab>>,
+    /// Optional user-loaded external amp (a hosted AU amp sim). When present *and*
+    /// `params.amp_external_active`, it replaces the built-in amp *and* cab: the mono
+    /// pre-amp signal is fed to it (duplicated to stereo) and its stereo output goes
+    /// straight to the rack. A [`StereoInsert`] like `insert`, swapped in lock-free.
+    ext_amp: Option<Box<dyn StereoInsert>>,
 }
 
 impl DspChain {
@@ -558,12 +582,18 @@ impl DspChain {
             params,
             insert: None,
             ext_cab: None,
+            ext_amp: None,
         }
     }
 
     /// Install (or clear, with `None`) the stereo plugin insert.
     pub fn set_insert(&mut self, insert: Option<Box<dyn StereoInsert>>) {
         self.insert = insert;
+    }
+
+    /// Install (or clear, with `None`) the external amp override.
+    pub fn set_ext_amp(&mut self, amp: Option<Box<dyn StereoInsert>>) {
+        self.ext_amp = amp;
     }
 
     /// Swap the external-IR cab, returning the displaced one (if any) for disposal
@@ -576,6 +606,18 @@ impl DspChain {
         cab: Option<Box<ExternalIrCab>>,
     ) -> Option<Box<ExternalIrCab>> {
         std::mem::replace(&mut self.ext_cab, cab)
+    }
+
+    /// Swap the external amp, returning the displaced one (if any) for disposal off the
+    /// audio thread. Same lock-free pointer-move discipline as
+    /// [`replace_insert`](Self::replace_insert): a hosted plugin must not be dropped in
+    /// the realtime callback.
+    #[must_use = "the displaced external amp must be dropped off the audio thread"]
+    pub fn replace_ext_amp(
+        &mut self,
+        amp: Option<Box<dyn StereoInsert>>,
+    ) -> Option<Box<dyn StereoInsert>> {
+        std::mem::replace(&mut self.ext_amp, amp)
     }
 
     /// Swap the stereo plugin insert, returning the displaced one (if any).
@@ -604,11 +646,19 @@ impl DspChain {
     /// [`process`](Self::process) wrapper applies the master bus directly.
     #[inline]
     fn process_core(&mut self, sample: f32) -> (f32, f32) {
-        let p = &self.params;
+        let x = self.pre_amp(sample);
+        let (l, r) = self.amp_cab(x);
+        self.rack(l, r)
+    }
 
-        // Mono pedal chain (gate → compressor → fuzz → TS → DS → pre-amp EQ).
-        // Fuzz comes first so it sees the rawest signal; the pre-amp EQ comes last
-        // so it shapes exactly what the amp's gain stage clips.
+    /// Mono pre-amp path: gate → compressor → fuzz → TS → DS → pre-amp EQ.
+    ///
+    /// Fuzz comes first so it sees the rawest signal; the pre-amp EQ comes last so it
+    /// shapes exactly what the amp's gain stage clips. This is the mono signal fed to
+    /// either the built-in amp or a hosted external amp.
+    #[inline]
+    fn pre_amp(&mut self, sample: f32) -> f32 {
+        let p = &self.params;
         let x = sample;
         let x = mono_stage!(self, p, x, ng_enabled, ng, ng_threshold, ng_release);
         let x = mono_stage!(
@@ -624,9 +674,18 @@ impl DspChain {
         let x = mono_stage!(self, p, x, fz_enabled, fz, fz_fuzz, fz_tone, fz_level);
         let x = mono_stage!(self, p, x, ts_enabled, ts, ts_drive, ts_tone, ts_level);
         let x = mono_stage!(self, p, x, ds_enabled, ds, ds_drive, ds_tone, ds_level);
-        let x = mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high);
+        mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high)
+    }
 
-        // Amp
+    /// Built-in amp then cabinet: mono in, stereo out. A loaded external IR overrides
+    /// the built-in cab when active; otherwise the multi-mic blend renders (the
+    /// external IR path ignores the mic knobs — the capture is already miked).
+    ///
+    /// Not used when an *external amp* is active: that path (in [`process_block`])
+    /// bypasses both the built-in amp and cab, since an amp-sim AU brings its own cab.
+    #[inline]
+    fn amp_cab(&mut self, x: f32) -> (f32, f32) {
+        let p = &self.params;
         let x = self.amp.process(
             p.amp_model(),
             x,
@@ -638,10 +697,7 @@ impl DspChain {
             p.amp_master.load(Relaxed),
         );
 
-        // Cabinet simulation — mono in, stereo out. A loaded external IR overrides
-        // the built-in cab when active; otherwise the multi-mic blend renders. The
-        // external path ignores the mic knobs (the capture is already miked).
-        let (l, r) = match self.ext_cab.as_mut() {
+        match self.ext_cab.as_mut() {
             Some(ext) if p.cab_external_active.load(Relaxed) => {
                 use cab::Cabinet;
                 ext.process(x, 0.0, 0.0, 0.0)
@@ -653,11 +709,15 @@ impl DspChain {
                 p.mic_blend.load(Relaxed),
                 p.mic_room.load(Relaxed),
             ),
-        };
+        }
+    }
 
-        // Stereo rack (parametric EQ → flanger → chorus → ping-pong delay → reverb).
-        // The flanger and chorus modulate the finished tone ahead of the time-based
-        // ambience.
+    /// Stereo rack (parametric EQ → flanger → chorus → ping-pong delay → reverb).
+    /// The flanger and chorus modulate the finished tone ahead of the time-based
+    /// ambience. Runs after both the built-in and external amp paths.
+    #[inline]
+    fn rack(&mut self, l: f32, r: f32) -> (f32, f32) {
+        let p = &self.params;
         let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);
         let (l, r) = stereo_stage!(
             self,
@@ -683,7 +743,7 @@ impl DspChain {
             delay_feedback,
             delay_mix
         );
-        let (l, r) = stereo_stage!(
+        stereo_stage!(
             self,
             p,
             l,
@@ -693,9 +753,7 @@ impl DspChain {
             rev_room,
             rev_damp,
             rev_mix
-        );
-
-        (l, r)
+        )
     }
 
     /// Process one mono input sample, returning a stereo (L, R) pair.
@@ -711,25 +769,51 @@ impl DspChain {
 
     /// Process a block of mono input samples into stereo output buffers.
     ///
-    /// Per sample: the core chain (pedals → amp → cab → stereo rack). Then, once
-    /// per block, the optional plugin insert runs across the whole buffer in the
-    /// stereo domain. Finally the master bus (widen + soft-limit) is applied per
-    /// sample. The master bus is stateless, so splitting it out of the core loop is
-    /// exact — and with no insert loaded the whole block is bit-identical to calling
+    /// Normal path, per sample: the core chain (pedals → amp → cab → stereo rack).
+    /// When an **external amp** is loaded and active, the amp+cab stages are replaced
+    /// by a block-based override: the mono pre-amp signal is duplicated to stereo, run
+    /// through the hosted plugin, then fed to the rack (this is why the amp position
+    /// needs a block boundary — a hosted plugin processes whole buffers, not samples).
+    ///
+    /// Either way, the optional post-rack plugin insert then runs once over the block,
+    /// and finally the stateless master bus (widen + soft-limit) is applied per sample.
+    /// With no external amp and no insert loaded, the block is bit-identical to calling
     /// [`process`](Self::process) on each sample.
     ///
     /// `out_l`/`out_r` must each be at least `input.len()` long; processing stops at
     /// the shortest of the three slices.
     pub fn process_block(&mut self, input: &[f32], out_l: &mut [f32], out_r: &mut [f32]) {
         let n = input.len().min(out_l.len()).min(out_r.len());
+        let input = &input[..n];
         let out_l = &mut out_l[..n];
         let out_r = &mut out_r[..n];
 
-        // Core chain, per sample (mono → stereo internally).
-        for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
-            let (lv, rv) = self.process_core(x);
-            *l = lv;
-            *r = rv;
+        let use_ext_amp = self.ext_amp.is_some() && self.params.amp_external_active.load(Relaxed);
+        if use_ext_amp {
+            // External amp path: pre-amp (mono) → duplicate to stereo → hosted plugin
+            // (amp + its own cab) → rack. Built-in amp and cab are bypassed. The three
+            // stages are separate loops so the `ext_amp` borrow doesn't overlap the
+            // `self.pre_amp` / `self.rack` calls.
+            for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
+                let pre = self.pre_amp(x);
+                *l = pre;
+                *r = pre;
+            }
+            if let Some(ext_amp) = self.ext_amp.as_mut() {
+                ext_amp.process_block(out_l, out_r);
+            }
+            for (l, r) in out_l.iter_mut().zip(out_r.iter_mut()) {
+                let (lv, rv) = self.rack(*l, *r);
+                *l = lv;
+                *r = rv;
+            }
+        } else {
+            // Normal path: the full built-in core chain, per sample.
+            for ((&x, l), r) in input.iter().zip(out_l.iter_mut()).zip(out_r.iter_mut()) {
+                let (lv, rv) = self.process_core(x);
+                *l = lv;
+                *r = rv;
+            }
         }
 
         // Optional third-party stereo insert, one block at a time.
@@ -876,6 +960,54 @@ mod tests {
                 || bare_r.iter().zip(&ins_r).any(|(a, b)| a != b),
             "insert had no effect on the output"
         );
+    }
+
+    /// An active external amp must override the built-in amp+cab (its output feeds the
+    /// rack instead), and a *loaded but inactive* external amp must leave the built-in
+    /// path bit-identical — the live built-in↔external toggle depends on both.
+    #[test]
+    fn external_amp_overrides_builtin_only_when_active() {
+        // A recognisable stereo signature so we can tell the override actually ran.
+        struct ConstAmp;
+        impl StereoInsert for ConstAmp {
+            fn process_block(&mut self, left: &mut [f32], right: &mut [f32]) {
+                for (l, r) in left.iter_mut().zip(right.iter_mut()) {
+                    *l = 0.3;
+                    *r = -0.3;
+                }
+            }
+        }
+
+        let sr = 48_000.0;
+        let input: Vec<f32> = (0..1000)
+            .map(|n| (2.0 * PI * 220.0 * n as f32 / sr).sin() * 0.6)
+            .collect();
+        let bufs = || (vec![0.0f32; input.len()], vec![0.0f32; input.len()]);
+
+        // Built-in reference path (no external amp).
+        let mut builtin = DspChain::new(sr, Arc::new(Params::new()));
+        let (mut bl, mut br) = bufs();
+        builtin.process_block(&input, &mut bl, &mut br);
+
+        // External amp loaded *and active*: must diverge from the built-in path.
+        let params = Arc::new(Params::new());
+        params.amp_external_active.store(true, Relaxed);
+        let mut active = DspChain::new(sr, params);
+        active.set_ext_amp(Some(Box::new(ConstAmp)));
+        let (mut al, mut ar) = bufs();
+        active.process_block(&input, &mut al, &mut ar);
+        assert!(
+            bl.iter().zip(&al).any(|(a, b)| a != b) || br.iter().zip(&ar).any(|(a, b)| a != b),
+            "active external amp had no effect (built-in amp+cab not bypassed)"
+        );
+
+        // External amp loaded but *inactive*: must match the built-in path exactly.
+        let mut inactive = DspChain::new(sr, Arc::new(Params::new()));
+        inactive.set_ext_amp(Some(Box::new(ConstAmp)));
+        let (mut il, mut ir) = bufs();
+        inactive.process_block(&input, &mut il, &mut ir);
+        assert_eq!(il, bl, "inactive external amp altered the built-in path (L)");
+        assert_eq!(ir, br, "inactive external amp altered the built-in path (R)");
     }
 
     /// `replace_insert` must hand back exactly the insert it displaced — the engine

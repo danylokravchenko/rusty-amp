@@ -18,10 +18,15 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use super::styles::{AMBER, CHROME, DIM, ORANGE, SAFE};
+use super::styles::{AMBER, CHROME, DIM, ORANGE, SAFE, WARN};
 use crate::audio::AudioEngine;
 use crate::dsp::Params;
 use crate::dsp::cab::{ExternalIrCab, MAX_IR_LEN, load_ir};
+
+/// Shown when the user tries to load/toggle an IR while an external amp (AU) is the
+/// active amp — it replaces the built-in amp+cab, so an IR is inert until they switch
+/// back to the built-in amp (`Z`).
+const AMP_ACTIVE_WARNING: &str = "External amp active — IR has no effect (press Z for built-in amp)";
 
 /// One discovered IR file: full path plus a short label (its stem, with a parent
 /// hint so same-named files in different folders are distinguishable).
@@ -75,13 +80,17 @@ impl IrBrowser {
             KeyCode::Enter => self.activate_selection(engine, params),
             // Toggle the loaded IR active/inactive without leaving the modal.
             KeyCode::Char('x') | KeyCode::Char('X') if self.loaded.is_some() => {
-                let now = !params.cab_external_active.load(Relaxed);
-                params.cab_external_active.store(now, Relaxed);
-                self.message = Some(if now {
-                    "External IR active".to_owned()
+                if params.amp_external_active.load(Relaxed) {
+                    self.message = Some(AMP_ACTIVE_WARNING.to_owned());
                 } else {
-                    "Built-in cab active".to_owned()
-                });
+                    let now = !params.cab_external_active.load(Relaxed);
+                    params.cab_external_active.store(now, Relaxed);
+                    self.message = Some(if now {
+                        "External IR active".to_owned()
+                    } else {
+                        "Built-in cab active".to_owned()
+                    });
+                }
             }
             KeyCode::Esc | KeyCode::Char('i') | KeyCode::Char('I') => self.open = false,
             _ => {}
@@ -89,6 +98,13 @@ impl IrBrowser {
     }
 
     fn activate_selection(&mut self, engine: &mut AudioEngine, params: &Params) {
+        // While an external amp (AU) is active it replaces the built-in amp *and* cab,
+        // so an IR would have no effect. Block loading and say so rather than silently
+        // doing nothing. Clearing (cursor 0) is still allowed.
+        if self.cursor != 0 && params.amp_external_active.load(Relaxed) {
+            self.message = Some(AMP_ACTIVE_WARNING.to_owned());
+            return;
+        }
         if self.cursor == 0 {
             // Clear the external IR and fall back to the built-in cabs.
             self.message = match engine.set_external_cab(None) {
@@ -127,8 +143,9 @@ impl IrBrowser {
         };
     }
 
-    /// Render the modal over the main UI.
-    pub(super) fn render(&self, f: &mut Frame) {
+    /// Render the modal over the main UI. `amp_ext_active` flags that a hosted AU amp
+    /// is the active amp, in which case IRs are inert and the modal says so.
+    pub(super) fn render(&self, f: &mut Frame, amp_ext_active: bool) {
         let area = centered_rect(60, f.area());
         f.render_widget(Clear, area);
 
@@ -145,17 +162,35 @@ impl IrBrowser {
         let inner = block.inner(area);
         f.render_widget(block, area);
 
+        // A one-line warning banner sits above the list whenever an external amp is
+        // active, so the "no effect" state is obvious before the user even tries.
+        let banner_h = u16::from(amp_ext_active);
         let rows = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(1), Constraint::Length(2)])
+            .constraints([
+                Constraint::Length(banner_h),
+                Constraint::Min(1),
+                Constraint::Length(2),
+            ])
             .split(inner);
 
-        self.render_list(f, rows[0]);
+        if amp_ext_active {
+            f.render_widget(
+                Paragraph::new(Line::from(Span::styled(
+                    format!("⚠ {AMP_ACTIVE_WARNING}"),
+                    Style::default().fg(WARN).add_modifier(Modifier::BOLD),
+                )))
+                .alignment(Alignment::Center),
+                rows[0],
+            );
+        }
+
+        self.render_list(f, rows[1]);
 
         let footer = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Length(1)])
-            .split(rows[1]);
+            .split(rows[2]);
 
         let hint = vec![
             Span::styled("↑/↓", Style::default().fg(AMBER)),
