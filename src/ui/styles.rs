@@ -21,3 +21,4 @@ pub(super) const PEDAL_RED: Color = Color::Rgb(215, 60, 55); // Fuzz
 pub(super) const PEDAL_GOLD: Color = Color::Rgb(220, 175, 50); // Compressor
 pub(super) const PEDAL_LIME: Color = Color::Rgb(150, 200, 60); // Pre-amp EQ
 pub(super) const PEDAL_INDIGO: Color = Color::Rgb(122, 124, 224); // Flanger
+pub(super) const PEDAL_PINK: Color = Color::Rgb(235, 120, 190); // Chorus

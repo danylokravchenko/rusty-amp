@@ -3,10 +3,10 @@ layout: page.njk
 permalink: pedals.html
 title: "Pedals & effects · rusty-amp"
 ogTitle: "rusty-amp · pedals & effects"
-description: "Every rusty-amp pedal explained: noise gate, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, delay, and stereo reverb — with full knob reference tables."
+description: "Every rusty-amp pedal explained: noise gate, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, chorus, delay, and stereo reverb — with full knob reference tables."
 eyebrow: "Pedals & effects"
 heading: "Configuring the board"
-lead: "Ten effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
+lead: "Eleven effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
 toc:
   - { href: "#board", label: "The board" }
   - { href: "#pedals", label: "All pedals" }
@@ -34,7 +34,7 @@ The **Guitar Rig** shows one compact tile per pedal that's on the board, followe
 
 <div class="note">
 <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
-Gate → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Delay → Reverb.
+Gate → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Delay → Reverb.
 Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
 </div>
 
@@ -75,6 +75,10 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <button class="tile" style="--c:var(--indigo)" role="tab" aria-selected="false" data-tab="flanger">
       <div class="tile__name"><span class="tile__dot"></span>Flanger</div>
       <div class="tile__sub">Rate · Depth · Feedback · Mix</div>
+    </button>
+    <button class="tile" style="--c:var(--pink)" role="tab" aria-selected="false" data-tab="chorus">
+      <div class="tile__name"><span class="tile__dot"></span>Chorus</div>
+      <div class="tile__sub">Rate · Depth · Mix</div>
     </button>
     <button class="tile" style="--c:var(--purple)" role="tab" aria-selected="false" data-tab="delay">
       <div class="tile__name"><span class="tile__dot"></span>Delay</div>
@@ -140,6 +144,13 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <div class="kv"><span class="kv__k">Depth</span><span class="kv__v"><span class="kv__r">0–10</span> Sweep width — how far the delay swings (~0.5 ms up to ~5 ms). Higher = a wider, more dramatic sweep.</span></div>
     <div class="kv"><span class="kv__k">Feedback</span><span class="kv__v"><span class="kv__r">0–10</span> Regeneration (0–90%). Feeds the swept tap back in, sharpening the notches into a resonant, ringing voice.</span></div>
     <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 5 = deepest flange (equal dry/wet), 10 = fully wet.</span></div>
+  </div>
+
+  <div class="tab-panel" style="--c:var(--pink)" role="tabpanel" data-panel="chorus">
+    <p class="muted">A long LFO-swept delay (~8–20 ms) mixed back with the dry signal — much longer than the flanger's sub-millisecond tap and with no feedback, so instead of a metallic comb sweep you get lush pitch-shimmer: several slightly detuned, slightly delayed copies of the note. Sits after the flanger, before the delay, modulating the finished tone ahead of the ambience. The two channels read one LFO half a cycle apart, so the shimmer drifts across the stereo field and widens the image.</p>
+    <div class="kv"><span class="kv__k">Rate</span><span class="kv__v"><span class="kv__r">0–10</span> LFO speed, 0.05–5 Hz (exponential). Low = a slow, glassy drift; high = a fast, vibrato-like warble.</span></div>
+    <div class="kv"><span class="kv__k">Depth</span><span class="kv__v"><span class="kv__r">0–10</span> Sweep width — how far the delay swings (up to ~12 ms). Higher = more detuning and a thicker, more obvious effect.</span></div>
+    <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 5 = classic chorus (equal dry/wet), 10 = fully wet (pitch-vibrato).</span></div>
   </div>
 
   <div class="tab-panel" style="--c:var(--purple)" role="tabpanel" data-panel="delay">

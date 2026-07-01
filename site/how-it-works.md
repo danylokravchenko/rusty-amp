@@ -122,6 +122,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--pink)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Chorus</span><span class="flow__badge flow__badge--stereo">Stereo</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">LFO-swept long delay (~8–20 ms), no feedback, mixed with the dry signal — lush pitch-shimmer, not a comb sweep · RATE 0.05–5 Hz · DEPTH · dry/wet MIX · L/R read half a cycle apart for stereo width.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--purple)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Delay</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>

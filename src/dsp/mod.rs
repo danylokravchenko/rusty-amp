@@ -16,8 +16,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
-    Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, PreampEq, Reverb,
-    TubeScreamer,
+    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, PreampEq,
+    Reverb, TubeScreamer,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -173,6 +173,11 @@ const DEFAULT_FL_DEPTH: f32 = 0.55;
 const DEFAULT_FL_FEEDBACK: f32 = 0.35;
 const DEFAULT_FL_MIX: f32 = 0.50;
 
+const DEFAULT_CH_ENABLED: bool = false;
+const DEFAULT_CH_RATE: f32 = 0.25;
+const DEFAULT_CH_DEPTH: f32 = 0.50;
+const DEFAULT_CH_MIX: f32 = 0.50;
+
 const DEFAULT_AMP_GAIN: f32 = 0.65;
 const DEFAULT_AMP_BASS: f32 = 0.50;
 const DEFAULT_AMP_MID: f32 = 0.45;
@@ -261,6 +266,12 @@ pub struct Params {
     pub fl_feedback: Arc<AtomicF32>,
     pub fl_mix: Arc<AtomicF32>,
 
+    // Chorus (stereo rack, post-cab modulation, after the flanger)
+    pub ch_enabled: Arc<AtomicBool>,
+    pub ch_rate: Arc<AtomicF32>,
+    pub ch_depth: Arc<AtomicF32>,
+    pub ch_mix: Arc<AtomicF32>,
+
     // Amp (shared by all models)
     pub amp_gain: Arc<AtomicF32>,
     pub amp_bass: Arc<AtomicF32>,
@@ -347,6 +358,11 @@ impl Params {
             fl_feedback: p!(DEFAULT_FL_FEEDBACK),
             fl_mix: p!(DEFAULT_FL_MIX),
 
+            ch_enabled: b!(DEFAULT_CH_ENABLED),
+            ch_rate: p!(DEFAULT_CH_RATE),
+            ch_depth: p!(DEFAULT_CH_DEPTH),
+            ch_mix: p!(DEFAULT_CH_MIX),
+
             amp_gain: p!(DEFAULT_AMP_GAIN),
             amp_bass: p!(DEFAULT_AMP_BASS),
             amp_mid: p!(DEFAULT_AMP_MID),
@@ -416,6 +432,11 @@ impl Params {
         self.fl_depth.store(DEFAULT_FL_DEPTH, Relaxed);
         self.fl_feedback.store(DEFAULT_FL_FEEDBACK, Relaxed);
         self.fl_mix.store(DEFAULT_FL_MIX, Relaxed);
+
+        self.ch_enabled.store(DEFAULT_CH_ENABLED, Relaxed);
+        self.ch_rate.store(DEFAULT_CH_RATE, Relaxed);
+        self.ch_depth.store(DEFAULT_CH_DEPTH, Relaxed);
+        self.ch_mix.store(DEFAULT_CH_MIX, Relaxed);
 
         self.amp_gain.store(DEFAULT_AMP_GAIN, Relaxed);
         self.amp_bass.store(DEFAULT_AMP_BASS, Relaxed);
@@ -505,6 +526,7 @@ pub struct DspChain {
     cab: CabBank,
     eq: ParametricEq,
     flanger: Flanger,
+    chorus: Chorus,
     delay: Delay,
     reverb: Reverb,
     params: Arc<Params>,
@@ -530,6 +552,7 @@ impl DspChain {
             cab: CabBank::new(sr),
             eq: ParametricEq::new(sr),
             flanger: Flanger::new(sr),
+            chorus: Chorus::new(sr),
             delay: Delay::new(sr),
             reverb: Reverb::new(sr),
             params,
@@ -632,8 +655,9 @@ impl DspChain {
             ),
         };
 
-        // Stereo rack (parametric EQ → flanger → ping-pong delay → reverb).
-        // The flanger modulates the finished tone ahead of the time-based ambience.
+        // Stereo rack (parametric EQ → flanger → chorus → ping-pong delay → reverb).
+        // The flanger and chorus modulate the finished tone ahead of the time-based
+        // ambience.
         let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);
         let (l, r) = stereo_stage!(
             self,
@@ -647,6 +671,7 @@ impl DspChain {
             fl_feedback,
             fl_mix
         );
+        let (l, r) = stereo_stage!(self, p, l, r, ch_enabled, chorus, ch_rate, ch_depth, ch_mix);
         let (l, r) = stereo_stage!(
             self,
             p,

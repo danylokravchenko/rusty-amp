@@ -67,7 +67,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
 
   <section>
     <h2>The pedalboard</h2>
-    <p class="lead">Nine effects, each added, removed, and bypassed independently — the board shows only what you're using.</p>
+    <p class="lead">Eleven effects, each added, removed, and bypassed independently — the board shows only what you're using.</p>
     <div class="pedalgrid" style="margin-top:18px">
       <div class="pedal" style="--c:var(--gray)"><div class="pedal__name"><span class="dot"></span>Noise Gate</div><div class="pedal__knobs">Thresh · Release</div><div class="pedal__desc">Envelope-follower gate that silences hum and hiss between riffs.</div></div>
       <div class="pedal" style="--c:var(--gold)"><div class="pedal__name"><span class="dot"></span>Compressor</div><div class="pedal__knobs">Sustain · Attack · Level</div><div class="pedal__desc">Hard-knee compressor with auto makeup — evens out picking, adds sustain.</div></div>
@@ -77,6 +77,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="pedal" style="--c:var(--lime)"><div class="pedal__name"><span class="dot"></span>Pre-amp EQ</div><div class="pedal__knobs">Low · Mid · High</div><div class="pedal__desc">Shapes the signal <em>before</em> the amp clips — tighten the chug or push leads.</div></div>
       <div class="pedal" style="--c:var(--teal)"><div class="pedal__name"><span class="dot"></span>Parametric EQ</div><div class="pedal__knobs">Low · Mid · High</div><div class="pedal__desc">Post-cabinet tone shaping of the final stereo mix.</div></div>
       <div class="pedal" style="--c:var(--indigo)"><div class="pedal__name"><span class="dot"></span>Flanger</div><div class="pedal__knobs">Rate · Depth · Feedback · Mix</div><div class="pedal__desc">LFO-swept comb filter — the classic metallic “jet plane” sweep, in stereo.</div></div>
+      <div class="pedal" style="--c:var(--pink)"><div class="pedal__name"><span class="dot"></span>Chorus</div><div class="pedal__knobs">Rate · Depth · Mix</div><div class="pedal__desc">LFO-swept long delay, no feedback — lush, watery thickening in stereo.</div></div>
       <div class="pedal" style="--c:var(--purple)"><div class="pedal__name"><span class="dot"></span>Delay</div><div class="pedal__knobs">Time · Feedback · Mix</div><div class="pedal__desc">Stereo ping-pong — repeats bounce L↔R, up to 500 ms.</div></div>
       <div class="pedal" style="--c:var(--blue)"><div class="pedal__name"><span class="dot"></span>Stereo Reverb</div><div class="pedal__knobs">Room · Damp · Mix</div><div class="pedal__desc">Dual decorrelated Freeverb cores for a wide, deep tail.</div></div>
     </div>

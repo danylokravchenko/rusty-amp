@@ -36,6 +36,7 @@ pub struct Preset {
     pub cabinet: Option<CabSection>,
     pub eq: Option<EqSection>,
     pub flanger: Option<FlangerSection>,
+    pub chorus: Option<ChorusSection>,
     pub delay: Option<DelaySection>,
     pub reverb: ReverbSection,
 }
@@ -157,6 +158,14 @@ pub struct FlangerSection {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct ChorusSection {
+    pub enabled: Option<bool>,
+    pub rate: f32,
+    pub depth: f32,
+    pub mix: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReverbSection {
     pub enabled: Option<bool>,
     pub room: f32,
@@ -269,6 +278,12 @@ impl Preset {
                 depth: params.fl_depth.load(Relaxed),
                 feedback: params.fl_feedback.load(Relaxed),
                 mix: params.fl_mix.load(Relaxed),
+            }),
+            chorus: Some(ChorusSection {
+                enabled: Some(params.ch_enabled.load(Relaxed)),
+                rate: params.ch_rate.load(Relaxed),
+                depth: params.ch_depth.load(Relaxed),
+                mix: params.ch_mix.load(Relaxed),
             }),
             reverb: ReverbSection {
                 enabled: Some(params.rev_enabled.load(Relaxed)),
@@ -417,6 +432,15 @@ impl Preset {
             params.fl_mix.store(fl.mix.clamp(0.0, 1.0), Relaxed);
         } else {
             params.fl_enabled.store(false, Relaxed);
+        }
+
+        if let Some(ch) = &self.chorus {
+            params.ch_enabled.store(ch.enabled.unwrap_or(true), Relaxed);
+            params.ch_rate.store(ch.rate.clamp(0.0, 1.0), Relaxed);
+            params.ch_depth.store(ch.depth.clamp(0.0, 1.0), Relaxed);
+            params.ch_mix.store(ch.mix.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.ch_enabled.store(false, Relaxed);
         }
 
         let rev = &self.reverb;

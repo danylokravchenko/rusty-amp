@@ -24,7 +24,7 @@ Signal-path code must be **allocation-free and panic-free** at runtime; process 
 1. **`src/dsp/effects/<effect>.rs`** — a `struct` holding state with a `process(sample: f32) -> f32` (or stereo) method. Reuse the shared helpers above.
 2. **`src/dsp/effects/mod.rs`** — declare and re-export the module.
 3. **`src/dsp/mod.rs`** — add a field to `DspChain`, a line in `DspChain::process` using the `mono_stage!` / `stereo_stage!` macro (so it bypasses cleanly and reads `Params`), and the `Params` fields + defaults: one `Arc<AtomicF32>` per knob **and** the `<fx>_enabled: Arc<AtomicBool>` bypass flag.
-4. **`src/dsp/draw.rs`** - update `render_header` chain
+4. **`src/ui/draw.rs`** - update `render_header` chain
 5. **`src/ui/config.rs`** — add the `<FX>_START` / `<FX>_END` knob-range constants and the `KNOBS` entries (in top-to-bottom on-screen order — `←`/`→` walks the array linearly), then a `PEDALS` entry (name, livery colour accessor, knob range, `enabled`-flag accessor). The tile grid, detail editor, `+ ADD` picker, and `D`-to-remove all derive from this table.
 6. **`src/ui/styles.rs`** — add the `PEDAL_<NAME>` colour used by the `PEDALS` entry.
 7. **`src/ui/input.rs`** — add the pedal's `enabled` flag to the `toggle_pedal` match so `Space` can bypass it on the board.
@@ -43,6 +43,7 @@ Data-driven HTML blocks inside Markdown — no new page. Use the **same livery c
 3. **`site/index.md`** — add a `<div class="pedal" style="--c:var(--<colour>)">` card to the board grid (landing-page overview).
 4. **`site/how-it-works.md`** — add a `<div class="flow__stage" style="--c:var(--<colour>)">` at the correct point in the signal-chain flow, with a one-line DSP summary.
 5. **`site/presets.md`** — add the new pedal to the bundled preset template.
+6. **`README.md`** — update the documentation to include the new pedal.
 
 ## Verify
 
