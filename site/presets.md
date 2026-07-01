@@ -181,6 +181,15 @@ low  = 0.50           # 0.0 = −15 dB, 0.5 = 0 dB, 1.0 = +15 dB
 mid  = 0.50
 high = 0.50
 
+# Omit [flanger] entirely to leave it off (the default for the bundled presets),
+# or include it with enabled = false to store values but keep it bypassed.
+[flanger]
+enabled  = false      # optional, defaults to true when the section is present
+rate     = 0.30       # 0.0 – 1.0  (LFO speed, 0.05–5 Hz, exponential)
+depth    = 0.55       # 0.0 – 1.0  (sweep width; delay swings ~0.5–5 ms)
+feedback = 0.35       # 0.0 – 1.0  (regeneration, capped at 90%)
+mix      = 0.50       # 0.0 = dry, 0.5 = deepest flange, 1.0 = fully wet
+
 [delay]
 enabled  = true       # optional, defaults to true
 time     = 0.30       # 0.0 = 0 ms, 1.0 = 500 ms

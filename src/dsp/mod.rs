@@ -16,10 +16,9 @@ use std::sync::atomic::{AtomicBool, AtomicU8, Ordering::Relaxed};
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
-    Compressor, Delay, Distortion, Fuzz, NoiseGate, ParametricEq, PreampEq, Reverb, TubeScreamer,
+    Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, PreampEq, Reverb,
+    TubeScreamer,
 };
-
-// ── Amp model ─────────────────────────────────────────────────────────────────
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -71,8 +70,6 @@ impl AmpModel {
     }
 }
 
-// ── Cabinet model ─────────────────────────────────────────────────────────────
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
 pub enum CabModel {
@@ -115,8 +112,6 @@ impl CabModel {
         }
     }
 }
-
-// ── Shared parameters (written by UI thread, read by audio thread) ────────────
 
 const DEFAULT_AMP_MODEL: u8 = AmpModel::Marshall as u8;
 const DEFAULT_CAB_MODEL: u8 = CabModel::Mesa as u8;
@@ -171,6 +166,12 @@ const DEFAULT_DELAY_ENABLED: bool = false;
 const DEFAULT_DELAY_TIME: f32 = 0.30;
 const DEFAULT_DELAY_FEEDBACK: f32 = 0.40;
 const DEFAULT_DELAY_MIX: f32 = 0.30;
+
+const DEFAULT_FL_ENABLED: bool = false;
+const DEFAULT_FL_RATE: f32 = 0.30;
+const DEFAULT_FL_DEPTH: f32 = 0.55;
+const DEFAULT_FL_FEEDBACK: f32 = 0.35;
+const DEFAULT_FL_MIX: f32 = 0.50;
 
 const DEFAULT_AMP_GAIN: f32 = 0.65;
 const DEFAULT_AMP_BASS: f32 = 0.50;
@@ -253,6 +254,13 @@ pub struct Params {
     pub delay_feedback: Arc<AtomicF32>,
     pub delay_mix: Arc<AtomicF32>,
 
+    // Flanger (stereo rack, post-cab modulation)
+    pub fl_enabled: Arc<AtomicBool>,
+    pub fl_rate: Arc<AtomicF32>,
+    pub fl_depth: Arc<AtomicF32>,
+    pub fl_feedback: Arc<AtomicF32>,
+    pub fl_mix: Arc<AtomicF32>,
+
     // Amp (shared by all models)
     pub amp_gain: Arc<AtomicF32>,
     pub amp_bass: Arc<AtomicF32>,
@@ -333,6 +341,12 @@ impl Params {
             delay_feedback: p!(DEFAULT_DELAY_FEEDBACK),
             delay_mix: p!(DEFAULT_DELAY_MIX),
 
+            fl_enabled: b!(DEFAULT_FL_ENABLED),
+            fl_rate: p!(DEFAULT_FL_RATE),
+            fl_depth: p!(DEFAULT_FL_DEPTH),
+            fl_feedback: p!(DEFAULT_FL_FEEDBACK),
+            fl_mix: p!(DEFAULT_FL_MIX),
+
             amp_gain: p!(DEFAULT_AMP_GAIN),
             amp_bass: p!(DEFAULT_AMP_BASS),
             amp_mid: p!(DEFAULT_AMP_MID),
@@ -397,6 +411,12 @@ impl Params {
         self.delay_feedback.store(DEFAULT_DELAY_FEEDBACK, Relaxed);
         self.delay_mix.store(DEFAULT_DELAY_MIX, Relaxed);
 
+        self.fl_enabled.store(DEFAULT_FL_ENABLED, Relaxed);
+        self.fl_rate.store(DEFAULT_FL_RATE, Relaxed);
+        self.fl_depth.store(DEFAULT_FL_DEPTH, Relaxed);
+        self.fl_feedback.store(DEFAULT_FL_FEEDBACK, Relaxed);
+        self.fl_mix.store(DEFAULT_FL_MIX, Relaxed);
+
         self.amp_gain.store(DEFAULT_AMP_GAIN, Relaxed);
         self.amp_bass.store(DEFAULT_AMP_BASS, Relaxed);
         self.amp_mid.store(DEFAULT_AMP_MID, Relaxed);
@@ -413,8 +433,6 @@ impl Params {
         CabModel::from_u8(self.cab_model.load(Relaxed))
     }
 }
-
-// ── Signal levels (written by audio thread, read by UI) ───────────────────────
 
 pub struct Levels {
     pub input: Arc<AtomicF32>,
@@ -436,8 +454,6 @@ impl Levels {
     }
 }
 
-// ── Plugin insert extension point ─────────────────────────────────────────────
-
 /// A stereo insert effect processed one block at a time, in place.
 ///
 /// The built-in [`DspChain`] is hardwired, but this is the single extension point
@@ -449,8 +465,6 @@ pub trait StereoInsert: Send {
     /// Process one block in place. `left` and `right` always have equal length.
     fn process_block(&mut self, left: &mut [f32], right: &mut [f32]);
 }
-
-// ── DSP chain (owned by audio thread, never shared) ───────────────────────────
 
 /// Run a mono effect when its enable flag is set, otherwise pass `$x` through.
 ///
@@ -490,6 +504,7 @@ pub struct DspChain {
     amp: AmpBank,
     cab: CabBank,
     eq: ParametricEq,
+    flanger: Flanger,
     delay: Delay,
     reverb: Reverb,
     params: Arc<Params>,
@@ -514,6 +529,7 @@ impl DspChain {
             amp: AmpBank::new(sr),
             cab: CabBank::new(sr),
             eq: ParametricEq::new(sr),
+            flanger: Flanger::new(sr),
             delay: Delay::new(sr),
             reverb: Reverb::new(sr),
             params,
@@ -616,8 +632,21 @@ impl DspChain {
             ),
         };
 
-        // Stereo rack (parametric EQ → ping-pong delay → reverb).
+        // Stereo rack (parametric EQ → flanger → ping-pong delay → reverb).
+        // The flanger modulates the finished tone ahead of the time-based ambience.
         let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);
+        let (l, r) = stereo_stage!(
+            self,
+            p,
+            l,
+            r,
+            fl_enabled,
+            flanger,
+            fl_rate,
+            fl_depth,
+            fl_feedback,
+            fl_mix
+        );
         let (l, r) = stereo_stage!(
             self,
             p,

@@ -3,10 +3,10 @@ layout: page.njk
 permalink: pedals.html
 title: "Pedals & effects · rusty-amp"
 ogTitle: "rusty-amp · pedals & effects"
-description: "Every rusty-amp pedal explained: noise gate, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, delay, and stereo reverb — with full knob reference tables."
+description: "Every rusty-amp pedal explained: noise gate, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, delay, and stereo reverb — with full knob reference tables."
 eyebrow: "Pedals & effects"
 heading: "Configuring the board"
-lead: "Nine effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
+lead: "Ten effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
 toc:
   - { href: "#board", label: "The board" }
   - { href: "#pedals", label: "All pedals" }
@@ -34,7 +34,7 @@ The **Guitar Rig** shows one compact tile per pedal that's on the board, followe
 
 <div class="note">
 <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
-Gate → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Delay → Reverb.
+Gate → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Delay → Reverb.
 Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
 </div>
 
@@ -71,6 +71,10 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <button class="tile" style="--c:var(--teal)" role="tab" aria-selected="false" data-tab="peq">
       <div class="tile__name"><span class="tile__dot"></span>Parametric EQ</div>
       <div class="tile__sub">Low · Mid · High</div>
+    </button>
+    <button class="tile" style="--c:var(--indigo)" role="tab" aria-selected="false" data-tab="flanger">
+      <div class="tile__name"><span class="tile__dot"></span>Flanger</div>
+      <div class="tile__sub">Rate · Depth · Feedback · Mix</div>
     </button>
     <button class="tile" style="--c:var(--purple)" role="tab" aria-selected="false" data-tab="delay">
       <div class="tile__name"><span class="tile__dot"></span>Delay</div>
@@ -128,6 +132,14 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <div class="kv"><span class="kv__k">Low</span><span class="kv__v"><span class="kv__r">120 Hz</span> Low shelf.</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v"><span class="kv__r">800 Hz</span> Peak (Q 1.5).</span></div>
     <div class="kv"><span class="kv__k">High</span><span class="kv__v"><span class="kv__r">5 kHz</span> High shelf.</span></div>
+  </div>
+
+  <div class="tab-panel" style="--c:var(--indigo)" role="tabpanel" data-panel="flanger">
+    <p class="muted">A short LFO-swept delay mixed back with the dry signal — the moving comb-filter notches give the classic metallic “jet plane” sweep. Sits after the cab and parametric EQ, before the delay, so it modulates the finished tone ahead of the ambience. The two channels read one LFO a quarter-cycle apart, so the sweep drifts across the stereo field.</p>
+    <div class="kv"><span class="kv__k">Rate</span><span class="kv__v"><span class="kv__r">0–10</span> LFO speed, 0.05–5 Hz (exponential). Low = a slow, deep whoosh; high = a fast warble.</span></div>
+    <div class="kv"><span class="kv__k">Depth</span><span class="kv__v"><span class="kv__r">0–10</span> Sweep width — how far the delay swings (~0.5 ms up to ~5 ms). Higher = a wider, more dramatic sweep.</span></div>
+    <div class="kv"><span class="kv__k">Feedback</span><span class="kv__v"><span class="kv__r">0–10</span> Regeneration (0–90%). Feeds the swept tap back in, sharpening the notches into a resonant, ringing voice.</span></div>
+    <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 5 = deepest flange (equal dry/wet), 10 = fully wet.</span></div>
   </div>
 
   <div class="tab-panel" style="--c:var(--purple)" role="tabpanel" data-panel="delay">

@@ -140,63 +140,51 @@ fn render_header(
     let ds_on = params.ds_enabled.load(Relaxed);
     let peq_on = params.peq_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
+    let fl_on = params.fl_enabled.load(Relaxed);
     let delay_on = params.delay_enabled.load(Relaxed);
     let rev_on = params.rev_enabled.load(Relaxed);
 
     let arrow = Span::styled(" ──▶ ", Style::default().fg(DIM));
 
-    let pedal_color = |on: bool| if on { ORANGE } else { OFF };
-    let amp_color = AMBER;
+    // The ribbon shows the live signal path: only pedals that are on appear, so it
+    // mirrors what is actually being heard. AMP and CAB are always in the path and
+    // anchor the pre-amp pedals to their post-cab counterparts.
+    let pre_pedals = [
+        ("GATE", ng_on),
+        ("COMP", cmp_on),
+        ("FUZZ", fz_on),
+        ("TS-808", ts_on),
+        ("DS-1", ds_on),
+        ("PRE-EQ", peq_on),
+    ];
+    let post_pedals = [
+        ("EQ", eq_on),
+        ("FLANGER", fl_on),
+        ("DELAY", delay_on),
+        ("REVERB", rev_on),
+    ];
 
     let mut chain: Vec<Span> = vec![Span::raw("  ")];
+    let push_stage = |chain: &mut Vec<Span>, label: &'static str, color: Color| {
+        if chain.len() > 1 {
+            chain.push(arrow.clone());
+        }
+        chain.push(Span::styled(label, Style::default().fg(color)));
+    };
 
-    chain.push(Span::styled(
-        "GATE",
-        Style::default().fg(pedal_color(ng_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "COMP",
-        Style::default().fg(pedal_color(cmp_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "FUZZ",
-        Style::default().fg(pedal_color(fz_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "TS-808",
-        Style::default().fg(pedal_color(ts_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "DS-1",
-        Style::default().fg(pedal_color(ds_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "PRE-EQ",
-        Style::default().fg(pedal_color(peq_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled("AMP", Style::default().fg(amp_color)));
-    chain.push(arrow.clone());
-    chain.push(Span::styled("CAB", Style::default().fg(amp_color)));
-    chain.push(arrow.clone());
-    chain.push(Span::styled("EQ", Style::default().fg(pedal_color(eq_on))));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "DELAY",
-        Style::default().fg(pedal_color(delay_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled(
-        "REVERB",
-        Style::default().fg(pedal_color(rev_on)),
-    ));
-    chain.push(arrow.clone());
-    chain.push(Span::styled("OUTPUT", Style::default().fg(CHROME)));
+    for (label, on) in pre_pedals {
+        if on {
+            push_stage(&mut chain, label, ORANGE);
+        }
+    }
+    push_stage(&mut chain, "AMP", AMBER);
+    push_stage(&mut chain, "CAB", AMBER);
+    for (label, on) in post_pedals {
+        if on {
+            push_stage(&mut chain, label, ORANGE);
+        }
+    }
+    push_stage(&mut chain, "OUTPUT", CHROME);
 
     f.render_widget(Paragraph::new(Line::from(chain)), rows[1]);
 }
