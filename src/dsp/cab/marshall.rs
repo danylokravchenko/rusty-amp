@@ -46,6 +46,13 @@ const TEX_L: Texture = Texture {
         (110.0, 85.0, 0.004),
         (2500.0, 5.0, 0.009),
     ],
+    scatter: Some(ir::Scatter {
+        seed: 21,
+        count: 22,
+        band: (1800.0, 6400.0),
+        t60_ms: (2.0, 5.0),
+        gain: 0.016,
+    }),
 };
 const TEX_R: Texture = Texture {
     predelay: 2,
@@ -65,6 +72,13 @@ const TEX_R: Texture = Texture {
         (114.0, 87.0, 0.004),
         (2600.0, 5.0, 0.009),
     ],
+    scatter: Some(ir::Scatter {
+        seed: 22,
+        count: 22,
+        band: (1800.0, 6400.0),
+        t60_ms: (2.0, 5.0),
+        gain: 0.016,
+    }),
 };
 
 // Room-mic textures: distance pre-delay + denser late reflections for air.
@@ -79,6 +93,7 @@ const ROOM_TEX_L: Texture = Texture {
         (18.00, -0.055),
     ],
     modes: &[(72.0, 130.0, 0.006), (170.0, 95.0, 0.005)],
+    scatter: None,
 };
 const ROOM_TEX_R: Texture = Texture {
     predelay: 150,
@@ -91,6 +106,7 @@ const ROOM_TEX_R: Texture = Texture {
         (17.50, -0.05),
     ],
     modes: &[(76.0, 135.0, 0.006), (180.0, 100.0, 0.005)],
+    scatter: None,
 };
 
 impl MarshallCab {
@@ -194,6 +210,7 @@ mod tests {
             predelay: t.predelay,
             reflections: t.reflections,
             modes: &[],
+            scatter: t.scatter,
         };
         macro_rules! check {
             ($tag:expr, $voicing:expr, $tex:expr) => {{

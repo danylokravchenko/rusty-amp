@@ -26,6 +26,51 @@ pub struct Texture {
     pub reflections: &'static [(f32, f32)],
     /// Speaker resonant modes as (freq_hz, t60_ms, gain).
     pub modes: &'static [(f32, f32, f32)],
+    /// Optional cone-breakup scatter: a seeded cluster of many small high-Q
+    /// modes across the breakup band (see [`Scatter`]).
+    pub scatter: Option<Scatter>,
+}
+
+/// Cone-breakup scatter. Above ~2 kHz a real cone stops moving as a piston and
+/// splits into dozens of small, irregularly-placed resonances; measured captures
+/// show 9–12 dB of spectral ripple per octave up there, where one or two
+/// hand-authored modes leave the response statistically far too smooth
+/// ("airbrushed"). Rather than author dozens of modes by hand, a deterministic
+/// LCG expands this spec into `count` modes with log-uniform random frequencies
+/// in `band`, decays in `t60_ms`, and alternating-sign gains up to `gain`.
+/// Different seeds per channel decorrelate L/R exactly like a real pair of
+/// speakers, whose breakup patterns never match.
+#[derive(Clone, Copy)]
+pub struct Scatter {
+    pub seed: u32,
+    pub count: usize,
+    /// Breakup band (Hz, log-uniform sampling).
+    pub band: (f32, f32),
+    /// Per-mode decay range (ms, uniform sampling).
+    pub t60_ms: (f32, f32),
+    /// Peak |gain| per mode; signs alternate so the scatter adds ripple, not tilt.
+    pub gain: f32,
+}
+
+impl Scatter {
+    /// Expand into concrete (freq, t60_ms, signed_gain) modes. Plain LCG —
+    /// stability across runs/platforms matters more than randomness quality.
+    fn modes(&self) -> Vec<(f32, f32, f32)> {
+        let mut state = self.seed.max(1);
+        let mut next = move || {
+            state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            (state >> 8) as f32 / (1 << 24) as f32 // uniform [0, 1)
+        };
+        let (lo, hi) = self.band;
+        (0..self.count)
+            .map(|i| {
+                let f = lo * (hi / lo).powf(next());
+                let t60 = self.t60_ms.0 + (self.t60_ms.1 - self.t60_ms.0) * next();
+                let g = self.gain * (0.4 + 0.6 * next());
+                (f, t60, if i % 2 == 0 { g } else { -g })
+            })
+            .collect()
+    }
 }
 
 /// Build an impulse response of `len` taps.
@@ -83,7 +128,9 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
 
     // 5. Add decaying modal resonances (cone + breakup ring) on top of the
     //    level-matched body — a controlled amount of resonance, not a takeover.
-    for &(f, t60_ms, g) in tex.modes {
+    //    The authored modes are joined by the expanded breakup scatter (if any).
+    let scatter = tex.scatter.map(|s| s.modes()).unwrap_or_default();
+    for &(f, t60_ms, g) in tex.modes.iter().chain(scatter.iter()) {
         // t60 (−60 dB) → exponential time constant: ln(1000) ≈ 6.908.
         let tau = (t60_ms / 1000.0) * sr / 6.908;
         let w = 2.0 * PI * f / sr;
@@ -112,15 +159,15 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
     ir
 }
 
-/// IR length in taps for a given sample rate (~46 ms at any rate).
+/// IR length in taps for a given sample rate (~93 ms at any rate).
 ///
 /// The length is a deliberate compromise: long enough that the late
 /// cabinet/room reflections (out to ~21 ms) and — crucially — the low
 /// body-mode ring (T60s of 100 ms+) actually develop inside the window; a
 /// short window fades the low resonances out before they bloom, which reads
-/// as a thin, shallow cab next to commercial captures. This matches the
-/// `MAX_IR_LEN` budget already granted to external user IRs, so the built-in
-/// cabs get the same low-end depth. Convolution is uniformly-partitioned FFT
+/// as a thin, shallow cab next to commercial captures — and the room-mic
+/// modes (T60 ~130 ms) need most of this window to decay naturally instead
+/// of being faded mid-ring. Convolution is uniformly-partitioned FFT
 /// ([`crate::dsp::conv::FftConvolver`]), so the extra taps add partitions —
 /// cheap frequency-domain MACs — and no latency.
 ///
@@ -128,7 +175,7 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
 /// the cabinet textures must be realizable within this window (see
 /// `cab::*::tests`). If you shorten this, trim the textures to match.
 pub fn ir_len(sr: f32) -> usize {
-    ((sr / 44100.0) * 2048.0) as usize
+    ((sr / 44100.0) * 4096.0) as usize
 }
 
 /// Window length in milliseconds for a given tap count / sample rate.
@@ -348,6 +395,7 @@ mod tests {
             predelay: 0,
             reflections: &[],
             modes: &[(110.0, 90.0, 0.05)],
+            scatter: None,
         };
         let ir = synth(sr, len, &mut flat, &tex);
         // Frequency: 110 Hz dominates its neighbours.
@@ -374,6 +422,7 @@ mod tests {
             predelay: 0,
             reflections: &[(TAU_MS, -0.7)],
             modes: &[],
+            scatter: None,
         };
         let ir = synth(sr, len, &mut flat, &tex);
         let f_ext = 1000.0 / (2.0 * TAU_MS); // 500 Hz
@@ -398,6 +447,7 @@ mod tests {
             predelay: 4,
             reflections: &[(0.5, -0.3), (2.0, 0.15)],
             modes: &[(95.0, 100.0, 0.01), (3400.0, 4.0, 0.1)],
+            scatter: None,
         };
         let ir = synth(sr, len, &mut voicing, &tex);
         assert!(ir.iter().all(|v| v.is_finite()), "non-finite IR tap");
