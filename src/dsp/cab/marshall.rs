@@ -15,7 +15,7 @@ use crate::dsp::biquad::Biquad;
 ///   • +3 dB low shelf at 120 Hz + a +6 dB resonant hump at 115 Hz (cab depth)
 ///   • +5 dB wide mound at 210 Hz and +3 dB at 480 Hz (low-mid body plateau)
 ///   • +1 dB at 800 Hz (a hint of the GB "vintage" honk)
-///   • -2.5 dB at 1500 Hz (the mid "pocket" of a real capture)
+///   • -3.5 dB wide dip at 1500 Hz (the mid "pocket" of a real capture)
 ///   • +4.5 dB at 2500 Hz and +2.5 dB at 4 kHz (GB presence — warmer/lower
 ///     than V30's 3.5 kHz, but held through the 3–5 kHz band like a real capture)
 ///   • -11 dB high shelf at 6000 Hz (softer cone rolloff vs V30)
@@ -34,15 +34,16 @@ const TEX_L: Texture = Texture {
         (0.30, -0.26),
         (0.62, 0.17),
         (1.24, -0.09),
-        (3.40, 0.05),
-        (7.10, -0.050),
-        (12.40, 0.038),
-        (17.00, -0.024),
-        (20.00, 0.015),
+        (3.40, 0.075),
+        (7.10, -0.070),
+        (12.40, 0.058),
+        (15.20, -0.047),
+        (17.00, 0.038),
+        (20.00, 0.029),
     ],
     modes: &[
-        (92.0, 55.0, 0.0025),
-        (110.0, 50.0, 0.0025),
+        (92.0, 95.0, 0.004),
+        (110.0, 85.0, 0.004),
         (2500.0, 5.0, 0.009),
     ],
 };
@@ -52,15 +53,16 @@ const TEX_R: Texture = Texture {
         (0.34, -0.23),
         (0.66, 0.18),
         (1.32, -0.08),
-        (3.70, 0.05),
-        (7.80, -0.046),
-        (13.30, 0.035),
-        (17.50, -0.022),
-        (20.50, 0.014),
+        (3.70, 0.072),
+        (7.80, -0.066),
+        (13.30, 0.055),
+        (15.90, -0.044),
+        (17.50, 0.036),
+        (20.50, 0.027),
     ],
     modes: &[
-        (94.0, 57.0, 0.0025),
-        (114.0, 52.0, 0.0025),
+        (94.0, 97.0, 0.004),
+        (114.0, 87.0, 0.004),
         (2600.0, 5.0, 0.009),
     ],
 };
@@ -120,7 +122,7 @@ impl MarshallCab {
             Biquad::peak_eq(sr, 210.0, 0.7, 5.0),
             Biquad::peak_eq(sr, 480.0, 0.9, 3.0),
             Biquad::peak_eq(sr, 800.0, 1.5, 1.0),
-            Biquad::peak_eq(sr, 1500.0, 1.0, -2.5),
+            Biquad::peak_eq(sr, 1500.0, 0.6, -3.5),
             // Greenback presence: broadened and trimmed (Q 1.8→1.4, +5→+4 dB) for a
             // smoother top — Greenbacks are inherently softer up here than V30s.
             Biquad::peak_eq(sr, 2500.0, 1.0, 4.5),

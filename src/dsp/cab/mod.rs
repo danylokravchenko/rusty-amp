@@ -200,7 +200,7 @@ impl MicBlend {
     fn recombine(&mut self, blend: f32, room: f32) {
         let wc = 1.0 - blend; // close dynamic weight
         let wr = blend; // ribbon weight
-        let wroom = room * 0.6; // room is additive ambience, kept lower
+        let wroom = room * 0.9; // room ambience: real captures carry ~25% late energy
         for (i, s) in self.scratch_l.iter_mut().enumerate() {
             *s = wc * self.close_l[i] + wr * self.ribbon_l[i] + wroom * self.room_l[i];
         }

@@ -17,7 +17,8 @@ use crate::dsp::biquad::Biquad;
 ///   • Resonant sub HP at 64 Hz (tight, closed-back low end — but with real depth)
 ///   • +6 dB low shelf at 110 Hz + a +6 dB hump at 118 Hz (the "chest thump")
 ///   • +3.5 dB wide mound at 230 Hz + +2.5 dB at 550 Hz (low-mid "wall" / body)
-///   • -1 dB at 1200 Hz (mid pocket — the grind stays but doesn't crowd the body)
+///   • -2.5 dB at 1450 Hz over a −3 dB shelf from 1.35 kHz (mid pocket — the
+///     grind stays but doesn't crowd the body)
 ///   • +3.5 dB at 3200 Hz and +2 dB at 4.4 kHz (V30 presence, a touch
 ///     lower/smoother than Mesa, held through the 3–5 kHz band)
 ///   • -13 dB high shelf at 5200 Hz (closed-back cone rolloff)
@@ -37,15 +38,16 @@ const TEX_L: Texture = Texture {
         (0.28, -0.30),
         (0.62, 0.21),
         (1.24, -0.11),
-        (3.20, 0.07),
-        (6.50, -0.052),
-        (11.00, 0.038),
-        (17.80, -0.025),
-        (20.50, 0.015),
+        (3.20, 0.078),
+        (6.50, -0.072),
+        (11.00, 0.060),
+        (14.60, -0.048),
+        (17.80, 0.038),
+        (20.50, 0.029),
     ],
     modes: &[
-        (100.0, 55.0, 0.0025),
-        (125.0, 50.0, 0.0025),
+        (100.0, 95.0, 0.004),
+        (125.0, 85.0, 0.004),
         (3300.0, 4.0, 0.1),
     ],
 };
@@ -55,15 +57,16 @@ const TEX_R: Texture = Texture {
         (0.32, -0.27),
         (0.66, 0.22),
         (1.32, -0.10),
-        (3.50, 0.06),
-        (7.10, -0.048),
-        (11.80, 0.035),
-        (18.90, -0.023),
-        (20.50, 0.014),
+        (3.50, 0.074),
+        (7.10, -0.068),
+        (11.80, 0.056),
+        (15.40, -0.045),
+        (18.90, 0.036),
+        (20.50, 0.027),
     ],
     modes: &[
-        (103.0, 57.0, 0.0025),
-        (128.0, 52.0, 0.0025),
+        (103.0, 97.0, 0.004),
+        (128.0, 87.0, 0.004),
         (3450.0, 4.0, 0.10),
     ],
 };
@@ -125,11 +128,13 @@ impl OrangeCab {
             Biquad::peak_eq(sr, 118.0, 1.4, 6.0),
             Biquad::peak_eq(sr, 230.0, 0.8, 3.5),
             Biquad::peak_eq(sr, 550.0, 0.9, 2.5),
-            Biquad::peak_eq(sr, 1200.0, 0.9, -1.0),
+            Biquad::peak_eq(sr, 1450.0, 0.55, -2.5),
+            // Downward 0.5–2 kHz tilt (see the Mesa voicing note).
+            Biquad::high_shelf(sr, 1350.0, -3.0),
             // V30 presence, broadened and tamed (Q 2.0→1.4, +5→+3.5 dB) so the
             // forward Orange mid grind stays but the top loses its ice-pick edge.
-            Biquad::peak_eq(sr, 3200.0, 1.1, 3.5),
-            Biquad::peak_eq(sr, 4400.0, 1.5, 2.0),
+            Biquad::peak_eq(sr, 3200.0, 1.1, 3.0),
+            Biquad::peak_eq(sr, 4400.0, 1.5, 3.0),
             Biquad::high_shelf(sr, 6200.0, -13.0),
             Biquad::lowpass(sr, 8500.0, 0.707),
         ];
@@ -144,7 +149,9 @@ impl OrangeCab {
             Biquad::peak_eq(sr, 120.0, 1.1, 5.5), // low resonant hump (cab depth)
             Biquad::peak_eq(sr, 220.0, 0.7, 5.0), // broad low-mid body mound
             Biquad::peak_eq(sr, 550.0, 0.9, 2.5),
-            Biquad::peak_eq(sr, 1200.0, 0.9, -1.0),
+            Biquad::peak_eq(sr, 1450.0, 0.55, -2.5),
+            // Downward 0.5–2 kHz tilt (see the Mesa voicing note).
+            Biquad::high_shelf(sr, 1350.0, -3.0),
             Biquad::peak_eq(sr, 3000.0, 1.6, 2.5), // gentler, lower presence
             Biquad::high_shelf(sr, 4400.0, -15.0), // ribbon HF rolloff
             Biquad::lowpass(sr, 6500.0, 0.707),
