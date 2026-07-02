@@ -1,5 +1,9 @@
 //! Print an AU's parameters and their default (freshly-loaded) values.
-fn main() {
+//!
+//! AU hosting is macOS-only; this example is a no-op elsewhere.
+
+#[cfg(target_os = "macos")]
+fn run() {
     let pat = std::env::args()
         .nth(1)
         .expect("usage: dump_params <au-substring>")
@@ -17,4 +21,13 @@ fn main() {
     for p in loaded.params() {
         println!("  {:<40} = {}", p.name, p.display_value());
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run() {
+    eprintln!("au_params is macOS-only (Audio Unit hosting).");
+}
+
+fn main() {
+    run();
 }

@@ -7,10 +7,15 @@
 //!
 //! A linearity check (two impulse amplitudes must scale identically) guards
 //! against accidentally capturing a nonlinear path.
+//!
+//! AU hosting is macOS-only; this example is a no-op elsewhere.
 
+#[cfg(target_os = "macos")]
 const SR: f32 = 48_000.0;
+#[cfg(target_os = "macos")]
 const CAP: usize = 16_384; // ~340 ms, plenty for the room mics
 
+#[cfg(target_os = "macos")]
 fn capture(ins: &mut Box<dyn rusty_amp::dsp::StereoInsert>, amp: f32) -> (Vec<f32>, Vec<f32>) {
     let (mut l_out, mut r_out) = (Vec::with_capacity(CAP), Vec::with_capacity(CAP));
     let mut i = 0usize;
@@ -33,7 +38,8 @@ fn capture(ins: &mut Box<dyn rusty_amp::dsp::StereoInsert>, amp: f32) -> (Vec<f3
     (l_out, r_out)
 }
 
-fn main() {
+#[cfg(target_os = "macos")]
+fn run() {
     let pat = std::env::args()
         .nth(1)
         .expect("usage: au_cab_extract <au-substring>")
@@ -93,4 +99,13 @@ fn main() {
     w.finalize().unwrap();
     println!("saved {}", path.display());
     println!("load it in rusty-amp with <I>, A/B against the built-in cab with <X>");
+}
+
+#[cfg(not(target_os = "macos"))]
+fn run() {
+    eprintln!("au_cab_extract is macOS-only (Audio Unit hosting).");
+}
+
+fn main() {
+    run();
 }
