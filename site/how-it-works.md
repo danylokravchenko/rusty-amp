@@ -105,7 +105,7 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
   <div class="flow__stage" style="--c:var(--amber)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Cabinet</span><span class="flow__badge flow__badge--mono">Mono → Stereo</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
-      <div class="flow__sig">Blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~93 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring + cone-breakup scatter, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
+      <div class="flow__sig">Nonlinear speaker drive (excursion-driven motor droop · cone breakup · thermal power compression · Doppler FM growl) → blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~93 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring + cone-breakup scatter, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
     </div>
   </div>
 
