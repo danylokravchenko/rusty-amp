@@ -169,7 +169,7 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
       <span class="freq"><b>+6.5 dB</b> @ 120 Hz · depth hump</span>
       <span class="freq"><b>+5 dB</b> @ 220 Hz · body plateau</span>
       <span class="freq"><b>−2.5 dB</b> @ 1.15 kHz · mid pocket</span>
-      <span class="freq"><b>+4 dB</b> @ 3.5 kHz · presence</span>
+      <span class="freq"><b>+4.5 dB</b> @ 3.5 kHz · presence held to 5 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-marshall">
@@ -177,8 +177,8 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <div class="freqs">
       <span class="freq"><b>+6 dB</b> @ 115 Hz · depth hump</span>
       <span class="freq"><b>+5 dB</b> @ 210 Hz · body plateau</span>
-      <span class="freq"><b>+4 dB</b> @ 2.5 kHz · presence</span>
-      <span class="freq"><b>soft rolloff</b> above 5 kHz</span>
+      <span class="freq"><b>+4.5 dB</b> @ 2.5 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>soft rolloff</b> above 6 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-orange">
@@ -186,7 +186,7 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <div class="freqs">
       <span class="freq"><b>+6 dB</b> @ 118 Hz · chest thump</span>
       <span class="freq"><b>+3.5 dB</b> @ 230 Hz · low-mid “wall”</span>
-      <span class="freq"><b>+3.5 dB</b> @ 3.2 kHz · presence</span>
+      <span class="freq"><b>+3.5 dB</b> @ 3.2 kHz · presence held to 5 kHz</span>
     </div>
   </div>
 </div>

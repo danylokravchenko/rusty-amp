@@ -18,7 +18,8 @@ use crate::dsp::biquad::Biquad;
 ///   • +6 dB low shelf at 110 Hz + a +6 dB hump at 118 Hz (the "chest thump")
 ///   • +3.5 dB wide mound at 230 Hz + +2.5 dB at 550 Hz (low-mid "wall" / body)
 ///   • -1 dB at 1200 Hz (mid pocket — the grind stays but doesn't crowd the body)
-///   • +3.5 dB at 3200 Hz (V30 presence, a touch lower/smoother than Mesa)
+///   • +3.5 dB at 3200 Hz and +2 dB at 4.4 kHz (V30 presence, a touch
+///     lower/smoother than Mesa, held through the 3–5 kHz band)
 ///   • -13 dB high shelf at 5200 Hz (closed-back cone rolloff)
 ///   • LP at 8500 Hz (fizz cut)
 pub struct OrangeCab {
@@ -127,8 +128,9 @@ impl OrangeCab {
             Biquad::peak_eq(sr, 1200.0, 0.9, -1.0),
             // V30 presence, broadened and tamed (Q 2.0→1.4, +5→+3.5 dB) so the
             // forward Orange mid grind stays but the top loses its ice-pick edge.
-            Biquad::peak_eq(sr, 3200.0, 1.4, 3.5),
-            Biquad::high_shelf(sr, 5200.0, -13.0),
+            Biquad::peak_eq(sr, 3200.0, 1.1, 3.5),
+            Biquad::peak_eq(sr, 4400.0, 1.5, 2.0),
+            Biquad::high_shelf(sr, 6200.0, -13.0),
             Biquad::lowpass(sr, 8500.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))

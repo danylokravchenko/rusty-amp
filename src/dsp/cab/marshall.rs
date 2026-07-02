@@ -16,8 +16,9 @@ use crate::dsp::biquad::Biquad;
 ///   • +5 dB wide mound at 210 Hz and +3 dB at 480 Hz (low-mid body plateau)
 ///   • +1 dB at 800 Hz (a hint of the GB "vintage" honk)
 ///   • -2.5 dB at 1500 Hz (the mid "pocket" of a real capture)
-///   • +4 dB at 2500 Hz (GB presence peak — warmer/lower than V30's 3.5 kHz)
-///   • -10 dB high shelf at 5000 Hz (softer cone rolloff vs V30)
+///   • +4.5 dB at 2500 Hz and +2.5 dB at 4 kHz (GB presence — warmer/lower
+///     than V30's 3.5 kHz, but held through the 3–5 kHz band like a real capture)
+///   • -11 dB high shelf at 6000 Hz (softer cone rolloff vs V30)
 ///   • LP at 8 kHz (fizz cut — GBs are inherently smoother on top)
 pub struct MarshallCab {
     inner: BlendedCab,
@@ -122,8 +123,9 @@ impl MarshallCab {
             Biquad::peak_eq(sr, 1500.0, 1.0, -2.5),
             // Greenback presence: broadened and trimmed (Q 1.8→1.4, +5→+4 dB) for a
             // smoother top — Greenbacks are inherently softer up here than V30s.
-            Biquad::peak_eq(sr, 2500.0, 1.4, 4.0),
-            Biquad::high_shelf(sr, 5000.0, -10.0),
+            Biquad::peak_eq(sr, 2500.0, 1.0, 4.5),
+            Biquad::peak_eq(sr, 4000.0, 1.3, 2.5),
+            Biquad::high_shelf(sr, 6000.0, -11.0),
             Biquad::lowpass(sr, 8000.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
