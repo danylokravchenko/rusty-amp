@@ -21,6 +21,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <a class="btn btn--primary" href="getting-started.html">▶ Get started</a>
       <a class="btn" href="https://github.com/danylokravchenko/rusty-amp/releases/latest">⬇ Download binary</a>
       <a class="btn" href="how-it-works.html">⚙ How it works</a>
+      <a class="btn" href="#hear">🔊 Hear samples</a>
     </div>
 
     <figure class="shot">
@@ -66,7 +67,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
     </div>
   </section>
 
-  <section>
+  <section id="hear">
     <h2>Hear it</h2>
     <p class="lead">Nothing is better than a showcase! DI guitar track — no re-amping, no post-processing, straight out of rusty-amp.</p>
     <div class="samplegrid">
