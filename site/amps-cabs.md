@@ -197,7 +197,7 @@ Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB 
 
 ## External cabinet IRs <span class="muted">(<kbd>I</kbd> · <kbd>X</kbd>)</span> {#irs}
 
-Beyond the three built-in cabs, rusty-amp can load your own **impulse-response `.wav` file** as the cabinet. A loaded IR replaces the multi-mic blend with a single captured response (the mono drive still passes through the same speaker cone-breakup + thermal power-compression model, so it stays alive and dynamic). Because the file is already a finished, miked capture, the **Mic / Blend / Room** knobs are inert while an external IR is active.
+Beyond the three built-in cabs, rusty-amp can load your own **impulse-response `.wav` file** as the cabinet. A loaded IR replaces the multi-mic blend with a single captured response (the mono drive still passes through the same nonlinear speaker model — excursion-driven motor droop, cone breakup, thermal power compression and Doppler FM "growl" — so it stays alive and dynamic). Because the file is already a finished, miked capture, the **Mic / Blend / Room** knobs are inert while an external IR is active.
 
 <div class="note">
 <b>One IR is a complete cabinet.</b> A speaker + cab + mic is a linear time-invariant system, and a single impulse response fully captures its linear response — exactly what a <code>.wav</code> IR is, and what every IR loader (Two Notes, Helix, NAM cab blocks, OwnHammer / God's Cab) uses: <b>one IR = one cab, one mic, one position</b>. rusty-amp adds the speaker's <em>nonlinear</em> behaviour back on top, so a loaded IR isn't static playback. A <em>multi-mic blend</em> is just a sum of IRs — pre-mix it into one file in your DAW, or load one mic at a time and A/B with <kbd>X</kbd>.
