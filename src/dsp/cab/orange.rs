@@ -139,7 +139,7 @@ impl OrangeCab {
             // note). The bottom octave runs hotter than the other cabs — the
             // closed-back thump also has to carry the low fundamentals over the
             // Randall's dense overtones (see `fundamental_is_not_buried…`).
-            Biquad::highpass(sr, 64.0, 1.2),
+            Biquad::highpass(sr, 74.0, 1.2),
             Biquad::low_shelf(sr, 110.0, 6.0),
             Biquad::peak_eq(sr, 118.0, 1.4, 6.0),
             Biquad::peak_eq(sr, 230.0, 0.8, 3.5),
@@ -150,7 +150,7 @@ impl OrangeCab {
             // V30 presence, broadened and tamed (Q 2.0→1.4, +5→+3.5 dB) so the
             // forward Orange mid grind stays but the top loses its ice-pick edge.
             Biquad::peak_eq(sr, 3200.0, 1.1, 3.0),
-            Biquad::peak_eq(sr, 4400.0, 1.5, 3.0),
+            Biquad::peak_eq(sr, 4500.0, 1.3, 3.5),
             Biquad::high_shelf(sr, 6600.0, -16.0),
             Biquad::lowpass(sr, 7600.0, 0.707),
         ];
@@ -160,7 +160,7 @@ impl OrangeCab {
     /// R121 ribbon close-mic: even thicker low-mids, softer presence, silky top.
     fn voicing_ribbon(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
-            Biquad::highpass(sr, 72.0, 1.2),
+            Biquad::highpass(sr, 74.0, 1.2),
             Biquad::low_shelf(sr, 150.0, 2.5),
             Biquad::peak_eq(sr, 120.0, 1.1, 5.5), // low resonant hump (cab depth)
             Biquad::peak_eq(sr, 220.0, 0.7, 5.0), // broad low-mid body mound
