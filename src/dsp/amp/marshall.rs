@@ -228,7 +228,7 @@ impl Amplifier for Marshall {
         // Output trim: the tube power stage runs at a conservative level; this
         // makeup brings the JCM800 up to the same loudness as the (much hotter)
         // solid-state Randall so switching models doesn't jump in volume.
-        x * master * 6.5
+        x * master * 6.4
     }
 }
 

@@ -163,7 +163,7 @@ impl Amplifier for Randall {
         // difference-tone "fart" from the chord's intervals; strip it here.
         let x = self.power_hp2.process(x);
 
-        x * master * 1.4
+        x * master * 1.1
     }
 }
 

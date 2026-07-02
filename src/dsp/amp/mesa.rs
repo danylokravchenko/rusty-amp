@@ -213,7 +213,7 @@ impl Amplifier for Mesa {
 
         // Output trim: level-match the Recto to the hotter solid-state Randall so
         // switching amp models doesn't produce a volume jump.
-        x * master * 18.0
+        x * master * 14.2
     }
 }
 
