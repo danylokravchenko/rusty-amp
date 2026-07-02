@@ -258,7 +258,6 @@ fn main() {
         (AmpModel::Marshall, CabModel::Marshall),
         (AmpModel::Mesa, CabModel::Mesa),
         (AmpModel::Randall, CabModel::Orange),
-        (AmpModel::Vox, CabModel::Marshall),
     ] {
         let mut dut = BuiltIn {
             model,
