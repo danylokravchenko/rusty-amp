@@ -5,3 +5,4 @@ node_modules
 _site
 *.snap.new
 *.wav
+!site/assets/audio/*.wav

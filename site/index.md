@@ -67,6 +67,33 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
   </section>
 
   <section>
+    <h2>Hear it</h2>
+    <p class="lead">Nothing is better than a showcase! DI guitar track — no re-amping, no post-processing, straight out of rusty-amp.</p>
+    <div class="samplegrid">
+      <div class="sample" style="--c:var(--rust)">
+        <div class="sample__head"><span class="sample__name">Default tone</span><span class="sample__rig">Mesa Dual Rectifier · Mesa V30</span></div>
+        <p class="sample__desc">What you hear on first launch — stock knob positions, Tube Screamer, nothing else in the chain.</p>
+        <audio controls preload="none" src="assets/audio/default.wav"></audio>
+      </div>
+      <div class="sample" style="--c:var(--blue)">
+        <div class="sample__head"><span class="sample__name">Clean melodic</span><span class="sample__rig">Marshall JCM800 · Greenback</span></div>
+        <p class="sample__desc">Warm glassy clean — gentle compression, edge-of-breakup gain, delay + hall reverb.</p>
+        <audio controls preload="none" src="assets/audio/clean_melodic.wav"></audio>
+      </div>
+      <div class="sample" style="--c:var(--gold)">
+        <div class="sample__head"><span class="sample__name">Solo seeker</span><span class="sample__rig">Mesa Dual Rectifier · Mesa V30</span></div>
+        <p class="sample__desc">Lead tone — sustain-focused, delay + reverb, on-axis mic for pick-attack clarity.</p>
+        <audio controls preload="none" src="assets/audio/solo_seeker.wav"></audio>
+      </div>
+      <div class="sample sample--soon">
+        <div class="sample__head"><span class="sample__name">More coming soon</span></div>
+        <p class="sample__desc">The other bundled presets are getting their own clips — check back.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px"><a class="btn" href="presets.html#bundled">All bundled presets →</a></p>
+  </section>
+
+  <section>
     <h2>The pedalboard</h2>
     <p class="lead">Eleven effects, each added, removed, and bypassed independently — the board shows only what you're using.</p>
     <div class="pedalgrid" style="margin-top:18px">
