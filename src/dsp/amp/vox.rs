@@ -91,7 +91,7 @@ impl Vox {
             tone: ToneStack::new(sr, Components::VOX),
             presence_shelf: Biquad::high_shelf(sr, 4500.0, 0.0),
             presence_cache: Cached::new(),
-            voice: VoiceBalance::new(sr, 200.0, 2.5, 900.0, -5.0),
+            voice: VoiceBalance::new(sr, 200.0, 6.0, 900.0, -5.0),
             out_hp: Biquad::highpass(sr, 12.0, 0.707),
             envelope: 0.0,
             // 2×12 Alnico Blue resonance ~85 Hz, tighter Q than the JCM800's 4×12
@@ -113,7 +113,7 @@ impl Vox {
     fn update_presence(&mut self, presence: f32) {
         // Presence models the AC30's output-transformer NFB loop: shelf at 4.5 kHz,
         // a touch higher than the JCM800's 3.5 kHz — the AC30 lives higher up.
-        self.presence_shelf = Biquad::high_shelf(self.sr, 4500.0, (presence - 0.5) * 12.0);
+        self.presence_shelf = Biquad::high_shelf(self.sr, 4500.0, (presence - 0.5) * 12.0 + 2.0);
     }
 
     #[inline]
@@ -128,8 +128,10 @@ impl Vox {
             1.0 - (-22.0 / self.sr).exp()
         };
         self.envelope += coeff * (abs_x - self.envelope);
-        let sag = 1.0 / (1.0 + self.envelope * 0.75);
-        tube_clip_asym(x * sag * 2.5) * 0.4
+        // Deepest sag of the bank (no NFB, Class A) with the static drive
+        // backed off the plateau — see the note in marshall.rs `power_amp`.
+        let sag = 1.0 / (1.0 + self.envelope * 1.9);
+        tube_clip_asym(x * sag * 1.5) * 0.62
     }
 }
 
@@ -166,16 +168,21 @@ impl Amplifier for Vox {
         let bias = self.bloom.follow(x) * 0.07;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
+        // Pregain split across the two triodes (see marshall.rs): each stage
+        // stays on the round part of its curve, so the harmonic series falls
+        // off fast instead of squaring into h5/h7 fizz.
+        let g1 = pregain.powf(0.6) * 1.4;
+        let g2 = (pregain / pregain.powf(0.6)) * 1.5;
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             // Dynamic cathode bias shifts the operating point under hard drive
             // before the stage-1 waveshaper; the inter-stage HP strips its DC.
-            let d = self.cathode.shift((u + bias) * pregain);
-            let s = tube_clip_asym(d) / pregain.sqrt();
+            let d = self.cathode.shift((u + bias) * g1);
+            let s = tube_clip_asym(d) / g1.sqrt();
             let s = self.stage_hp.process(s);
-            *o = tube_clip_asym(s * 3.0) / 3.0_f32.sqrt();
+            *o = tube_clip_asym(s * g2) / g2.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
@@ -203,7 +210,7 @@ impl Amplifier for Vox {
 
         // Output trim: level-matched to the other three models so switching amps
         // mid-set doesn't jump the volume.
-        x * master * 3.9
+        x * master * 9.8
     }
 }
 

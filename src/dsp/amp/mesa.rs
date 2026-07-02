@@ -92,7 +92,7 @@ impl Mesa {
             bright: BrightCap::new(sr, 2400.0, 0.12),
             // First-stage cathode bias, same fast-charge / RC-recovery shape as the
             // JCM800; the Recto's tighter feel keeps the depth modest.
-            cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.028, 1.0),
+            cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.055, 0.8),
             // Output transformer: the big Recto iron compresses the lows; corner
             // ~140 Hz, gentle drive and a trace of crossover.
             xfmr: OutputTransformer::new(sr, 140.0, 1.5, 0.04),
@@ -100,7 +100,7 @@ impl Mesa {
             tone_cache: ToneCache::new(),
             presence_shelf: Biquad::high_shelf(sr, 4000.0, 0.0),
             presence_cache: Cached::new(),
-            voice: VoiceBalance::new(sr, 320.0, 7.0, 600.0, -9.5),
+            voice: VoiceBalance::new(sr, 320.0, 9.0, 600.0, -9.5),
             envelope: 0.0,
             // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
             // rectifier, so a tight dynamic bloom. Trimmed (0.45→0.22) so palm-muted
@@ -118,7 +118,7 @@ impl Mesa {
 
     fn update_presence(&mut self, presence: f32) {
         // Recto presence: 4 kHz (brighter/tighter than JCM800 3.5 kHz), ±6 dB
-        self.presence_shelf = Biquad::high_shelf(self.sr, 4000.0, (presence - 0.5) * 12.0);
+        self.presence_shelf = Biquad::high_shelf(self.sr, 4000.0, (presence - 0.5) * 12.0 + 2.0);
     }
 
     /// Silicon rectifier sag: tight attack (0.5 ms), moderate release (80 ms).
@@ -131,8 +131,12 @@ impl Mesa {
             1.0 - (-1.0 / (0.080 * self.sr)).exp()
         };
         self.envelope += coeff * (abs_x - self.envelope);
-        let sag = 1.0 / (1.0 + self.envelope * 0.35);
-        silicon_clip_asym(x * sag * 2.5) * 0.4
+        // Silicon supply: stiff, true to the Recto (deep sag also scales the
+        // asymmetric clip's drive down under sustained level, which would kill
+        // the h2 growth that makes the amp touch-sensitive). The static drive
+        // still sits off the plateau — see marshall.rs `power_amp`.
+        let sag = 1.0 / (1.0 + self.envelope * 0.45);
+        silicon_clip_asym(x * sag * 1.7) * 0.55
     }
 }
 
@@ -163,24 +167,30 @@ impl Amplifier for Mesa {
         let pregain = 1.0 + gain * 30.0;
         // Bias depth halved and bloom release shortened (above) so a note attacks
         // the same whether played alone or right after others — see marshall.rs.
-        let bias = self.bloom.follow(x) * 0.06;
+        let bias = self.bloom.follow(x) * 0.09;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
         // Per-stage drives kept moderate: three cascaded clippers multiply harmonic
         // content fast, and the old ×5/×3 inter-stage gains pushed the spectrum so
         // high that the played note was buried under its own overtones. ×2.6/×2.0
         // still saturates hard at high gain but lets the fundamental lead.
+        // Pregain split across the three stages (see marshall.rs): the Recto
+        // keeps a hotter final silicon stage than the tube amps — its modern
+        // aggression — but no single stage runs deep on its plateau any more.
+        let g1 = pregain.powf(0.62) * 1.4;
+        let g2 = pregain.powf(0.22) * 1.8;
+        let g3 = (pregain / (pregain.powf(0.62) * pregain.powf(0.22))) * 1.3;
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             // Dynamic cathode bias on stage 1 (DC removed by the inter-stage HP).
-            let d = self.cathode.shift((u + bias) * pregain);
-            let s = tube_clip_asym(d) / pregain.sqrt();
+            let d = self.cathode.shift((u + bias) * g1);
+            let s = tube_clip_asym(d) / g1.sqrt();
             let s = self.stage_hp_1.process(s);
-            let s = tube_clip_asym(s * 2.6) / 2.6_f32.sqrt();
+            let s = tube_clip_asym(s * g2) / g2.sqrt();
             let s = self.stage_hp_2.process(s);
-            *o = silicon_clip_asym(s * 2.0) / 2.0_f32.sqrt();
+            *o = silicon_clip_asym(s * g3) / g3.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
@@ -203,7 +213,7 @@ impl Amplifier for Mesa {
 
         // Output trim: level-match the Recto to the hotter solid-state Randall so
         // switching amp models doesn't produce a volume jump.
-        x * master * 7.2
+        x * master * 18.0
     }
 }
 
@@ -225,11 +235,15 @@ fn tube_clip_asym(x: f32) -> f32 {
 /// reverse-bias characteristic of real junction diodes (harder knee on neg swing).
 #[inline]
 fn silicon_clip_asym(x: f32) -> f32 {
-    use std::f32::consts::FRAC_2_PI;
+    // Both halves have unity slope at zero — silicon is *linear* until it nears
+    // a rail, so quiet playing passes clean (this is what lets the amp's h2 grow
+    // with picking strength instead of idling at a static floor). The asymmetry
+    // lives in the rails: the positive half saturates exponentially toward +1,
+    // the negative half clamps harder toward −0.79 — even harmonics appear only
+    // once the stage is actually driven.
     if x >= 0.0 {
         1.0 - (-x).exp()
     } else {
-        // Reverse direction: slightly faster saturation, still → -1 asymptotically
-        FRAC_2_PI * (x * 1.1).atan()
+        (2.0 * x).atan() / 2.0
     }
 }

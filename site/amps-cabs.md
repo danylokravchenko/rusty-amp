@@ -50,14 +50,14 @@ Four amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓</
     <div class="specs">
       <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–40× into dual 12AX7</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Marshall values)</div></div>
-      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Tube sag (5 ms / 200 ms) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep tube sag (5 ms / 60 ms) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
     </div>
     <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–40× into dual 12AX7.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall values).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Sets the depth of the stack's inherent scoop.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Interacts with mid/bass, lossy &amp; peak-normalised.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 3.5 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 3.5 kHz (+2.5 dB fixed offset, ±6 dB).</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 
@@ -72,7 +72,7 @@ Four amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓</
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV stack (Fender-type values: fuller lows, gentler scoop).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Gentler scoop than the Marshall.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Same interacting network.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4 kHz (+2 dB fixed offset, ±6 dB).</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 
@@ -95,14 +95,14 @@ Four amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓</
     <div class="specs">
       <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–33× into dual 12AX7</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Vox values — lighter scoop, brighter)</div></div>
-      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Class A sag (3.8 ms / 260 ms, no NFB) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep Class A sag (3.8 ms / 45 ms, no NFB) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
     </div>
     <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–33× into dual 12AX7.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV tone stack (Vox values — lighter mid scoop than the Marshall).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Sets the depth of the stack's scoop, gentler than the JCM800's.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Interacts with mid/bass; boosted further by the Top Boost bright cap.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4.5 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4.5 kHz (+2 dB fixed offset, ±6 dB).</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 </div>
