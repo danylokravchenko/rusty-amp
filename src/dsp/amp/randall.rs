@@ -75,7 +75,7 @@ impl Randall {
             tone_cache: ToneCache::new(),
             presence_shelf: Biquad::high_shelf(sr, 5000.0, 3.0),
             presence_cache: Cached::new(),
-            voice: VoiceBalance::new(sr, 260.0, 7.0, 800.0, -4.0),
+            voice: VoiceBalance::new(sr, 260.0, 8.5, 800.0, -4.0),
             // Tight 8×12 resonance ~90 Hz, modest and static (no rectifier sag).
             speaker: SpeakerLoad::new(sr, 90.0, 1.0, 0.05, 0.0, 0.8),
         };
@@ -129,13 +129,18 @@ impl Amplifier for Randall {
         // Drives trimmed (BJT ×6→×3.6, rail ×3→×2.2): the hard BJT/rail clippers are
         // strong odd-harmonic generators, and at the old drives the 3rd–7th
         // harmonics overran the fundamental, giving the buzzy, square-ish edge.
+        // Milder gain split than the tube amps (FET keeps p^0.7): a solid-state
+        // head genuinely runs its front end harder and stays buzzier — that is
+        // its character — but the worst plateau squaring still comes off.
+        let g1 = pregain.powf(0.7) * 1.55;
+        let g2 = (pregain / pregain.powf(0.7)) * 2.4;
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before FET stage
-            let s = fet_clip_asym((u + bias) * pregain) / pregain.sqrt();
+            let s = fet_clip_asym((u + bias) * g1) / g1.sqrt();
             let s = self.stage_hp_1.process(s);
-            let s = bjt_clip(s * 3.6) / 3.6_f32.sqrt();
+            let s = bjt_clip(s * g2) / g2.sqrt();
             let s = self.stage_hp_2.process(s);
             *o = rail_clip(s * 2.2) / 2.2_f32.sqrt();
         }
@@ -158,7 +163,7 @@ impl Amplifier for Randall {
         // difference-tone "fart" from the chord's intervals; strip it here.
         let x = self.power_hp2.process(x);
 
-        x * master * 0.55
+        x * master * 1.4
     }
 }
 
