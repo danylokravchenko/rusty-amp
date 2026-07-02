@@ -151,8 +151,8 @@ impl OrangeCab {
             // forward Orange mid grind stays but the top loses its ice-pick edge.
             Biquad::peak_eq(sr, 3200.0, 1.1, 3.0),
             Biquad::peak_eq(sr, 4400.0, 1.5, 3.0),
-            Biquad::high_shelf(sr, 6200.0, -13.0),
-            Biquad::lowpass(sr, 8500.0, 0.707),
+            Biquad::high_shelf(sr, 6600.0, -16.0),
+            Biquad::lowpass(sr, 7600.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
     }

@@ -143,8 +143,8 @@ impl MarshallCab {
             // smoother top — Greenbacks are inherently softer up here than V30s.
             Biquad::peak_eq(sr, 2500.0, 1.0, 4.5),
             Biquad::peak_eq(sr, 4000.0, 1.3, 2.5),
-            Biquad::high_shelf(sr, 6000.0, -11.0),
-            Biquad::lowpass(sr, 8000.0, 0.707),
+            Biquad::high_shelf(sr, 6600.0, -15.0),
+            Biquad::lowpass(sr, 7200.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
     }
