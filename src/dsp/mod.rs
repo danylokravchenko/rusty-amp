@@ -113,11 +113,11 @@ impl CabModel {
     }
 }
 
-const DEFAULT_AMP_MODEL: u8 = AmpModel::Marshall as u8;
+const DEFAULT_AMP_MODEL: u8 = AmpModel::Mesa as u8;
 const DEFAULT_CAB_MODEL: u8 = CabModel::Mesa as u8;
-const DEFAULT_MIC_POS: f32 = 0.5;
-const DEFAULT_MIC_BLEND: f32 = 0.15;
-const DEFAULT_MIC_ROOM: f32 = 0.15;
+const DEFAULT_MIC_POS: f32 = 0.4;
+const DEFAULT_MIC_BLEND: f32 = 0.0;
+const DEFAULT_MIC_ROOM: f32 = 0.0;
 
 // When an external IR is loaded it can be toggled against the built-in cabs live;
 // it starts inactive (the engine boots on a built-in cab).
@@ -182,11 +182,11 @@ const DEFAULT_CH_RATE: f32 = 0.25;
 const DEFAULT_CH_DEPTH: f32 = 0.50;
 const DEFAULT_CH_MIX: f32 = 0.50;
 
-const DEFAULT_AMP_GAIN: f32 = 0.65;
-const DEFAULT_AMP_BASS: f32 = 0.50;
-const DEFAULT_AMP_MID: f32 = 0.45;
+const DEFAULT_AMP_GAIN: f32 = 0.75;
+const DEFAULT_AMP_BASS: f32 = 1.00;
+const DEFAULT_AMP_MID: f32 = 0.0;
 const DEFAULT_AMP_TREBLE: f32 = 0.65;
-const DEFAULT_AMP_PRESENCE: f32 = 0.50;
+const DEFAULT_AMP_PRESENCE: f32 = 0.40;
 const DEFAULT_AMP_MASTER: f32 = 0.55;
 
 pub struct Params {

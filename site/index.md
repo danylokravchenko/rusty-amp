@@ -21,6 +21,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <a class="btn btn--primary" href="getting-started.html">▶ Get started</a>
       <a class="btn" href="https://github.com/danylokravchenko/rusty-amp/releases/latest">⬇ Download binary</a>
       <a class="btn" href="how-it-works.html">⚙ How it works</a>
+      <a class="btn" href="#hear">🔊 Hear samples</a>
     </div>
 
     <figure class="shot">
@@ -64,6 +65,33 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="card"><div class="ico">⏺️</div><h3>One-key recording</h3><p>Capture the fully-processed signal straight to a stereo WAV file with a single keystroke.</p></div>
       <div class="card"><div class="ico">🖥️</div><h3>Cross-platform</h3><p>Runs natively on macOS, Windows, and Linux via <a href="https://github.com/RustAudio/cpal">cpal</a>.</p></div>
     </div>
+  </section>
+
+  <section id="hear">
+    <h2>Hear it</h2>
+    <p class="lead">Nothing is better than a showcase! DI guitar track — no re-amping, no post-processing, straight out of rusty-amp.</p>
+    <div class="samplegrid">
+      <div class="sample" style="--c:var(--rust)">
+        <div class="sample__head"><span class="sample__name">Default tone</span><span class="sample__rig">Mesa Dual Rectifier · Mesa V30</span></div>
+        <p class="sample__desc">What you hear on first launch — stock knob positions, Tube Screamer, nothing else in the chain.</p>
+        <audio controls preload="none" src="assets/audio/default.wav"></audio>
+      </div>
+      <div class="sample" style="--c:var(--blue)">
+        <div class="sample__head"><span class="sample__name">Clean melodic</span><span class="sample__rig">Marshall JCM800 · Greenback</span></div>
+        <p class="sample__desc">Warm glassy clean — gentle compression, edge-of-breakup gain, delay + hall reverb.</p>
+        <audio controls preload="none" src="assets/audio/clean_melodic.wav"></audio>
+      </div>
+      <div class="sample" style="--c:var(--gold)">
+        <div class="sample__head"><span class="sample__name">Solo seeker</span><span class="sample__rig">Mesa Dual Rectifier · Mesa V30</span></div>
+        <p class="sample__desc">Lead tone — sustain-focused, delay + reverb, on-axis mic for pick-attack clarity.</p>
+        <audio controls preload="none" src="assets/audio/solo_seeker.wav"></audio>
+      </div>
+      <div class="sample sample--soon">
+        <div class="sample__head"><span class="sample__name">More coming soon</span></div>
+        <p class="sample__desc">The other bundled presets are getting their own clips — check back.</p>
+      </div>
+    </div>
+    <p style="margin-top:14px"><a class="btn" href="presets.html#bundled">All bundled presets →</a></p>
   </section>
 
   <section>

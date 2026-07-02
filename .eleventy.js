@@ -8,6 +8,7 @@ module.exports = function (eleventyConfig) {
 
   // The site's own contributor README is not a page.
   eleventyConfig.ignores.add("site/README.md");
+  eleventyConfig.ignores.add("site/assets/audio/README.md");
 
   // Markdown: allow raw HTML in pages, and `{#id}` / `{.class}` attribute syntax
   // on headings and fenced code blocks.

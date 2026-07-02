@@ -158,9 +158,9 @@ impl MesaCab {
             // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
             // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
             Biquad::peak_eq(sr, 3500.0, 1.0, 4.0),
-            Biquad::peak_eq(sr, 4300.0, 1.5, 3.0),
-            Biquad::high_shelf(sr, 6500.0, -14.0),
-            Biquad::lowpass(sr, 9000.0, 0.707),
+            Biquad::peak_eq(sr, 4500.0, 1.3, 4.0),
+            Biquad::high_shelf(sr, 6800.0, -17.0),
+            Biquad::lowpass(sr, 8000.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
     }

@@ -132,19 +132,19 @@ impl MarshallCab {
             // Resonant rise into a ~115 Hz hump, then the broad 120–600 Hz body
             // plateau over a shallow 800 Hz–2 kHz pocket — the deep-and-juicy
             // shape of a real capture (see the Mesa `voicing_sm57` note).
-            Biquad::highpass(sr, 66.0, 1.2),
-            Biquad::low_shelf(sr, 120.0, 3.0),
+            Biquad::highpass(sr, 74.0, 1.2),
+            Biquad::low_shelf(sr, 120.0, 2.0),
             Biquad::peak_eq(sr, 115.0, 1.1, 6.0),
             Biquad::peak_eq(sr, 210.0, 0.7, 5.0),
             Biquad::peak_eq(sr, 480.0, 0.9, 3.0),
-            Biquad::peak_eq(sr, 800.0, 1.5, 1.0),
-            Biquad::peak_eq(sr, 1500.0, 0.6, -3.5),
+            Biquad::peak_eq(sr, 800.0, 1.5, 2.0),
+            Biquad::peak_eq(sr, 1500.0, 0.6, -2.0),
             // Greenback presence: broadened and trimmed (Q 1.8→1.4, +5→+4 dB) for a
             // smoother top — Greenbacks are inherently softer up here than V30s.
-            Biquad::peak_eq(sr, 2500.0, 1.0, 4.5),
-            Biquad::peak_eq(sr, 4000.0, 1.3, 2.5),
-            Biquad::high_shelf(sr, 6000.0, -11.0),
-            Biquad::lowpass(sr, 8000.0, 0.707),
+            Biquad::peak_eq(sr, 2500.0, 1.0, 5.5),
+            Biquad::peak_eq(sr, 4300.0, 1.2, 3.5),
+            Biquad::high_shelf(sr, 6600.0, -15.0),
+            Biquad::lowpass(sr, 7200.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
     }
@@ -152,12 +152,12 @@ impl MarshallCab {
     /// R121 ribbon close-mic: warmer still, softer presence, silky top.
     fn voicing_ribbon(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
-            Biquad::highpass(sr, 64.0, 1.2),
-            Biquad::low_shelf(sr, 150.0, 2.5),
+            Biquad::highpass(sr, 72.0, 1.2),
+            Biquad::low_shelf(sr, 150.0, 2.0),
             Biquad::peak_eq(sr, 105.0, 1.1, 5.5), // low resonant hump (cab depth)
             Biquad::peak_eq(sr, 200.0, 0.7, 5.0), // broad low-mid body mound
             Biquad::peak_eq(sr, 480.0, 0.9, 2.5),
-            Biquad::peak_eq(sr, 800.0, 1.3, 1.5),
+            Biquad::peak_eq(sr, 800.0, 1.3, 2.5),
             Biquad::peak_eq(sr, 2200.0, 1.4, 2.0), // softer, lower presence
             Biquad::high_shelf(sr, 4200.0, -14.0), // ribbon HF rolloff
             Biquad::lowpass(sr, 6000.0, 0.707),

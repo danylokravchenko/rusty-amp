@@ -108,12 +108,12 @@ Three controls model a multi-mic'd 4×12 — the close mic's position, a blend f
 <div class="miccards">
   <div class="miccard">
     <div class="miccard__top">
-      <div class="knob__dial" style="--r:0deg"></div>
+      <div class="knob__dial" style="--r:-19deg"></div>
       <div class="miccard__id"><div class="miccard__name">Mic</div><div class="miccard__range">Close-mic position · 0–10</div></div>
     </div>
-    <div class="miccard__bar"><span class="miccard__mark" style="--at:50%"></span></div>
+    <div class="miccard__bar"><span class="miccard__mark" style="--at:40%"></span></div>
     <div class="miccard__ends"><span>Edge · dark</span><span>On-axis · bright</span></div>
-    <div class="miccard__def">Default <b>5.0</b> · centre neutral</div>
+    <div class="miccard__def">Default <b>4.0</b> · just off-axis</div>
     <div class="miccard__desc">0 = edge (off-axis, dark, −6 dB at 5 kHz) · 5 = centre neutral · 10 = on-axis (bright, +6 dB at 5 kHz).</div>
   </div>
 
@@ -122,9 +122,9 @@ Three controls model a multi-mic'd 4×12 — the close mic's position, a blend f
       <div class="knob__dial" style="--r:-95deg"></div>
       <div class="miccard__id"><div class="miccard__name">Blend</div><div class="miccard__range">Close-mic capsule · 0–10</div></div>
     </div>
-    <div class="miccard__bar"><span class="miccard__mark" style="--at:15%"></span></div>
+    <div class="miccard__bar"><span class="miccard__mark" style="--at:0%"></span></div>
     <div class="miccard__ends"><span>SM57 dynamic</span><span>R121 ribbon</span></div>
-    <div class="miccard__def">Default <b>1.5</b> · mostly SM57</div>
+    <div class="miccard__def">Default <b>0</b> · pure SM57</div>
     <div class="miccard__desc">0 = SM57 dynamic (bright, present) · 10 = R121 ribbon (darker, fuller low-mids, silky top).</div>
   </div>
 
@@ -133,9 +133,9 @@ Three controls model a multi-mic'd 4×12 — the close mic's position, a blend f
       <div class="knob__dial" style="--r:-95deg"></div>
       <div class="miccard__id"><div class="miccard__name">Room</div><div class="miccard__range">Room-mic amount · 0–10</div></div>
     </div>
-    <div class="miccard__bar"><span class="miccard__mark" style="--at:15%"></span></div>
+    <div class="miccard__bar"><span class="miccard__mark" style="--at:0%"></span></div>
     <div class="miccard__ends"><span>Dry close mic</span><span>Full room</span></div>
-    <div class="miccard__def">Default <b>1.5</b> · a touch of room</div>
+    <div class="miccard__def">Default <b>0</b> · dry close mic</div>
     <div class="miccard__desc">Amount of a distant room mic mixed in — adds air and three-dimensional depth (0 = dry close mic only).</div>
   </div>
 </div>
@@ -177,7 +177,7 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <div class="freqs">
       <span class="freq"><b>+6 dB</b> @ 115 Hz · depth hump</span>
       <span class="freq"><b>+5 dB</b> @ 210 Hz · body plateau</span>
-      <span class="freq"><b>+4.5 dB</b> @ 2.5 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>+5.5 dB</b> @ 2.5 kHz · presence held to 5 kHz</span>
       <span class="freq"><b>soft rolloff</b> above 6 kHz</span>
     </div>
   </div>
