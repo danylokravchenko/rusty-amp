@@ -166,30 +166,32 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
   <div class="tab-panel is-active" role="tabpanel" data-panel="cab-mesa">
     <p class="muted" style="margin:2px 0 4px">Scooped, aggressive, and forward-projecting — the modern high-gain reference.</p>
     <div class="freqs">
-      <span class="freq"><b>−5 dB</b> @ 400 Hz · mid scoop</span>
-      <span class="freq"><b>+7 dB</b> @ 3.5 kHz · presence</span>
-      <span class="freq"><b>hard rolloff</b> above 6 kHz</span>
+      <span class="freq"><b>+6.5 dB</b> @ 120 Hz · depth hump</span>
+      <span class="freq"><b>+5 dB</b> @ 220 Hz · body plateau</span>
+      <span class="freq"><b>−2.5 dB</b> @ 1.15 kHz · mid pocket</span>
+      <span class="freq"><b>+4 dB</b> @ 3.5 kHz · presence</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-marshall">
     <p class="muted" style="margin:2px 0 4px">Warm and mid-forward with a smooth top end — the classic rock voice.</p>
     <div class="freqs">
-      <span class="freq"><b>+4 dB</b> @ 800 Hz · body</span>
-      <span class="freq"><b>+5 dB</b> @ 2.5 kHz · presence</span>
+      <span class="freq"><b>+6 dB</b> @ 115 Hz · depth hump</span>
+      <span class="freq"><b>+5 dB</b> @ 210 Hz · body plateau</span>
+      <span class="freq"><b>+4 dB</b> @ 2.5 kHz · presence</span>
       <span class="freq"><b>soft rolloff</b> above 5 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-orange">
     <p class="muted" style="margin:2px 0 4px">Thick and chunky from the closed-back birch enclosure — a wall of low-mids.</p>
     <div class="freqs">
-      <span class="freq"><b>+5 dB</b> @ 600 Hz · low-mid “wall”</span>
-      <span class="freq"><b>+3 dB</b> @ 1.2 kHz · grind</span>
-      <span class="freq"><b>+5 dB</b> @ 3.2 kHz · presence</span>
+      <span class="freq"><b>+6 dB</b> @ 118 Hz · chest thump</span>
+      <span class="freq"><b>+3.5 dB</b> @ 230 Hz · low-mid “wall”</span>
+      <span class="freq"><b>+3.5 dB</b> @ 3.2 kHz · presence</span>
     </div>
   </div>
 </div>
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz). Two slightly different L/R IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~46 ms (~2200 taps at 48 kHz), the same length budget as an external loaded IR, so the low-end ring fully develops. Two slightly different L/R IRs decorrelate the stereo image for natural width.
 
 Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB high shelf at 5 kHz per channel after convolution, modelling on-axis vs off-axis placement. For the partitioned-FFT convolution engine, see [How it works](how-it-works.html#cabinet).
 

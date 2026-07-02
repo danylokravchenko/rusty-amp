@@ -112,21 +112,23 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
     ir
 }
 
-/// IR length in taps for a given sample rate (~23 ms at any rate).
+/// IR length in taps for a given sample rate (~46 ms at any rate).
 ///
 /// The length is a deliberate compromise: long enough that the late
-/// cabinet/room reflections (out to ~21 ms) and the low cone-resonance ring
-/// actually fit inside the window — a short IR truncates them and the authored
-/// values become inert — but not so long that we pay for a tail that adds little
-/// beyond a controllable boom. At 48 kHz this is ~1114 taps per channel;
-/// direct-form convolution at that length is a few hundred MFLOP/s, well within
-/// a real-time budget on a modern CPU.
+/// cabinet/room reflections (out to ~21 ms) and — crucially — the low
+/// body-mode ring (T60s of 100 ms+) actually develop inside the window; a
+/// short window fades the low resonances out before they bloom, which reads
+/// as a thin, shallow cab next to commercial captures. This matches the
+/// `MAX_IR_LEN` budget already granted to external user IRs, so the built-in
+/// cabs get the same low-end depth. Convolution is uniformly-partitioned FFT
+/// ([`crate::dsp::conv::FftConvolver`]), so the extra taps add partitions —
+/// cheap frequency-domain MACs — and no latency.
 ///
 /// Invariant relied upon by the tests: every reflection time and modal decay in
 /// the cabinet textures must be realizable within this window (see
 /// `cab::*::tests`). If you shorten this, trim the textures to match.
 pub fn ir_len(sr: f32) -> usize {
-    ((sr / 44100.0) * 1024.0) as usize
+    ((sr / 44100.0) * 2048.0) as usize
 }
 
 /// Window length in milliseconds for a given tap count / sample rate.

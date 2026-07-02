@@ -104,7 +104,7 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
   <div class="flow__stage" style="--c:var(--amber)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Cabinet</span><span class="flow__badge flow__badge--mono">Mono → Stereo</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
-      <div class="flow__sig">Blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~23 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
+      <div class="flow__sig">Blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~46 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
     </div>
   </div>
 
@@ -177,11 +177,11 @@ The **passive FMV tone stack** is a single RC network where bass, mid, and trebl
 
 Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download — though you can also [load your own `.wav` IR](amps-cabs.html#irs)): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab.
 
-Each IR runs ~23 ms (~1100 taps at 48 kHz), long enough for the late room reflections and the low cone resonance to ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
+Each IR runs ~46 ms (~2200 taps at 48 kHz) — the same length budget as an external loaded IR — long enough for the late room reflections and the deep, slow-decaying cone resonance to fully ring out. Two slightly different left/right IRs decorrelate the stereo image for natural width.
 
 ### The convolution engine
 
-The convolution is computed with a **partitioned-FFT (uniformly-partitioned overlap-save)** engine rather than a direct tap-by-tap loop. At ~1100 taps per channel this is the single heaviest DSP stage, and the frequency-domain approach cuts its cost several-fold while producing the exact same linear convolution — so the tone is unchanged. The only trade-off is a fixed ~2.7 ms of latency (128 samples at 48 kHz), shared equally by both channels so the stereo image stays aligned.
+The convolution is computed with a **partitioned-FFT (uniformly-partitioned overlap-save)** engine rather than a direct tap-by-tap loop. At ~2200 taps per channel this is the single heaviest DSP stage, and the frequency-domain approach cuts its cost several-fold while producing the exact same linear convolution — so the tone is unchanged. The only trade-off is a fixed ~2.7 ms of latency (128 samples at 48 kHz), shared equally by both channels so the stereo image stays aligned.
 
 ### Three mics, one blend
 
