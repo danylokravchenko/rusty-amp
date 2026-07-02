@@ -10,14 +10,16 @@ use crate::dsp::biquad::Biquad;
 /// voiced EQ "skeleton" plus a reflection texture; the room mic adds pre-delay and
 /// denser late reflections for a sense of air.
 ///
-/// V30 close-mic (SM57) signature:
-///   • Sub HP at 80 Hz with slight resonance (ported cab alignment)
-///   • +3 dB low shelf at 100 Hz (speaker low-end weight)
-///   • -4 dB at 300 Hz (cardboard boxiness notch)
-///   • -5 dB at 400 Hz (honky lower-mid cut — V30 mid scoop)
-///   • +2 dB at 800 Hz (low-mid body / pick attack)
-///   • +7 dB at 3500 Hz (V30 signature presence spike)
-///   • -14 dB high shelf at 5500 Hz (speaker cone rolloff)
+/// V30 close-mic (SM57) signature, voiced against measured commercial 4×12
+/// captures (see the note in `voicing_sm57`):
+///   • Resonant sub HP at 72 Hz (ported cab alignment)
+///   • +3 dB low shelf at 100 Hz + a +6.5 dB resonant hump at 120 Hz (cab depth)
+///   • +5 dB wide mound at 220 Hz and +3 dB at 500 Hz (low-mid body plateau)
+///   • −3 dB wide dip at 1450 Hz over a −3 dB shelf from 1.35 kHz (the mid
+///     "pocket": real captures slope *down* through 0.5–2 kHz)
+///   • +4.5 dB at 3500 Hz and +2 dB at 4.3 kHz (V30 presence, held to ~5 kHz —
+///     real captures keep their treble through 2.3–5 kHz, then crash)
+///   • -14 dB high shelf at 6500 Hz (speaker cone rolloff)
 ///   • LP at 9 kHz (fizz cut + cone break-up noise removal)
 pub struct MesaCab {
     inner: BlendedCab,
@@ -26,42 +28,65 @@ pub struct MesaCab {
 // Left/right speaker textures: slightly different reflection times and modes so
 // the two channels decorrelate (stereo width) without smearing a mono sum.
 //
-// Early taps (< 4 ms) are the cone-to-grille / panel comb that colours the body;
-// the later taps (6–28 ms) are cabinet-edge and near-wall reflections that put
-// the speaker in a space and give the note depth and air. The low modal pair
-// (a deep ~75 Hz cabinet "thump" plus the ~95 Hz cone resonance) blooms and
-// rings out across the long IR for weight; the ~3.4 kHz mode is the V30 breakup.
+// Early taps (< 4 ms) are the cone-to-grille / panel comb that colours the body —
+// timed so their comb notches land in the 800 Hz–2 kHz mid pocket rather than in
+// the 400–600 Hz body; the later taps (6–28 ms) are cabinet-edge and near-wall
+// reflections that put the speaker in a space and give the note depth and air.
+// The two low modes near 100–120 Hz add a subtle thump ring on top of the EQ hump
+// (they sit where the direct sound is strong: an additive resonance placed where
+// the direct path is weak phase-cancels it just above resonance and carves a
+// notch instead of adding depth); the ~3.4 kHz mode is the V30 breakup.
 const TEX_L: Texture = Texture {
     predelay: 0,
     reflections: &[
         (0.27, -0.32),
-        (0.85, 0.20),
-        (1.70, -0.12),
-        (3.10, 0.07),
-        (6.30, -0.055),
-        (10.80, 0.040),
-        (17.50, -0.026),
-        (20.50, 0.015),
+        (0.62, 0.20),
+        (1.24, -0.12),
+        (3.10, 0.08),
+        (6.30, -0.075),
+        (10.80, 0.062),
+        (14.20, -0.050),
+        (17.50, 0.040),
+        (20.50, 0.030),
     ],
-    modes: &[(74.0, 65.0, 0.005), (95.0, 58.0, 0.007), (3400.0, 4.0, 0.1)],
+    modes: &[
+        (98.0, 95.0, 0.004),
+        (118.0, 85.0, 0.004),
+        (3400.0, 4.0, 0.1),
+    ],
+    scatter: Some(ir::Scatter {
+        seed: 11,
+        count: 22,
+        band: (2200.0, 7600.0),
+        t60_ms: (2.0, 5.0),
+        gain: 0.014,
+    }),
 };
 const TEX_R: Texture = Texture {
     predelay: 2,
     reflections: &[
         (0.31, -0.28),
-        (0.95, 0.22),
-        (1.90, -0.10),
-        (3.40, 0.06),
-        (6.90, -0.050),
-        (11.60, 0.037),
-        (18.80, -0.024),
-        (20.50, 0.014),
+        (0.66, 0.22),
+        (1.32, -0.10),
+        (3.40, 0.075),
+        (6.90, -0.070),
+        (11.60, 0.058),
+        (15.10, -0.047),
+        (18.80, 0.037),
+        (20.50, 0.028),
     ],
     modes: &[
-        (79.0, 67.0, 0.005),
-        (102.0, 60.0, 0.007),
+        (100.0, 97.0, 0.004),
+        (122.0, 87.0, 0.004),
         (3550.0, 4.0, 0.10),
     ],
+    scatter: Some(ir::Scatter {
+        seed: 12,
+        count: 22,
+        band: (2200.0, 7600.0),
+        t60_ms: (2.0, 5.0),
+        gain: 0.014,
+    }),
 };
 
 // Room-mic textures: extra pre-delay (distance) and denser, later reflections so
@@ -76,7 +101,8 @@ const ROOM_TEX_L: Texture = Texture {
         (16.50, 0.08),
         (18.50, -0.06),
     ],
-    modes: &[(82.0, 120.0, 0.006), (180.0, 95.0, 0.005)],
+    modes: &[(82.0, 130.0, 0.006), (180.0, 95.0, 0.005)],
+    scatter: None,
 };
 const ROOM_TEX_R: Texture = Texture {
     predelay: 138,
@@ -88,7 +114,8 @@ const ROOM_TEX_R: Texture = Texture {
         (16.00, 0.075),
         (18.00, -0.055),
     ],
-    modes: &[(86.0, 125.0, 0.006), (190.0, 100.0, 0.005)],
+    modes: &[(86.0, 135.0, 0.006), (190.0, 100.0, 0.005)],
+    scatter: None,
 };
 
 impl MesaCab {
@@ -111,21 +138,28 @@ impl MesaCab {
     /// SM57 close-mic: the bright, present V30 voicing (the original skeleton).
     fn voicing_sm57(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
-            Biquad::highpass(sr, 80.0, 0.9),
-            Biquad::low_shelf(sr, 100.0, 5.0),
-            // V30 scoop, mostly filled (−4→−1.5 @ 300, −5→−2 @ 400) and more low
-            // shelf (+4→+5): the deep scoop hollowed the low-mid body that carries
-            // fretted notes, which — combined with the bright upper mids — left the
-            // response rising ~20 dB up the neck so single high notes blasted. A
-            // shallow scoop keeps V30 character while evening the level across notes.
-            Biquad::peak_eq(sr, 300.0, 1.8, -1.5),
-            Biquad::peak_eq(sr, 400.0, 1.5, -2.0),
-            Biquad::peak_eq(sr, 800.0, 1.5, 2.5),
+            // The low end is voiced to the shape real close-mic'd 4×12 captures
+            // (e.g. God's Cab) measure: a steep resonant rise into a big ~120 Hz
+            // hump — a shelf alone is flat below its corner; the hump is what
+            // reads as "deep" — then a broad +5…+10 dB body plateau from ~120 to
+            // ~600 Hz relative to the 800 Hz–2 kHz band, which instead carries a
+            // wide, shallow pocket. That plateau-vs-pocket tilt, not sub-bass, is
+            // what makes a capture sound deep and juicy.
+            Biquad::highpass(sr, 72.0, 1.2),
+            Biquad::low_shelf(sr, 100.0, 3.0),
+            Biquad::peak_eq(sr, 120.0, 1.1, 6.5),
+            Biquad::peak_eq(sr, 220.0, 0.7, 5.0),
+            Biquad::peak_eq(sr, 500.0, 0.8, 3.0),
+            Biquad::peak_eq(sr, 1450.0, 0.55, -3.0),
+            // Downward 0.5–2 kHz tilt: real captures slope *down* through the
+            // pocket into presence; without this the band rises instead.
+            Biquad::high_shelf(sr, 1350.0, -3.0),
             // V30 presence: broadened (Q 2.0→1.3) and tamed (+7→+4 dB). The narrow
             // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
             // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
-            Biquad::peak_eq(sr, 3500.0, 1.3, 4.0),
-            Biquad::high_shelf(sr, 5500.0, -14.0),
+            Biquad::peak_eq(sr, 3500.0, 1.0, 4.0),
+            Biquad::peak_eq(sr, 4300.0, 1.5, 3.0),
+            Biquad::high_shelf(sr, 6500.0, -14.0),
             Biquad::lowpass(sr, 9000.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
@@ -134,13 +168,14 @@ impl MesaCab {
     /// R121 ribbon close-mic: fuller low-mids, softer presence, silky top rolloff.
     fn voicing_ribbon(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
-            Biquad::highpass(sr, 75.0, 0.9),
-            Biquad::low_shelf(sr, 140.0, 3.5),
-            Biquad::peak_eq(sr, 300.0, 1.8, -3.0),
-            Biquad::peak_eq(sr, 500.0, 1.2, -2.0),
-            Biquad::peak_eq(sr, 1100.0, 1.0, 2.0), // ribbon body
-            Biquad::peak_eq(sr, 3200.0, 1.6, 2.5), // gentler, lower presence
-            Biquad::high_shelf(sr, 4500.0, -16.0), // ribbon HF rolloff
+            Biquad::highpass(sr, 70.0, 1.2),
+            Biquad::low_shelf(sr, 140.0, 2.5),
+            Biquad::peak_eq(sr, 115.0, 1.1, 5.5), // low resonant hump (cab depth)
+            Biquad::peak_eq(sr, 210.0, 0.7, 5.0), // broad low-mid body mound
+            Biquad::peak_eq(sr, 500.0, 0.9, 2.5),
+            Biquad::peak_eq(sr, 1400.0, 0.7, -2.5), // mid pocket
+            Biquad::peak_eq(sr, 3200.0, 1.6, 2.5),  // gentler, lower presence
+            Biquad::high_shelf(sr, 4500.0, -16.0),  // ribbon HF rolloff
             Biquad::lowpass(sr, 6500.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
@@ -149,8 +184,8 @@ impl MesaCab {
     /// Room mic: a darker, distance-coloured version of the cab voicing.
     fn voicing_room(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
-            Biquad::highpass(sr, 95.0, 0.8),
-            Biquad::low_shelf(sr, 150.0, 1.5),
+            Biquad::highpass(sr, 78.0, 0.8),
+            Biquad::low_shelf(sr, 150.0, 2.5),
             Biquad::peak_eq(sr, 400.0, 1.2, -3.0),
             Biquad::peak_eq(sr, 1200.0, 1.0, 1.5),
             Biquad::high_shelf(sr, 4000.0, -10.0),
@@ -191,6 +226,7 @@ mod tests {
             predelay: t.predelay,
             reflections: t.reflections,
             modes: &[],
+            scatter: t.scatter,
         };
         macro_rules! check {
             ($tag:expr, $voicing:expr, $tex:expr) => {{

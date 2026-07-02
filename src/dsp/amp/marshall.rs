@@ -88,7 +88,11 @@ impl Marshall {
             tone: ToneStack::new(sr, Components::MARSHALL),
             presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
             presence_cache: Cached::new(),
-            voice: VoiceBalance::new(sr, 180.0, 3.5, 750.0, -7.0),
+            // Body shelf deepened (+3.5 → +8) and measured against a commercial
+            // JCM-family rig: a real driven Marshall carries its 110–350 Hz
+            // low-mid body ~12 dB above the 1–1.4 kHz pocket; ours ran nearly
+            // flat, which read as thin and quiet next to it.
+            voice: VoiceBalance::new(sr, 180.0, 8.0, 750.0, -7.0),
             out_hp: Biquad::highpass(sr, 12.0, 0.707),
             envelope: 0.0,
             // 8×12 resonance ~95 Hz; tube amp has moderate damping. Dynamic bloom
@@ -107,8 +111,10 @@ impl Marshall {
     }
 
     fn update_presence(&mut self, presence: f32) {
-        // Presence models the JCM800 output-transformer NFB loop: shelf at 3.5 kHz, ±6 dB
-        self.presence_shelf = Biquad::high_shelf(self.sr, 3500.0, (presence - 0.5) * 12.0);
+        // Presence models the JCM800 output-transformer NFB loop: shelf at
+        // 3.5 kHz, ±6 dB around a +2.5 dB static lift (the reference rig holds
+        // its 1.8–5.6 kHz shelf well above the mid pocket even at noon).
+        self.presence_shelf = Biquad::high_shelf(self.sr, 3500.0, (presence - 0.5) * 12.0 + 2.5);
     }
 
     #[inline]
@@ -124,8 +130,17 @@ impl Marshall {
             1.0 - (-16.0 / self.sr).exp()
         };
         self.envelope += coeff * (abs_x - self.envelope);
-        let sag = 1.0 / (1.0 + self.envelope * 0.6);
-        tube_clip_asym(x * sag * 2.5) * 0.4
+        // Deep sag, light static drive (measured against a commercial JCM-family
+        // reference): a real driven power amp gets most of its squash from the
+        // supply sagging — a *slow gain reduction* that compresses level without
+        // bending the waveform — while the tube curve itself stays on its round
+        // knee. Loading the compression onto the static drive instead pushes the
+        // clipper toward its plateau, whose square-ish waveform carries the
+        // slowly-decaying h5/h7 series that reads as cheap fizz. Sag deepened
+        // (0.6 → 1.5) and static drive backed off (2.5 → 1.5) so total
+        // compression stays but the harmonic series falls off fast.
+        let sag = 1.0 / (1.0 + self.envelope * 1.5);
+        tube_clip_asym(x * sag * 1.5) * 0.62
     }
 }
 
@@ -165,16 +180,26 @@ impl Amplifier for Marshall {
         let bias = self.bloom.follow(x) * 0.06;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
+        // The preamp gain is split across the two triodes (g1·g2 = pregain)
+        // instead of slamming the first stage with all of it. One stage driven
+        // 26× runs deep on its plateau and squares the wave — a square's
+        // slowly-decaying h5/h7 series is the "cheap fizz" fingerprint; two
+        // stages at ~7× and ~4× each stay on the round part of the curve and
+        // produce the fast-falling harmonic series a real cascade (and the
+        // commercial reference amps) measure. At gain 0 both drives collapse
+        // to 1 (clean), so the knob's range is preserved.
+        let g1 = pregain.powf(0.6) * 1.4;
+        let g2 = (pregain / pregain.powf(0.6)) * 1.6;
         let up = self.os.upsample(x);
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             // Dynamic cathode bias shifts the operating point under hard drive
             // before the stage-1 waveshaper; the inter-stage HP strips its DC.
-            let d = self.cathode.shift((u + bias) * pregain);
-            let s = tube_clip_asym(d) / pregain.sqrt();
+            let d = self.cathode.shift((u + bias) * g1);
+            let s = tube_clip_asym(d) / g1.sqrt();
             let s = self.stage_hp.process(s);
-            *o = tube_clip_asym(s * 3.2) / 3.2_f32.sqrt();
+            *o = tube_clip_asym(s * g2) / g2.sqrt();
         }
         let x = self.os.downsample(down);
         // ── end oversampled section ───────────────────────────────────────────
@@ -203,7 +228,7 @@ impl Amplifier for Marshall {
         // Output trim: the tube power stage runs at a conservative level; this
         // makeup brings the JCM800 up to the same loudness as the (much hotter)
         // solid-state Randall so switching models doesn't jump in volume.
-        x * master * 3.6
+        x * master * 6.5
     }
 }
 

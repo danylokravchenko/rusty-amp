@@ -45,14 +45,14 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
     <div class="specs">
       <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–40× into dual 12AX7</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Marshall values)</div></div>
-      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Tube sag (5 ms / 200 ms) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep tube sag (5 ms / 60 ms) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
     </div>
     <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–40× into dual 12AX7.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall values).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Sets the depth of the stack's inherent scoop.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Interacts with mid/bass, lossy &amp; peak-normalised.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 3.5 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 3.5 kHz (+2.5 dB fixed offset, ±6 dB).</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 
@@ -67,7 +67,7 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV stack (Fender-type values: fuller lows, gentler scoop).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Gentler scoop than the Marshall.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Same interacting network.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4 kHz (±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4 kHz (+2 dB fixed offset, ±6 dB).</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 
@@ -166,36 +166,38 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
   <div class="tab-panel is-active" role="tabpanel" data-panel="cab-mesa">
     <p class="muted" style="margin:2px 0 4px">Scooped, aggressive, and forward-projecting — the modern high-gain reference.</p>
     <div class="freqs">
-      <span class="freq"><b>−5 dB</b> @ 400 Hz · mid scoop</span>
-      <span class="freq"><b>+7 dB</b> @ 3.5 kHz · presence</span>
-      <span class="freq"><b>hard rolloff</b> above 6 kHz</span>
+      <span class="freq"><b>+6.5 dB</b> @ 120 Hz · depth hump</span>
+      <span class="freq"><b>+5 dB</b> @ 220 Hz · body plateau</span>
+      <span class="freq"><b>−3 dB</b> @ 1.45 kHz · mid pocket</span>
+      <span class="freq"><b>+4.5 dB</b> @ 3.5 kHz · presence held to 5 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-marshall">
     <p class="muted" style="margin:2px 0 4px">Warm and mid-forward with a smooth top end — the classic rock voice.</p>
     <div class="freqs">
-      <span class="freq"><b>+4 dB</b> @ 800 Hz · body</span>
-      <span class="freq"><b>+5 dB</b> @ 2.5 kHz · presence</span>
-      <span class="freq"><b>soft rolloff</b> above 5 kHz</span>
+      <span class="freq"><b>+6 dB</b> @ 115 Hz · depth hump</span>
+      <span class="freq"><b>+5 dB</b> @ 210 Hz · body plateau</span>
+      <span class="freq"><b>+4.5 dB</b> @ 2.5 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>soft rolloff</b> above 6 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-orange">
     <p class="muted" style="margin:2px 0 4px">Thick and chunky from the closed-back birch enclosure — a wall of low-mids.</p>
     <div class="freqs">
-      <span class="freq"><b>+5 dB</b> @ 600 Hz · low-mid “wall”</span>
-      <span class="freq"><b>+3 dB</b> @ 1.2 kHz · grind</span>
-      <span class="freq"><b>+5 dB</b> @ 3.2 kHz · presence</span>
+      <span class="freq"><b>+6 dB</b> @ 118 Hz · chest thump</span>
+      <span class="freq"><b>+3.5 dB</b> @ 230 Hz · low-mid “wall”</span>
+      <span class="freq"><b>+3.5 dB</b> @ 3.2 kHz · presence held to 5 kHz</span>
     </div>
   </div>
 </div>
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton, then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances — including a deep, long-decaying cone "thump" — add the time-domain depth of a real miked cab. Each IR runs ~23 ms (~1100 taps at 48 kHz). Two slightly different L/R IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~93 ms (~4500 taps at 48 kHz), so the low-end ring and room decay fully develop, and a seeded cone-breakup scatter adds the jagged 2–7.5 kHz ripple texture real captures show. Two slightly different L/R IRs decorrelate the stereo image for natural width.
 
 Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB high shelf at 5 kHz per channel after convolution, modelling on-axis vs off-axis placement. For the partitioned-FFT convolution engine, see [How it works](how-it-works.html#cabinet).
 
 ## External cabinet IRs <span class="muted">(<kbd>I</kbd> · <kbd>X</kbd>)</span> {#irs}
 
-Beyond the three built-in cabs, rusty-amp can load your own **impulse-response `.wav` file** as the cabinet. A loaded IR replaces the multi-mic blend with a single captured response (the mono drive still passes through the same speaker cone-breakup + thermal power-compression model, so it stays alive and dynamic). Because the file is already a finished, miked capture, the **Mic / Blend / Room** knobs are inert while an external IR is active.
+Beyond the three built-in cabs, rusty-amp can load your own **impulse-response `.wav` file** as the cabinet. A loaded IR replaces the multi-mic blend with a single captured response (the mono drive still passes through the same nonlinear speaker model — excursion-driven motor droop, cone breakup, thermal power compression and Doppler FM "growl" — so it stays alive and dynamic). Because the file is already a finished, miked capture, the **Mic / Blend / Room** knobs are inert while an external IR is active.
 
 <div class="note">
 <b>One IR is a complete cabinet.</b> A speaker + cab + mic is a linear time-invariant system, and a single impulse response fully captures its linear response — exactly what a <code>.wav</code> IR is, and what every IR loader (Two Notes, Helix, NAM cab blocks, OwnHammer / God's Cab) uses: <b>one IR = one cab, one mic, one position</b>. rusty-amp adds the speaker's <em>nonlinear</em> behaviour back on top, so a loaded IR isn't static playback. A <em>multi-mic blend</em> is just a sum of IRs — pre-mix it into one file in your DAW, or load one mic at a time and A/B with <kbd>X</kbd>.
@@ -224,7 +226,7 @@ Each location is searched **up to ~4 folders deep**, so a small pack with a coup
 
 The loaded IR's name appears in the header in place of the cabinet label (`IR: …`) while it is active. Outside the browser, <kbd>X</kbd> toggles the same A/B at any time. Loading and clearing take effect live — the audio stream is never interrupted (the IR is decoded and resampled off the audio thread, then swapped in on a lock-free handoff).
 
-On load the IR is rate-matched to your interface (windowed-sinc resampler), trimmed to ~2048 taps with a raised-cosine tail fade, DC-removed, and energy-normalised so swapping IRs doesn't jump the level. Mono files feed both channels; stereo files keep their L/R.
+On load the IR is rate-matched to your interface (windowed-sinc resampler), trimmed to ~8192 taps (~170 ms @ 48 kHz) with a raised-cosine tail fade, DC-removed, and energy-normalised so swapping IRs doesn't jump the level. Mono files feed both channels; stereo files keep their L/R.
 
 <div class="note note--info">
 <b>No IRs are bundled.</b> Load only files you are licensed to use — the app never ships or redistributes third-party captures.
@@ -243,7 +245,7 @@ Practically any guitar IR works as-is.
 | Channels | Mono or stereo | Mono feeds both sides; stereo keeps L/R; extra channels are dropped |
 | Sample rate | Any (44.1 / 48 / 96 kHz…) | Resampled to your interface rate on load |
 | Bit depth | 16 / 24 / 32-bit int or 32-bit float | — |
-| Length | Any (~20 ms to several hundred ms) | Trimmed to ~2048 taps (~43 ms @ 48 kHz) with a tail fade |
+| Length | Any (~20 ms to several hundred ms) | Trimmed to ~8192 taps (~170 ms @ 48 kHz) with a tail fade |
 
 <div class="note">
 <b>Curate — don't dump a whole pack.</b> Big libraries ship hundreds or thousands of files in deeply-nested folders (by sample rate → mic → processing). The browser scans only ~4 levels deep and a 2,000-entry list is unusable, so copy a handful of favourites into a <b>flat</b> <code>irs/</code> folder.

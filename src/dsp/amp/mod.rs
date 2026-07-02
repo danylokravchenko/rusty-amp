@@ -820,7 +820,7 @@ mod tests {
 
     // — Integration: the features reach the player's controls ——————————————————
 
-    /// One instance per tube amp (Marshall + Mesa), the two models that carry the
+    /// One instance per tube amp (Marshall + Mesa + Vox), the models that carry the
     /// triode/transformer/bright-cap chain. The Randall is solid-state and is
     /// deliberately left out of these — it has no output transformer or triode stage
     /// to model.

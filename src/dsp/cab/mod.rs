@@ -45,8 +45,8 @@ pub trait Cabinet {
 /// adds the even-harmonic warmth a real cone produces; any DC it introduces is
 /// removed downstream by the cab IR (whose 0 Hz gain is ~0). Bounded via `tanh`,
 /// so it also can't blow up on a hot amp input.
-const BREAKUP_DRIVE: f32 = 0.12;
-const BREAKUP_ASYM: f32 = 0.05;
+const BREAKUP_DRIVE: f32 = 0.16;
+const BREAKUP_ASYM: f32 = 0.07;
 
 #[inline]
 fn cone_breakup(x: f32) -> f32 {
@@ -106,13 +106,48 @@ impl Comb {
 
 // ── Stage 1: speaker drive (mono, pre-mic) ──────────────────────────────────────
 
-/// The two driver nonlinearities a fixed IR can't hold, applied to the mono drive
-/// before the mic picks the sound up: stateless [`cone_breakup`] saturation
-/// followed by stateful voice-coil thermal power compression.
+// Frequency-dependent driver distortion. The broadband [`cone_breakup`] above is
+// only part of the story: a real speaker's distortion is dominated by cone
+// *displacement*, which lives almost entirely below ~150 Hz (excursion falls
+// ~12 dB/oct above the driver resonance). Two displacement-driven effects:
+//
+//   • motor (Bl) droop — the voice coil leaves the magnetic gap at high
+//     excursion, so the *gain of the whole signal* sags with instantaneous
+//     displacement: LF picks up odd harmonics and, crucially, sustained bass
+//     amplitude-modulates the mids/treble riding on it;
+//   • Doppler FM — the treble is radiated from a cone that the bass is
+//     physically moving, phase-modulating it. Bass excursion puts FM sidebands
+//     around every HF partial at the bass fundamental's spacing — the "growl"
+//     of a pushed 4×12 under palm mutes, and an effect no static waveshaper
+//     (breakup included) can produce.
+//
+// Both scale with drive: transparent on quiet playing, emerging as the cab is
+// pushed — the same design contract as the breakup/compression stages.
+
+/// Displacement estimator: 2nd-order lowpass at the driver resonance. Its output
+/// approximates cone excursion in signal units (bass ≈ full swing, mids/HF ≈ 0).
+const DISP_FC: f32 = 100.0;
+const DISP_Q: f32 = 0.9;
+/// Motor droop: gain = 1 / (1 + K·d²). At full drive (d ≈ 1) ≈ −1.6 dB of
+/// displacement-synchronous gain modulation; negligible below d ≈ 0.3.
+const BL_DROOP_K: f32 = 0.20;
+/// Doppler depth in samples of delay per unit displacement (±). ~0.45 samples at
+/// 48 kHz ≈ ±9 µs ≈ ±3 mm of cone travel — a 4×12 driven hard.
+const DOPPLER_DEPTH: f32 = 0.45;
+/// Base delay for the Doppler line so modulation never reads the future.
+const DOPPLER_BASE: f32 = 2.0;
+
+/// The driver nonlinearities a fixed IR can't hold, applied to the mono drive
+/// before the mic picks the sound up: displacement-driven motor droop, stateless
+/// [`cone_breakup`] saturation, voice-coil thermal power compression, and
+/// displacement-driven Doppler FM on the radiated output.
 struct SpeakerDrive {
     env: f32,
     atk: f32,
     rel: f32,
+    disp_lp: Biquad,
+    dop_buf: [f32; 8],
+    dop_pos: usize,
 }
 
 impl SpeakerDrive {
@@ -122,21 +157,42 @@ impl SpeakerDrive {
             env: 0.0,
             atk: coeff(PC_ATK_MS),
             rel: coeff(PC_REL_MS),
+            disp_lp: Biquad::lowpass(sr, DISP_FC, DISP_Q),
+            dop_buf: [0.0; 8],
+            dop_pos: 0,
         }
     }
 
-    /// Cone breakup, then voice-coil thermal power compression. The envelope tracks
-    /// the signal with a fast-ish attack and slow release (so transients pass and
-    /// only sustained level compresses), and the gain rolls off smoothly above the
-    /// threshold.
+    /// Motor droop → cone breakup → thermal power compression → Doppler FM.
+    /// The compression envelope tracks the signal with a fast-ish attack and slow
+    /// release (so transients pass and only sustained level compresses).
     #[inline]
     fn process(&mut self, x: f32) -> f32 {
+        // Instantaneous cone displacement (bounded so a hot amp can't blow up
+        // the droop/Doppler maths).
+        let d = self.disp_lp.process(x).clamp(-1.5, 1.5);
+
+        // Motor (Bl) droop: displacement-synchronous gain on the whole signal.
+        let x = x / (1.0 + BL_DROOP_K * d * d);
+
         let x = cone_breakup(x);
         let a = x.abs();
         let coeff = if a > self.env { self.atk } else { self.rel };
         self.env += (a - self.env) * coeff;
         let over = (self.env - PC_THRESHOLD).max(0.0);
-        x / (1.0 + PC_RATIO_K * over)
+        let x = x / (1.0 + PC_RATIO_K * over);
+
+        // Doppler: read the output through a short delay line whose length is
+        // modulated by displacement (linear interpolation; sub-sample swing).
+        self.dop_buf[self.dop_pos] = x;
+        let len = self.dop_buf.len();
+        let delay = DOPPLER_BASE + DOPPLER_DEPTH * d;
+        let ipart = delay as usize;
+        let frac = delay - ipart as f32;
+        let i0 = (self.dop_pos + len - ipart) % len;
+        let i1 = (self.dop_pos + len - ipart - 1) % len;
+        self.dop_pos = (self.dop_pos + 1) % len;
+        self.dop_buf[i0] * (1.0 - frac) + self.dop_buf[i1] * frac
     }
 }
 
@@ -200,7 +256,7 @@ impl MicBlend {
     fn recombine(&mut self, blend: f32, room: f32) {
         let wc = 1.0 - blend; // close dynamic weight
         let wr = blend; // ribbon weight
-        let wroom = room * 0.6; // room is additive ambience, kept lower
+        let wroom = room * 0.9; // room ambience: real captures carry ~25% late energy
         for (i, s) in self.scratch_l.iter_mut().enumerate() {
             *s = wc * self.close_l[i] + wr * self.ribbon_l[i] + wroom * self.room_l[i];
         }
@@ -508,15 +564,21 @@ mod tests {
     /// Power compression is *thermal*: a fast transient must punch through before
     /// the slow envelope engages. The first few milliseconds of a cold loud burst
     /// must be louder than the settled steady state of the same tone.
+    ///
+    /// Probed at 1.9 kHz, away from the cab's low resonant hump and body modes
+    /// (at a resonance the linear ring-up would mask the compression under test),
+    /// with an attack window long enough (12 ms) for most of the ~46 ms IR's
+    /// reflections to contribute to the "uncompressed" peak, yet well inside the
+    /// 20 ms thermal attack.
     #[test]
     fn transient_punches_through_thermal_compression() {
         let mut cab = MarshallCab::new(SR);
         let mut peak_attack = 0.0f32;
-        let attack_n = (SR * 0.004) as usize; // first 4 ms
+        let attack_n = (SR * 0.012) as usize; // first 12 ms
         let mut settled = 0.0f32;
         let total = (SR * 0.5) as usize;
         for i in 0..total {
-            let x = (2.0 * PI * 110.0 * i as f32 / SR).sin();
+            let x = (2.0 * PI * 1900.0 * i as f32 / SR).sin();
             let (l, r) = cab.process(x, 0.5, 0.15, 0.15);
             let m = (l + r).abs();
             if i < attack_n {
@@ -588,6 +650,47 @@ mod tests {
         );
     }
 
+    /// Frequency-dependent driver distortion: sustained bass excursion must
+    /// modulate the treble riding on it (motor droop AM + Doppler FM), putting
+    /// sidebands around an HF carrier at the bass fundamental's spacing — the
+    /// "growl" of a pushed cab. It must scale with drive: pronounced when the
+    /// cab is driven, gone on quiet playing.
+    #[test]
+    fn bass_modulates_treble_only_when_driven() {
+        let sideband_ratio = |level: f32| -> f32 {
+            let mut cab = MarshallCab::new(SR);
+            let n = SR as usize;
+            let warm = n / 3;
+            let mut out = Vec::with_capacity(n - warm);
+            for i in 0..n {
+                let t = i as f32 / SR;
+                let x = level
+                    * (0.9 * (2.0 * PI * 95.0 * t).sin() + 0.2 * (2.0 * PI * 2200.0 * t).sin());
+                let (l, r) = cab.process(x, 0.5, 0.15, 0.15);
+                if i >= warm {
+                    out.push(l + r);
+                }
+            }
+            let carrier = goertzel(&out, 2200.0, SR).max(1e-12);
+            let sb = goertzel(&out, 2200.0 - 95.0, SR) + goertzel(&out, 2200.0 + 95.0, SR);
+            sb / carrier
+        };
+        let quiet = sideband_ratio(0.08);
+        let driven = sideband_ratio(1.0);
+        assert!(
+            driven > quiet * 3.0,
+            "no drive-dependent growl: sidebands quiet {quiet:.4} driven {driven:.4}"
+        );
+        // Audible colour, not a broken modulator: sidebands well below the
+        // carrier even at full drive.
+        assert!(
+            (0.01..0.35).contains(&driven),
+            "driven growl out of range: {driven:.4}"
+        );
+        // Quiet playing stays essentially clean.
+        assert!(quiet < 0.03, "growl leaks into quiet playing: {quiet:.4}");
+    }
+
     /// Across every cab model, the full mic-position sweep at a hot drive must stay
     /// finite, bounded, and free of DC offset — the new feedback-free nonlinearities
     /// and comb must never blow up or leak a sub-DC bias into the stereo bus.
@@ -601,7 +704,10 @@ mod tests {
                 let mut sum = 0.0f64;
                 let mut count = 0u32;
                 for i in 0..n {
-                    let x = (2.0 * PI * 110.0 * i as f32 / SR).sin() * 1.2;
+                    // 120 Hz divides the 48 kHz rate exactly (400 samples/period),
+                    // so the DC average below spans whole periods and carries no
+                    // truncation residue — it measures true DC only.
+                    let x = (2.0 * PI * 120.0 * i as f32 / SR).sin() * 1.2;
                     let (l, r) = bank.process(model, x, pos, 0.2, 0.2);
                     assert!(l.is_finite() && r.is_finite(), "non-finite at pos {pos}");
                     max_abs = max_abs.max(l.abs()).max(r.abs());
@@ -610,7 +716,12 @@ mod tests {
                         count += 1;
                     }
                 }
-                assert!(max_abs < 3.0, "cab runaway at pos {pos}: {max_abs}");
+                // Bound sized to the voiced low-end: the cabs peak ~+9 dB near
+                // 100–140 Hz (commercial captures like God's Cab measure +12 dB
+                // there), so a 1.2-amplitude 110 Hz tone legitimately leaves the
+                // cab near 3×. The guard is against instability/runaway, not the
+                // voicing itself.
+                assert!(max_abs < 4.0, "cab runaway at pos {pos}: {max_abs}");
                 let dc = (sum / count as f64).abs();
                 assert!(dc < 0.02, "cab leaks DC at pos {pos}: {dc:.4}");
             }
