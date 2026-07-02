@@ -211,7 +211,7 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
   </div>
 </div>
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~46 ms (~2200 taps at 48 kHz), the same length budget as an external loaded IR, so the low-end ring fully develops. Two slightly different L/R IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~93 ms (~4500 taps at 48 kHz), so the low-end ring and room decay fully develop, and a seeded cone-breakup scatter adds the jagged 2–7.5 kHz ripple texture real captures show. Two slightly different L/R IRs decorrelate the stereo image for natural width.
 
 Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB high shelf at 5 kHz per channel after convolution, modelling on-axis vs off-axis placement. For the partitioned-FFT convolution engine, see [How it works](how-it-works.html#cabinet).
 
@@ -246,7 +246,7 @@ Each location is searched **up to ~4 folders deep**, so a small pack with a coup
 
 The loaded IR's name appears in the header in place of the cabinet label (`IR: …`) while it is active. Outside the browser, <kbd>X</kbd> toggles the same A/B at any time. Loading and clearing take effect live — the audio stream is never interrupted (the IR is decoded and resampled off the audio thread, then swapped in on a lock-free handoff).
 
-On load the IR is rate-matched to your interface (windowed-sinc resampler), trimmed to ~2048 taps with a raised-cosine tail fade, DC-removed, and energy-normalised so swapping IRs doesn't jump the level. Mono files feed both channels; stereo files keep their L/R.
+On load the IR is rate-matched to your interface (windowed-sinc resampler), trimmed to ~8192 taps (~170 ms @ 48 kHz) with a raised-cosine tail fade, DC-removed, and energy-normalised so swapping IRs doesn't jump the level. Mono files feed both channels; stereo files keep their L/R.
 
 <div class="note note--info">
 <b>No IRs are bundled.</b> Load only files you are licensed to use — the app never ships or redistributes third-party captures.
@@ -265,7 +265,7 @@ Practically any guitar IR works as-is.
 | Channels | Mono or stereo | Mono feeds both sides; stereo keeps L/R; extra channels are dropped |
 | Sample rate | Any (44.1 / 48 / 96 kHz…) | Resampled to your interface rate on load |
 | Bit depth | 16 / 24 / 32-bit int or 32-bit float | — |
-| Length | Any (~20 ms to several hundred ms) | Trimmed to ~2048 taps (~43 ms @ 48 kHz) with a tail fade |
+| Length | Any (~20 ms to several hundred ms) | Trimmed to ~8192 taps (~170 ms @ 48 kHz) with a tail fade |
 
 <div class="note">
 <b>Curate — don't dump a whole pack.</b> Big libraries ship hundreds or thousands of files in deeply-nested folders (by sample rate → mic → processing). The browser scans only ~4 levels deep and a 2,000-entry list is unusable, so copy a handful of favourites into a <b>flat</b> <code>irs/</code> folder.

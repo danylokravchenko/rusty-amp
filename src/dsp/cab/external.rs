@@ -34,7 +34,7 @@ use crate::dsp::conv::FftConvolver;
 /// convolution well inside the realtime budget — the built-in cabs already run two
 /// ~1024-tap convolutions per sample, and FFT cost grows sub-linearly, so 2048 is
 /// comfortably affordable.
-pub const MAX_IR_LEN: usize = 2048;
+pub const MAX_IR_LEN: usize = 8192;
 
 /// A decoded, rate-matched, length-conditioned stereo impulse response, ready to be
 /// loaded into a convolver. A mono source file is duplicated into both channels; a
