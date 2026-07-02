@@ -188,7 +188,7 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <div class="freqs">
       <span class="freq"><b>+6.5 dB</b> @ 120 Hz · depth hump</span>
       <span class="freq"><b>+5 dB</b> @ 220 Hz · body plateau</span>
-      <span class="freq"><b>−2.5 dB</b> @ 1.15 kHz · mid pocket</span>
+      <span class="freq"><b>−3 dB</b> @ 1.45 kHz · mid pocket</span>
       <span class="freq"><b>+4.5 dB</b> @ 3.5 kHz · presence held to 5 kHz</span>
     </div>
   </div>

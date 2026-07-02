@@ -15,7 +15,8 @@ use crate::dsp::biquad::Biquad;
 ///   • Resonant sub HP at 72 Hz (ported cab alignment)
 ///   • +3 dB low shelf at 100 Hz + a +6.5 dB resonant hump at 120 Hz (cab depth)
 ///   • +5 dB wide mound at 220 Hz and +3 dB at 500 Hz (low-mid body plateau)
-///   • −2.5 dB wide dip at 1150 Hz (the mid "pocket" of a real capture)
+///   • −3 dB wide dip at 1450 Hz over a −3 dB shelf from 1.35 kHz (the mid
+///     "pocket": real captures slope *down* through 0.5–2 kHz)
 ///   • +4.5 dB at 3500 Hz and +2 dB at 4.3 kHz (V30 presence, held to ~5 kHz —
 ///     real captures keep their treble through 2.3–5 kHz, then crash)
 ///   • -14 dB high shelf at 6500 Hz (speaker cone rolloff)
@@ -41,15 +42,16 @@ const TEX_L: Texture = Texture {
         (0.27, -0.32),
         (0.62, 0.20),
         (1.24, -0.12),
-        (3.10, 0.07),
-        (6.30, -0.055),
-        (10.80, 0.040),
-        (17.50, -0.026),
-        (20.50, 0.015),
+        (3.10, 0.08),
+        (6.30, -0.075),
+        (10.80, 0.062),
+        (14.20, -0.050),
+        (17.50, 0.040),
+        (20.50, 0.030),
     ],
     modes: &[
-        (98.0, 55.0, 0.0025),
-        (118.0, 50.0, 0.0025),
+        (98.0, 95.0, 0.004),
+        (118.0, 85.0, 0.004),
         (3400.0, 4.0, 0.1),
     ],
 };
@@ -59,15 +61,16 @@ const TEX_R: Texture = Texture {
         (0.31, -0.28),
         (0.66, 0.22),
         (1.32, -0.10),
-        (3.40, 0.06),
-        (6.90, -0.050),
-        (11.60, 0.037),
-        (18.80, -0.024),
-        (20.50, 0.014),
+        (3.40, 0.075),
+        (6.90, -0.070),
+        (11.60, 0.058),
+        (15.10, -0.047),
+        (18.80, 0.037),
+        (20.50, 0.028),
     ],
     modes: &[
-        (100.0, 57.0, 0.0025),
-        (122.0, 52.0, 0.0025),
+        (100.0, 97.0, 0.004),
+        (122.0, 87.0, 0.004),
         (3550.0, 4.0, 0.10),
     ],
 };
@@ -131,12 +134,15 @@ impl MesaCab {
             Biquad::peak_eq(sr, 120.0, 1.1, 6.5),
             Biquad::peak_eq(sr, 220.0, 0.7, 5.0),
             Biquad::peak_eq(sr, 500.0, 0.8, 3.0),
-            Biquad::peak_eq(sr, 1150.0, 0.7, -2.5),
+            Biquad::peak_eq(sr, 1450.0, 0.55, -3.0),
+            // Downward 0.5–2 kHz tilt: real captures slope *down* through the
+            // pocket into presence; without this the band rises instead.
+            Biquad::high_shelf(sr, 1350.0, -3.0),
             // V30 presence: broadened (Q 2.0→1.3) and tamed (+7→+4 dB). The narrow
             // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
             // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
-            Biquad::peak_eq(sr, 3500.0, 1.0, 4.5),
-            Biquad::peak_eq(sr, 4300.0, 1.5, 2.0),
+            Biquad::peak_eq(sr, 3500.0, 1.0, 4.0),
+            Biquad::peak_eq(sr, 4300.0, 1.5, 3.0),
             Biquad::high_shelf(sr, 6500.0, -14.0),
             Biquad::lowpass(sr, 9000.0, 0.707),
         ];
@@ -151,7 +157,7 @@ impl MesaCab {
             Biquad::peak_eq(sr, 115.0, 1.1, 5.5), // low resonant hump (cab depth)
             Biquad::peak_eq(sr, 210.0, 0.7, 5.0), // broad low-mid body mound
             Biquad::peak_eq(sr, 500.0, 0.9, 2.5),
-            Biquad::peak_eq(sr, 1150.0, 0.8, -1.5), // mid pocket
+            Biquad::peak_eq(sr, 1400.0, 0.7, -2.5), // mid pocket
             Biquad::peak_eq(sr, 3200.0, 1.6, 2.5),  // gentler, lower presence
             Biquad::high_shelf(sr, 4500.0, -16.0),  // ribbon HF rolloff
             Biquad::lowpass(sr, 6500.0, 0.707),
