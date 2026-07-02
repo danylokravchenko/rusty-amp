@@ -108,6 +108,116 @@ fn synth_di() -> Vec<f32> {
     out
 }
 
+// ── Performance extraction from a wet recording ────────────────────────────────
+//
+// A distorted render can't be inverse-filtered back to a DI (clipping destroys
+// information), but the *performance* survives: onset times, accents, pitch,
+// muted-vs-ringing, chord-vs-note. Extracting those events and re-synthesizing
+// a Karplus-Strong DI reproduces the player's riff with matched input for both
+// rigs — no re-recording needed.
+
+struct Event {
+    t: f32,
+    f: f32,
+    amp: f32,
+    mute: bool,
+    chord: bool,
+    dur: f32,
+}
+
+/// Pitch of a window via autocorrelation on the LF band (fundamental range
+/// 70–350 Hz). Distortion enriches harmonics but the fundamental lag survives.
+fn detect_pitch(win: &[f32]) -> f32 {
+    use rusty_amp::dsp::biquad::Biquad;
+    let mut lp = Biquad::lowpass(SR, 400.0, 0.707);
+    let s: Vec<f32> = win.iter().map(|&x| lp.process(x)).collect();
+    let (lag_min, lag_max) = ((SR / 350.0) as usize, (SR / 70.0) as usize);
+    let mut best = (0.0f32, lag_min);
+    for lag in lag_min..lag_max.min(s.len() / 2) {
+        let mut acc = 0.0f32;
+        for i in 0..s.len() - lag {
+            acc += s[i] * s[i + lag];
+        }
+        if acc > best.0 {
+            best = (acc, lag);
+        }
+    }
+    SR / best.1 as f32
+}
+
+/// Extract note events from a wet recording: envelope-derivative onsets, then
+/// per-onset pitch, accent, mute (fast decay) and chord (energy at 1.5·f0 —
+/// a single note has only integer partials; a power chord adds the fifth).
+fn extract_events(s: &[f32]) -> Vec<Event> {
+    let env = envelope(s, 5.0);
+    let hop = (SR * 0.010) as usize;
+    let min_gap = (SR * 0.09) as usize;
+    let peak = env.iter().fold(0.0f32, |m, &e| m.max(e)).max(1e-9);
+    let mut onsets: Vec<usize> = vec![];
+    let mut i = hop;
+    while i < env.len() {
+        let rise = env[i] - env[i - hop];
+        if rise > 0.12 * peak && onsets.last().is_none_or(|&o| i - o > min_gap) {
+            onsets.push(i);
+        }
+        i += hop;
+    }
+    let mut events = vec![];
+    for (k, &o) in onsets.iter().enumerate() {
+        let next = onsets.get(k + 1).copied().unwrap_or(s.len());
+        let win_end = (o + (SR * 0.25) as usize).min(next).min(s.len());
+        if win_end - o < (SR * 0.06) as usize {
+            continue;
+        }
+        let f = detect_pitch(&s[o..win_end]);
+        let a = env[o..win_end].iter().fold(0.0f32, |m, &e| m.max(e)) / peak;
+        // Mute: how fast the envelope collapses after the attack.
+        let probe = (o + (SR * 0.18) as usize).min(s.len() - 1);
+        let sustain = env[probe] / env[o..win_end].iter().fold(1e-9f32, |m, &e| m.max(e));
+        let mute = sustain < 0.4 && next.saturating_sub(o) < (SR * 0.5) as usize;
+        // Chord: fifth present between the integer partials.
+        let seg = &s[o..win_end];
+        let fifth = goertzel(seg, f * 1.5);
+        let second = goertzel(seg, f * 2.0).max(1e-9);
+        let chord = fifth / second > 0.4;
+        let dur = ((next - o) as f32 / SR).clamp(0.15, 2.5);
+        events.push(Event {
+            t: o as f32 / SR,
+            f,
+            amp: a,
+            mute,
+            chord,
+            dur,
+        });
+    }
+    events
+}
+
+/// Re-synthesize a DI from extracted events.
+fn synth_from_events(events: &[Event], len_s: f32) -> Vec<f32> {
+    let mut out = vec![0.0f32; (SR * (len_s + 0.5)) as usize];
+    for (k, e) in events.iter().enumerate() {
+        let freqs: &[f32] = if e.chord { &[1.0, 1.5, 2.0] } else { &[1.0] };
+        for (j, &m) in freqs.iter().enumerate() {
+            let a = e.amp * if j == 0 { 0.9 } else { 0.55 };
+            pluck(
+                &mut out,
+                e.t,
+                e.f * m,
+                e.dur,
+                a,
+                e.mute,
+                (17 * k + 5 * j + 3) as u32,
+            );
+        }
+    }
+    let peak = out.iter().fold(0.0f32, |m, &x| m.max(x.abs())).max(1e-9);
+    for v in &mut out {
+        *v *= 0.7 / peak;
+    }
+    out
+}
+
 fn load_di(path: &str) -> Vec<f32> {
     let mut reader = hound::WavReader::open(path).expect("open DI wav");
     let spec = reader.spec();
@@ -149,16 +259,99 @@ fn load_di(path: &str) -> Vec<f32> {
 
 // ── Renders ─────────────────────────────────────────────────────────────────────
 
-fn render_builtin(di: &[f32]) -> Vec<f32> {
+/// The player-facing knobs of the built-in rig (all 0–1; UI shows ×10).
+#[derive(Clone, Copy)]
+struct Knobs {
+    gain: f32,
+    bass: f32,
+    mid: f32,
+    treble: f32,
+    presence: f32,
+    mic: f32,
+    blend: f32,
+    room: f32,
+}
+
+const DEFAULT_KNOBS: Knobs = Knobs {
+    gain: 0.65,
+    bass: 0.50,
+    mid: 0.45,
+    treble: 0.65,
+    presence: 0.50,
+    mic: 0.5,
+    blend: 0.15,
+    room: 0.15,
+};
+
+fn render_knobs(di: &[f32], k: Knobs) -> Vec<f32> {
     let mut amp = AmpBank::new(SR);
     let mut cab = CabBank::new(SR);
     di.iter()
         .map(|&x| {
-            let a = amp.process(AmpModel::Marshall, x, 0.65, 0.50, 0.45, 0.65, 0.50, 0.50);
-            let (l, r) = cab.process(CabModel::Marshall, a, 0.5, 0.15, 0.15);
+            let a = amp.process(
+                AmpModel::Marshall,
+                x,
+                k.gain,
+                k.bass,
+                k.mid,
+                k.treble,
+                k.presence,
+                0.50,
+            );
+            let (l, r) = cab.process(CabModel::Marshall, a, k.mic, k.blend, k.room);
             0.5 * (l + r)
         })
         .collect()
+}
+
+fn render_builtin(di: &[f32]) -> Vec<f32> {
+    render_knobs(di, DEFAULT_KNOBS)
+}
+
+/// Mean-removed RMS distance between two LTAS curves (level-independent).
+fn ltas_dist(a: &[(f32, f32)], b: &[(f32, f32)]) -> f32 {
+    let n = a.len() as f32;
+    let off = a.iter().zip(b).map(|(x, y)| x.1 - y.1).sum::<f32>() / n;
+    (a.iter()
+        .zip(b)
+        .map(|(x, y)| (x.1 - y.1 - off).powi(2))
+        .sum::<f32>()
+        / n)
+        .sqrt()
+}
+
+/// Coordinate descent over the rig knobs to match a target render's LTAS:
+/// sweep each knob over a coarse grid, keep the best, repeat. Level-blind
+/// (master excluded), so the result is a tone match, not a loudness match.
+fn match_knobs(di: &[f32], target: &[(f32, f32)]) -> Knobs {
+    let mut k = DEFAULT_KNOBS;
+    let grid: Vec<f32> = (0..=8).map(|i| i as f32 / 8.0).collect();
+    let eval = |k: Knobs| ltas_dist(&ltas(&render_knobs(di, k)), target);
+    let mut best = eval(k);
+    for pass in 0..3 {
+        for which in 0..8 {
+            for &v in &grid {
+                let mut cand = k;
+                match which {
+                    0 => cand.gain = v,
+                    1 => cand.bass = v,
+                    2 => cand.mid = v,
+                    3 => cand.treble = v,
+                    4 => cand.presence = v,
+                    5 => cand.mic = v,
+                    6 => cand.blend = v,
+                    _ => cand.room = v,
+                }
+                let d = eval(cand);
+                if d < best {
+                    best = d;
+                    k = cand;
+                }
+            }
+        }
+        println!("  pass {}: distance {best:.2} dB rms", pass + 1);
+    }
+    k
 }
 
 #[cfg(target_os = "macos")]
@@ -285,25 +478,119 @@ fn save(path: &std::path::Path, s: &[f32]) {
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
+
+    // ── Wet mode: compare two already-rendered recordings ──────────────────
+    // `--wet a.wav b.wav` runs the same metrics over two finished renders
+    // (e.g. in-app recordings of a reference AU vs the built-in rig). The
+    // takes are usually different performances, so read the LTAS as broad
+    // strokes, not bin-by-bin truth.
+    if let Some(i) = args.iter().position(|a| a == "--wet") {
+        let (a, b) = (&args[i + 1], &args[i + 2]);
+        let (sa, sb) = (load_di(a), load_di(b));
+        println!("wet compare:\n  A = {a}\n  B = {b}\n");
+        println!("render metrics:");
+        let (spec_a, ..) = report("A", &sa);
+        let (spec_b, ..) = report("B", &sb);
+        println!("\nLTAS (third-octave, mean-normalized dB) and difference (A−B):");
+        println!("  {:>6}  {:>7} {:>7} {:>7}", "Hz", "A", "B", "Δ");
+        for (x, y) in spec_a.iter().zip(&spec_b) {
+            println!(
+                "  {:>6.0}  {:>7.1} {:>7.1} {:>+7.1}",
+                x.0,
+                x.1,
+                y.1,
+                x.1 - y.1
+            );
+        }
+        return;
+    }
+
     let au_pat = args
         .iter()
         .position(|a| a == "--au")
         .and_then(|i| args.get(i + 1))
         .cloned();
     let di_path = args
-        .iter().rfind(|a| !a.starts_with("--") && Some(*a) != au_pat.as_ref())
+        .iter()
+        .rfind(|a| !a.starts_with("--") && Some(*a) != au_pat.as_ref())
         .cloned();
 
-    let di = match &di_path {
-        Some(p) => {
-            println!("DI: {p}");
-            load_di(p)
+    // ── From-wet mode: extract the performance from a wet recording and
+    // re-synthesize a matched DI (`--from-wet take.wav [--au name]`).
+    let from_wet = args
+        .iter()
+        .position(|a| a == "--from-wet")
+        .and_then(|i| args.get(i + 1))
+        .cloned();
+
+    let di = if let Some(p) = &from_wet {
+        let wet = load_di(p);
+        let events = extract_events(&wet);
+        println!("performance extracted from {p}: {} events", events.len());
+        for e in &events {
+            println!(
+                "  t {:>5.2}s  {:>5.1} Hz  amp {:.2}  {}{}",
+                e.t,
+                e.f,
+                e.amp,
+                if e.mute { "mute " } else { "ring " },
+                if e.chord { "chord" } else { "note" }
+            );
         }
-        None => {
-            println!("DI: synthesized Karplus-Strong performance (11 s, deterministic)");
-            synth_di()
+        let di = synth_from_events(&events, wet.len() as f32 / SR);
+        save(&std::env::temp_dir().join("di_extracted.wav"), &di);
+        di
+    } else {
+        match &di_path {
+            Some(p) => {
+                println!("DI: {p}");
+                load_di(p)
+            }
+            None => {
+                println!("DI: synthesized Karplus-Strong performance (11 s, deterministic)");
+                synth_di()
+            }
         }
     };
+
+    // ── Knob-matching mode: find the amp+mic settings that best match the
+    // reference AU's tone on this DI (`--match-knobs --au name [--from-wet …]`).
+    #[cfg(target_os = "macos")]
+    if args.iter().any(|a| a == "--match-knobs") {
+        let pat = au_pat.expect("--match-knobs needs --au <name>");
+        let (name, theirs) = render_au(&di, &pat);
+        let target = ltas(&theirs);
+        println!("matching knobs against AU:{name} …");
+        let k = match_knobs(&di, &target);
+        println!("\nbest match (UI units 0–10):");
+        println!(
+            "  GAIN {:.1}  BASS {:.1}  MID {:.1}  TREBLE {:.1}  PRESENCE {:.1}",
+            k.gain * 10.0,
+            k.bass * 10.0,
+            k.mid * 10.0,
+            k.treble * 10.0,
+            k.presence * 10.0
+        );
+        println!(
+            "  MIC {:.1}  BLEND {:.1}  ROOM {:.1}",
+            k.mic * 10.0,
+            k.blend * 10.0,
+            k.room * 10.0
+        );
+        println!("\nmetrics at matched knobs vs reference:");
+        let matched = render_knobs(&di, k);
+        report("matched rig", &matched);
+        report(&format!("AU:{name}"), &theirs);
+        let out_dir = std::env::temp_dir();
+        save(&out_dir.join("di_matched.wav"), &matched);
+        save(&out_dir.join("di_reference.wav"), &theirs);
+        println!(
+            "\nrenders written: {} and {}",
+            out_dir.join("di_matched.wav").display(),
+            out_dir.join("di_reference.wav").display()
+        );
+        return;
+    }
 
     println!("\nrender metrics:");
     let ours = render_builtin(&di);
