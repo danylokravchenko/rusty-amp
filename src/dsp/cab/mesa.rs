@@ -16,8 +16,9 @@ use crate::dsp::biquad::Biquad;
 ///   • +3 dB low shelf at 100 Hz + a +6.5 dB resonant hump at 120 Hz (cab depth)
 ///   • +5 dB wide mound at 220 Hz and +3 dB at 500 Hz (low-mid body plateau)
 ///   • −2.5 dB wide dip at 1150 Hz (the mid "pocket" of a real capture)
-///   • +4 dB at 3500 Hz (V30 signature presence)
-///   • -14 dB high shelf at 5500 Hz (speaker cone rolloff)
+///   • +4.5 dB at 3500 Hz and +2 dB at 4.3 kHz (V30 presence, held to ~5 kHz —
+///     real captures keep their treble through 2.3–5 kHz, then crash)
+///   • -14 dB high shelf at 6500 Hz (speaker cone rolloff)
 ///   • LP at 9 kHz (fizz cut + cone break-up noise removal)
 pub struct MesaCab {
     inner: BlendedCab,
@@ -134,8 +135,9 @@ impl MesaCab {
             // V30 presence: broadened (Q 2.0→1.3) and tamed (+7→+4 dB). The narrow
             // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
             // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
-            Biquad::peak_eq(sr, 3500.0, 1.3, 4.0),
-            Biquad::high_shelf(sr, 5500.0, -14.0),
+            Biquad::peak_eq(sr, 3500.0, 1.0, 4.5),
+            Biquad::peak_eq(sr, 4300.0, 1.5, 2.0),
+            Biquad::high_shelf(sr, 6500.0, -14.0),
             Biquad::lowpass(sr, 9000.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
