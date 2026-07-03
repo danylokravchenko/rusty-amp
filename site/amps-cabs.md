@@ -169,9 +169,9 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <p class="muted" style="margin:2px 0 4px">Scooped, aggressive, and forward-projecting — the modern high-gain reference.</p>
     <div class="freqs">
       <span class="freq"><b>+6.5 dB</b> @ 120 Hz · depth hump</span>
-      <span class="freq"><b>+5 dB</b> @ 220 Hz · body plateau</span>
-      <span class="freq"><b>−3 dB</b> @ 1.45 kHz · mid pocket</span>
-      <span class="freq"><b>+4.5 dB</b> @ 3.5 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>+4 dB</b> @ 220 Hz · body plateau</span>
+      <span class="freq"><b>−4 dB</b> @ 1.3 kHz · mid pocket</span>
+      <span class="freq"><b>+5.5 dB</b> @ 4.5 kHz · presence held to 5 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-marshall">
@@ -188,14 +188,14 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <div class="freqs">
       <span class="freq"><b>+6 dB</b> @ 118 Hz · chest thump</span>
       <span class="freq"><b>+3.5 dB</b> @ 230 Hz · low-mid “wall”</span>
-      <span class="freq"><b>+3.5 dB</b> @ 3.2 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>+4 dB</b> @ 3.2 kHz · presence held to 5 kHz</span>
     </div>
   </div>
 </div>
 
 Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~93 ms (~4500 taps at 48 kHz), so the low-end ring and room decay fully develop, and a seeded cone-breakup scatter adds the jagged 2–7.5 kHz ripple texture real captures show. Two slightly different L/R IRs decorrelate the stereo image for natural width.
 
-Before the mics, the drive signal also picks up **neighbour-cone interference** derived from real 4×12 geometry: the close mic hears the three other cones arriving ~0.7–1.0 ms late, lowpassed and ~15 dB down — the low/mid comb texture of a real multi-speaker box. After the mics, a genuinely tiny **mic/transformer saturation** squeezes only the hottest peaks.
+Before the mics, the drive signal also picks up **neighbour-cone interference** derived from real 4×12 geometry: the close mic hears the three other cones arriving ~0.6–0.9 ms late, lowpassed above ~2 kHz and 15–20 dB down — the low/mid comb texture of a real multi-speaker box, matching the ~3 dB echo comb real captures measure. After the mics, a genuinely tiny **mic/transformer saturation** squeezes only the hottest peaks.
 
 Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB high shelf at 5 kHz per channel after convolution, modelling on-axis vs off-axis placement. For the partitioned-FFT convolution engine, see [How it works](how-it-works.html#cabinet).
 
