@@ -107,6 +107,7 @@ The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears i
 | `clean_melodic.toml` | Marshall JCM800 | Marshall Greenback | Warm glassy clean — gentle compression, edge-of-breakup gain, delay + hall reverb |
 | `disturbed.toml` | Mesa Dual Rectifier | Mesa V30 | Dan Donegan's nu-metal chug — TS boost, scooped-but-punchy grind, bone-dry rhythm |
 | `deftones.toml` | Mesa Dual Rectifier | Mesa V30 | Stephen Carpenter's thick, warm wall — un-scooped mids, compressed, chorus + reverb wash |
+| `crowbar.toml` | Marshall JCM800 | Orange PPC412 (V30) | Kirk Windstein's NOLA sludge — TS tightening boost, forward low-mid wall, cavernous room |
 
 ## Writing your own preset {#write}
 

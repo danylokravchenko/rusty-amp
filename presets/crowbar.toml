@@ -1,0 +1,88 @@
+name        = "Crowbar — NOLA Sludge"
+description = "Kirk Windstein's crushing downtuned sludge: a massive low-mid wall, raw Marshall grind, cavernous weight."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# High-gain and downtuned to B/drop-A, so the gate has to sit on the hiss between
+# the slow, deliberate riffs — but sludge lives on chords that ring and decay, so
+# the release stays slow enough that nothing gets choked mid-swell.
+[noise_gate]
+enabled   = true
+threshold = 0.18   # moderate — tames hiss without clamping the sustain
+release   = 0.35   # slow — lets the heavy chords ring and bloom
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# A near-clean boost in front of the amp, used the way every downtuned player
+# uses it: not for drive but to firm up a floppy low end so the drop tuning stays
+# articulate instead of turning to mud when the whole wall hits at once.
+[tube_screamer]
+enabled = true
+drive = 0.15   # minimal clip — this is a tightening boost, not a distortion
+tone  = 0.55   # neutral-bright — firms the attack without thinning the body
+level = 0.80   # hot — slams the Marshall front end
+
+# DS-1 off — the grind is all amp + the tightening TS boost.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Pre-amp EQ ────────────────────────────────────────────────────────────────
+# Shapes what the preamp clips: trims the sub-lows before the gain stage so the
+# drop tuning doesn't flub out, then pushes the low-mids *into* the clip — that
+# pre-clip low-mid emphasis is what builds the saturated sludge "wall" rather
+# than a thin scooped crunch.
+[preamp_eq]
+enabled = true
+low  = 0.38   # ≈ −2.9 dB at 100 Hz — tightens the front end before clipping
+mid  = 0.58   # ≈ +1.9 dB at 650 Hz — feeds the low-mid wall into the gain stage
+high = 0.48   # a hair down — sludge is thick, not fizzy
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Crowbar's grind is rooted in cranked high-gain Marshalls, not a tight modern
+# Recto — the JCM800 keeps the raw, punchy saturation the sludge is built on.
+# The defining move vs a Pantera scoop: the mids stay *forward*. Sludge is a wall
+# of low-mid, dark and thick up top, with a huge downtuned bottom.
+[amp]
+model  = "marshall"
+gain   = 0.86  # heavily saturated but still raw and grinding, not fizzed out
+bass   = 0.80  # massive downtuned low end
+mid    = 0.55  # forward — the wall, not a scoop
+treble = 0.55  # moderate — kept dark and thick, no ice-pick
+presence = 0.42  # low-moderate — thick, never glassy on top
+master = 0.68
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# The Orange PPC412 — heavy closed-back birch, all thick low-mid "wall" — is the
+# natural home for this tone: it fills in exactly the band the sludge lives in.
+[cabinet]
+model     = "orange"
+mic_pos   = 0.42   # just off-axis — a touch dark to thicken the wall
+mic_blend = 0.18   # mostly SM57 with a hair of ribbon to round the top
+mic_room  = 0.20   # some room — the cavernous weight sludge leans on
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# Post-cab, reinforce the low-mid wall and roll a little off the top so the tone
+# reads dark and crushing rather than bright and cutting.
+[eq]
+enabled = true
+low  = 0.52   # slight low reinforcement under the wall
+mid  = 0.58   # ≈ +2.2 dB at 800 Hz — pushes the low-mid wall forward
+high = 0.44   # gentle top rolloff — keeps it thick and dark
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# Off — the riffs are slow and deliberate; a repeat tail would smear the weight.
+[delay]
+enabled  = false
+time     = 0.25
+feedback = 0.25
+mix      = 0.00
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# Unlike a bone-dry thrash tone, sludge wants a little cavern around it — a modest,
+# well-damped room adds doom weight without washing out the palm-mute grind.
+[reverb]
+enabled = true
+room = 0.30   # modest room size
+damp = 0.70   # damped — the tail stays dark, no bright wash
+mix  = 0.12   # subtle — ambience and weight, not a soak
