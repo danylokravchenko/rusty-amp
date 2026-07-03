@@ -203,17 +203,23 @@ impl SpeakerDrive {
 // off-axis, where a 12" cone beams away its top end, and off the cardioid mic's
 // axis too). The IRs' early reflections gesture at this, but here the arrivals
 // are derived from the actual box geometry: 12" drivers on a ~28 cm pitch, mic
-// ~5 cm from the near cone. Two equidistant side/below neighbours share one
-// tap; the diagonal cone is farther and quieter.
+// capsule ~10 cm from the near cone ("an inch from the grille" plus the grille
+// standoff and the cone's recess — verified against the God's Cab capture,
+// whose echo-delay scan peaks at ~0.6 ms, matching this distance). Two
+// equidistant side/below neighbours share one tap; the diagonal cone is
+// farther and quieter.
 const CONE_PITCH_M: f32 = 0.28;
-const MIC_DIST_M: f32 = 0.05;
+const MIC_DIST_M: f32 = 0.10;
 const SOUND_SPEED_M_S: f32 = 343.0;
-/// Off-axis + cardioid-rejection loss applied on top of 1/r spreading.
-const NEIGHBOR_AXIS_LOSS_SIDE: f32 = 0.55;
-const NEIGHBOR_AXIS_LOSS_DIAG: f32 = 0.45;
-/// Neighbour arrivals are heard ~80° off the cone's axis: brutal beaming loss
-/// above ~1.6 kHz, so the interference lives in the lows and mids.
-const NEIGHBOR_LP_HZ: f32 = 1600.0;
+/// Off-axis + cardioid-rejection loss applied on top of 1/r spreading,
+/// calibrated so the summed tap gains (~0.30 side / ~0.09 diagonal) reproduce
+/// the ~3 dB echo-scan comb the God's Cab capture measures at τ ≈ 0.6 ms.
+const NEIGHBOR_AXIS_LOSS_SIDE: f32 = 0.45;
+const NEIGHBOR_AXIS_LOSS_DIAG: f32 = 0.36;
+/// Neighbour arrivals are heard ~80° off the cone's axis: strong beaming loss,
+/// but the reference capture keeps comb ripple through the 1–2 kHz octave, so
+/// the corner sits at 2.2 kHz rather than a brick wall at the beaming onset.
+const NEIGHBOR_LP_HZ: f32 = 2200.0;
 
 /// The three neighbour-cone arrivals summed back into the drive signal.
 /// Power-normalised: the IR voicings were measured against real captures (which
@@ -263,6 +269,18 @@ impl ConeSpread {
         self.pos = (self.pos + 1) % len;
         (x + self.lp.process(neighbors)) * self.norm
     }
+}
+
+/// Impulse response of a fresh [`ConeSpread`] — analysis-tool access (see
+/// `examples/cone_interference.rs`) to the isolated neighbour-cone comb, which
+/// is otherwise buried under the mic IRs' own reflection texture in the full
+/// cab path. Not part of the public API.
+#[doc(hidden)]
+pub fn cone_spread_response(sr: f32, len: usize) -> Vec<f32> {
+    let mut cs = ConeSpread::new(sr);
+    (0..len)
+        .map(|i| cs.process(if i == 0 { 1.0 } else { 0.0 }))
+        .collect()
 }
 
 // ── Stage 2: multi-mic blend convolution ────────────────────────────────────────
@@ -795,9 +813,10 @@ mod tests {
         }
         let d_side = cs.d_side;
         let d_diag = cs.d_diag;
-        // Geometry sanity: side cones ~0.68 ms, diagonal ~1.0 ms at 48 kHz.
+        // Geometry sanity: side cones ~0.58 ms, diagonal ~0.90 ms at 48 kHz
+        // (28 cm pitch, 10 cm capsule-to-cone — see the constants).
         assert!(
-            (25..40).contains(&d_side) && (44..56).contains(&d_diag),
+            (24..34).contains(&d_side) && (38..50).contains(&d_diag),
             "neighbour delays off-geometry: side {d_side} diag {d_diag}"
         );
         // Direct arrival passes (power-normalised), then silence until the

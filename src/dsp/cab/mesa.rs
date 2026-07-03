@@ -39,7 +39,7 @@ pub struct MesaCab {
 const TEX_L: Texture = Texture {
     predelay: 0,
     reflections: &[
-        (0.27, -0.32),
+        (0.27, -0.24),
         (0.62, 0.20),
         (1.24, -0.12),
         (3.10, 0.08),
@@ -59,13 +59,13 @@ const TEX_L: Texture = Texture {
         count: 22,
         band: (2200.0, 7600.0),
         t60_ms: (5.0, 12.0),
-        gain: 0.022,
+        gain: 0.014,
     }),
 };
 const TEX_R: Texture = Texture {
     predelay: 2,
     reflections: &[
-        (0.31, -0.28),
+        (0.31, -0.24),
         (0.66, 0.22),
         (1.32, -0.10),
         (3.40, 0.075),
@@ -85,7 +85,7 @@ const TEX_R: Texture = Texture {
         count: 22,
         band: (2200.0, 7600.0),
         t60_ms: (5.0, 12.0),
-        gain: 0.022,
+        gain: 0.014,
     }),
 };
 
@@ -148,7 +148,7 @@ impl MesaCab {
             Biquad::highpass(sr, 72.0, 1.2),
             Biquad::low_shelf(sr, 100.0, 3.0),
             Biquad::peak_eq(sr, 120.0, 1.1, 6.5),
-            Biquad::peak_eq(sr, 220.0, 0.7, 5.0),
+            Biquad::peak_eq(sr, 220.0, 0.7, 4.0),
             // 500 Hz widened/raised (+3→+4.5, Q 0.8→0.7) and the pocket deepened
             // (−3→−4.5): measured against God's Cab SM57, our 0.5–1 kHz sat ~3.5 dB
             // below the reference while 1–2 kHz sat ~4.5 dB above — the pocket was

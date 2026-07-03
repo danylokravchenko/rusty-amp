@@ -51,7 +51,7 @@ const TEX_L: Texture = Texture {
         count: 22,
         band: (1800.0, 6400.0),
         t60_ms: (5.0, 12.0),
-        gain: 0.022,
+        gain: 0.030,
     }),
 };
 const TEX_R: Texture = Texture {
@@ -77,7 +77,7 @@ const TEX_R: Texture = Texture {
         count: 22,
         band: (1800.0, 6400.0),
         t60_ms: (5.0, 12.0),
-        gain: 0.022,
+        gain: 0.030,
     }),
 };
 
@@ -136,7 +136,7 @@ impl MarshallCab {
             Biquad::low_shelf(sr, 120.0, 2.0),
             Biquad::peak_eq(sr, 115.0, 1.1, 6.0),
             Biquad::peak_eq(sr, 210.0, 0.7, 5.0),
-            Biquad::peak_eq(sr, 480.0, 0.8, 4.0),
+            Biquad::peak_eq(sr, 480.0, 0.8, 5.5),
             Biquad::peak_eq(sr, 800.0, 1.5, 1.0),
             // Pocket deepened (−2→−3.5): measured against God's Cab, the 1–2 kHz
             // band sat ~5 dB above the reference — honk, not Greenback crunch
