@@ -196,6 +196,75 @@ impl SpeakerDrive {
     }
 }
 
+// ── Stage 1b: multi-speaker interference (4×12 geometry) ────────────────────────
+
+// A close mic on one cone of a 4×12 also hears the three neighbouring cones —
+// the same drive signal arriving late (longer path) and dull (heard far
+// off-axis, where a 12" cone beams away its top end, and off the cardioid mic's
+// axis too). The IRs' early reflections gesture at this, but here the arrivals
+// are derived from the actual box geometry: 12" drivers on a ~28 cm pitch, mic
+// ~5 cm from the near cone. Two equidistant side/below neighbours share one
+// tap; the diagonal cone is farther and quieter.
+const CONE_PITCH_M: f32 = 0.28;
+const MIC_DIST_M: f32 = 0.05;
+const SOUND_SPEED_M_S: f32 = 343.0;
+/// Off-axis + cardioid-rejection loss applied on top of 1/r spreading.
+const NEIGHBOR_AXIS_LOSS_SIDE: f32 = 0.55;
+const NEIGHBOR_AXIS_LOSS_DIAG: f32 = 0.45;
+/// Neighbour arrivals are heard ~80° off the cone's axis: brutal beaming loss
+/// above ~1.6 kHz, so the interference lives in the lows and mids.
+const NEIGHBOR_LP_HZ: f32 = 1600.0;
+
+/// The three neighbour-cone arrivals summed back into the drive signal.
+/// Power-normalised: the IR voicings were measured against real captures (which
+/// already include the neighbours' steady-state energy), so this stage adds the
+/// comb/arrival *time structure* without re-tilting the overall level.
+struct ConeSpread {
+    buf: Vec<f32>,
+    pos: usize,
+    d_side: usize,
+    d_diag: usize,
+    g_side: f32,
+    g_diag: f32,
+    norm: f32,
+    lp: Biquad,
+}
+
+impl ConeSpread {
+    fn new(sr: f32) -> Self {
+        let path = |cone_dist: f32| (cone_dist * cone_dist + MIC_DIST_M * MIC_DIST_M).sqrt();
+        let delay = |p: f32| ((p - MIC_DIST_M) / SOUND_SPEED_M_S * sr) as usize;
+        let side_path = path(CONE_PITCH_M);
+        let diag_path = path(CONE_PITCH_M * std::f32::consts::SQRT_2);
+        // 1/r spreading relative to the near cone, times the off-axis loss;
+        // the two equidistant neighbours (beside + below) share one tap.
+        let g_side = 2.0 * (MIC_DIST_M / side_path) * NEIGHBOR_AXIS_LOSS_SIDE;
+        let g_diag = (MIC_DIST_M / diag_path) * NEIGHBOR_AXIS_LOSS_DIAG;
+        let d_side = delay(side_path).max(1);
+        let d_diag = delay(diag_path).max(d_side + 1);
+        Self {
+            buf: vec![0.0; d_diag + 2],
+            pos: 0,
+            d_side,
+            d_diag,
+            g_side,
+            g_diag,
+            norm: 1.0 / (1.0 + g_side * g_side + g_diag * g_diag).sqrt(),
+            lp: Biquad::lowpass(sr, NEIGHBOR_LP_HZ, 0.707),
+        }
+    }
+
+    #[inline]
+    fn process(&mut self, x: f32) -> f32 {
+        let len = self.buf.len();
+        self.buf[self.pos] = x;
+        let tap = |d: usize| self.buf[(self.pos + len - d) % len];
+        let neighbors = self.g_side * tap(self.d_side) + self.g_diag * tap(self.d_diag);
+        self.pos = (self.pos + 1) % len;
+        (x + self.lp.process(neighbors)) * self.norm
+    }
+}
+
 // ── Stage 2: multi-mic blend convolution ────────────────────────────────────────
 
 /// The three-mic blend rendered as a single pair of convolvers. Each capture is a
@@ -359,20 +428,37 @@ impl MicPosition {
     }
 }
 
+// ── Stage 4: mic/transformer saturation ─────────────────────────────────────────
+
+/// The last, genuinely tiny nonlinearity in the capture chain: the mic's output
+/// transformer (an SM57's iron, a ribbon's step-up) and the preamp's input iron
+/// compress the loudest peaks by a fraction of a dB. Odd-symmetric, so it adds
+/// no DC; at normal levels it is inaudibly close to unity.
+const MIC_SAT_DRIVE: f32 = 0.12;
+
+#[inline]
+fn mic_sat(x: f32) -> f32 {
+    (x * MIC_SAT_DRIVE).tanh() / MIC_SAT_DRIVE
+}
+
 // ── Composed cabinet ────────────────────────────────────────────────────────────
 
-/// A studio "mic'd cab" assembled from three stages, in signal order:
+/// A studio "mic'd cab" assembled from four stages, in signal order:
 ///   1. [`SpeakerDrive`] — the speaker's cone-breakup saturation and thermal power
-///      compression on the mono drive (the parts of a real cab a fixed IR can't hold);
+///      compression on the mono drive (the parts of a real cab a fixed IR can't hold),
+///      then [`ConeSpread`] — the three neighbouring cones' late, dull arrivals,
+///      derived from real 4×12 geometry;
 ///   2. [`MicBlend`] — the linear capture: a blend of three mic IRs (close SM57
 ///      dynamic, close R121 ribbon, ambient room) convolved per channel;
 ///   3. [`MicPosition`] — the physical edge↔centre mic-position colouration on each
-///      captured channel (proximity low-shelf + axis brightness + off-axis comb).
+///      captured channel (proximity low-shelf + axis brightness + off-axis comb);
+///   4. [`mic_sat`] — the tiny mic/preamp transformer saturation on each channel.
 ///
 /// Each stage owns its own state, parameter-change caching, and coefficient updates;
 /// `process` just threads a sample through them.
 pub struct BlendedCab {
     speaker: SpeakerDrive,
+    spread: ConeSpread,
     blend: MicBlend,
     mic: MicPosition,
 }
@@ -383,6 +469,7 @@ impl BlendedCab {
     pub fn new(sr: f32, irs: [Vec<f32>; 6]) -> Self {
         Self {
             speaker: SpeakerDrive::new(sr),
+            spread: ConeSpread::new(sr),
             blend: MicBlend::new(irs),
             mic: MicPosition::new(sr),
         }
@@ -393,9 +480,10 @@ impl BlendedCab {
         self.blend.set(blend, room);
         self.mic.set(mic_pos);
 
-        let drive = self.speaker.process(sample);
+        let drive = self.spread.process(self.speaker.process(sample));
         let (l, r) = self.blend.process(drive);
-        self.mic.process(l, r)
+        let (l, r) = self.mic.process(l, r);
+        (mic_sat(l), mic_sat(r))
     }
 }
 
@@ -689,6 +777,65 @@ mod tests {
         );
         // Quiet playing stays essentially clean.
         assert!(quiet < 0.03, "growl leaks into quiet playing: {quiet:.4}");
+    }
+
+    // ── 3. Multi-speaker interference + mic saturation ─────────────────────────
+
+    /// The neighbour-cone taps must land where the 4×12 geometry puts them: an
+    /// impulse comes out as the direct arrival at t=0, silence until the first
+    /// neighbour arrival (~0.68 ms), then lowpassed energy at the side- and
+    /// diagonal-cone delays — late, dull, and well below the direct sound.
+    #[test]
+    fn neighbor_cones_arrive_late_dull_and_quiet() {
+        let mut cs = ConeSpread::new(SR);
+        let n = (SR * 0.004) as usize; // 4 ms window covers both arrivals
+        let mut out = Vec::with_capacity(n);
+        for i in 0..n {
+            out.push(cs.process(if i == 0 { 1.0 } else { 0.0 }));
+        }
+        let d_side = cs.d_side;
+        let d_diag = cs.d_diag;
+        // Geometry sanity: side cones ~0.68 ms, diagonal ~1.0 ms at 48 kHz.
+        assert!(
+            (25..40).contains(&d_side) && (44..56).contains(&d_diag),
+            "neighbour delays off-geometry: side {d_side} diag {d_diag}"
+        );
+        // Direct arrival passes (power-normalised), then silence until the
+        // first neighbour arrives.
+        assert!((out[0] - cs.norm).abs() < 1e-6, "direct arrival altered");
+        for (i, &y) in out.iter().enumerate().take(d_side - 1).skip(1) {
+            assert!(y.abs() < 1e-9, "pre-arrival leakage at sample {i}: {y}");
+        }
+        // Both arrivals carry energy, and the neighbour sum stays well below
+        // the direct sound (they are heard far off-axis, ~15 dB down).
+        let energy = |from: usize, to: usize| out[from..to].iter().map(|y| y.abs()).sum::<f32>();
+        let side = energy(d_side, d_diag);
+        let diag = energy(d_diag, n.min(d_diag + 24));
+        assert!(side > 1e-3 && diag > 1e-4, "missing neighbour arrivals");
+        assert!(
+            side + diag < 0.5,
+            "neighbour arrivals too loud: {}",
+            side + diag
+        );
+    }
+
+    /// The mic/transformer saturation must be genuinely tiny: transparent at
+    /// normal capture levels, a fraction-of-a-dB squeeze on the hottest peaks,
+    /// and odd-symmetric so it can never leak DC into the stereo bus.
+    #[test]
+    fn mic_saturation_is_tiny_and_symmetric() {
+        assert!(
+            (mic_sat(0.1) - 0.1).abs() < 1e-4,
+            "not transparent at -20 dB"
+        );
+        let squeeze = mic_sat(2.0) / 2.0;
+        assert!(
+            (0.9..1.0).contains(&squeeze),
+            "peak squeeze out of range: {squeeze:.4}"
+        );
+        for &x in &[0.05f32, 0.5, 1.5, 3.0] {
+            assert_eq!(mic_sat(-x), -mic_sat(x), "asymmetric at {x}");
+        }
     }
 
     /// Across every cab model, the full mic-position sweep at a hot drive must stay

@@ -145,6 +145,146 @@ impl CathodeBias {
     }
 }
 
+/// Power-supply ripple riding on the sag — the source of "ghost notes".
+///
+/// A real amp's B+ rail is a rectified mains supply: full-wave rectification
+/// leaves a ripple at twice the mains frequency (100 Hz UK/EU, 120 Hz US) whose
+/// amplitude grows as the supply is loaded down by hard playing. Because the
+/// power stage's gain tracks the rail, that ripple amplitude-modulates the
+/// signal, putting faint sidebands ±100/120 Hz around every note — the
+/// subliminal "ghost notes" of a big amp working hard, part of the amp-in-the-
+/// room texture no smooth sag envelope produces. At idle the supply is barely
+/// loaded and the ripple (and its modulation) all but vanishes.
+pub(crate) struct SupplyRipple {
+    phase: f32,
+    inc: f32,
+    depth: f32,
+}
+
+impl SupplyRipple {
+    /// `hz` is the ripple frequency (2× mains: 100 or 120 Hz), `depth` the peak
+    /// gain-modulation at full supply load.
+    pub fn new(sr: f32, hz: f32, depth: f32) -> Self {
+        Self {
+            phase: 0.0,
+            inc: 2.0 * std::f32::consts::PI * hz / sr,
+            depth,
+        }
+    }
+
+    /// Modulate the sag gain by the ripple. `load` is the sag envelope: the
+    /// harder the supply is worked, the deeper the ripple rides on the rail.
+    #[inline]
+    pub fn gain(&mut self, sag: f32, load: f32) -> f32 {
+        self.phase += self.inc;
+        if self.phase > 2.0 * std::f32::consts::PI {
+            self.phase -= 2.0 * std::f32::consts::PI;
+        }
+        sag * (1.0 + self.depth * load.min(1.0) * self.phase.sin())
+    }
+}
+
+/// Blocking distortion proper: the harsh "crackle-then-recover" of a truly
+/// slammed input stage, distinct from [`CathodeBias`]'s gentle within-note give.
+///
+/// When the grid is driven hard past conduction, grid current through the
+/// coupling cap is not proportional — the diode-like grid-cathode junction turns
+/// on exponentially, so charge accumulation grows roughly with the *square* of
+/// the overdrive. On a hard transient the cap charges almost instantly, slamming
+/// the stage toward cutoff (the note's attack spits and chokes), then the charge
+/// bleeds off through the grid-leak resistor over tens of milliseconds and the
+/// gain recovers into the note. The gain split across stages keeps ordinary
+/// playing away from this regime; only genuinely slammed inputs (a boost into a
+/// cranked front end, a violent transient) trigger it — which is exactly the
+/// behaviour of the real circuit. Runs at the oversampled rate before the
+/// stage-1 waveshaper; the inter-stage HP strips the DC component downstream.
+pub(crate) struct GridBlock {
+    bias: f32,
+    charge: f32,
+    recover: f32,
+    depth: f32,
+    thresh: f32,
+}
+
+/// The quadratic charge target is capped so a sustained max-gain signal shifts
+/// the operating point by a bounded amount instead of choking the stage dead.
+const GRID_BLOCK_CAP: f32 = 2.0;
+
+impl GridBlock {
+    /// `thresh` sits above [`CathodeBias`]'s conduction threshold (in waveshaper
+    /// drive units), `charge_ms` is near-instant, `recover_ms` the grid-leak
+    /// bleed, `depth` how far full charge shifts the bias.
+    pub fn new(sr: f32, charge_ms: f32, recover_ms: f32, depth: f32, thresh: f32) -> Self {
+        Self {
+            bias: 0.0,
+            charge: 1.0 - (-1.0 / (charge_ms * 0.001 * sr)).exp(),
+            recover: 1.0 - (-1.0 / (recover_ms * 0.001 * sr)).exp(),
+            depth,
+            thresh,
+        }
+    }
+
+    #[inline]
+    pub fn shift(&mut self, x: f32) -> f32 {
+        let over = (x - self.thresh).max(0.0);
+        // Exponential grid conduction ≈ quadratic charge growth past threshold.
+        let target = (over * over).min(GRID_BLOCK_CAP);
+        let c = if target > self.bias {
+            self.charge
+        } else {
+            self.recover
+        };
+        self.bias += c * (target - self.bias);
+        x - self.bias * self.depth
+    }
+}
+
+/// Presence that lives where the real one does: inside the power-amp negative-
+/// feedback loop, so its action changes with drive.
+///
+/// The presence pot bleeds high frequencies out of the NFB divider — the boost
+/// exists only because the *loop* stops correcting the highs. When the power
+/// stage is driven hard its incremental gain collapses, the loop loses
+/// authority, and the response drifts toward the open-loop voicing regardless
+/// of where the knob sits: the knob's range shrinks and the top end settles on
+/// the amp's natural (NFB-free) lift. A static shelf can't do that. Modelled as
+/// a high-frequency tap whose gain crossfades, per sample, from the knob's
+/// shelf toward a fixed open-loop lift as the sag envelope loads the loop.
+pub(crate) struct DynamicPresence {
+    hp: Biquad,
+    g_knob: f32,
+    g_open: f32,
+    sag_k: f32,
+}
+
+impl DynamicPresence {
+    /// `freq` is the shelf corner, `open_db` the open-loop HF lift the response
+    /// collapses toward under drive, `sag_k` how fast the sag envelope eats the
+    /// loop gain. Call [`set_knob`](Self::set_knob) to dial the static shelf.
+    pub fn new(sr: f32, freq: f32, open_db: f32, sag_k: f32) -> Self {
+        Self {
+            hp: Biquad::highpass(sr, freq, 0.707),
+            g_knob: 0.0,
+            g_open: 10.0_f32.powf(open_db / 20.0) - 1.0,
+            sag_k,
+        }
+    }
+
+    /// Re-dial the knob's shelf amount (dB at full loop authority).
+    pub fn set_knob(&mut self, db: f32) {
+        self.g_knob = 10.0_f32.powf(db / 20.0) - 1.0;
+    }
+
+    #[inline]
+    pub fn process(&mut self, x: f32, env: f32) -> f32 {
+        // Loop authority falls as the supply sags; the shelf gain slides from
+        // the knob's setting toward the open-loop lift.
+        let w = 1.0 / (1.0 + self.sag_k * env);
+        let g = self.g_knob * w + self.g_open * (1.0 - w);
+        x + g * self.hp.process(x)
+    }
+}
+
 /// Output-transformer character: low-frequency core saturation plus a trace of
 /// class-AB crossover content.
 ///
@@ -711,6 +851,149 @@ mod tests {
         assert!(
             m < -0.02,
             "cathode bias did not skew the operating point under hard drive: mean {m:.4}"
+        );
+    }
+
+    // — Supply ripple (ghost notes) ————————————————————————————————————————————
+
+    /// The mains ripple must intermodulate with the signal only when the supply
+    /// is loaded: a hard-driven note grows sidebands at ±(ripple Hz) around the
+    /// fundamental — the ghost notes — while quiet playing stays essentially
+    /// sideband-free. Probed through the whole Marshall (100 Hz ripple) so the
+    /// wiring from the sag envelope to the supply gain is covered too.
+    #[test]
+    fn supply_ripple_grows_ghost_sidebands_only_when_driven() {
+        // Over a 30 720-sample window, 225 Hz (144 cycles), the ±100 Hz
+        // sidebands (80/208 cycles) and the ±62.5 Hz control bins are all
+        // integer-cycle, so the huge fundamental leaks nothing into the bins
+        // under test (a rectangular-window sinc sidelobe would otherwise set a
+        // ~0.005 floor and mask the ghost notes).
+        let f0 = 225.0;
+        const WIN: usize = 30_720;
+        let sidebands = |amp_in: f32, gain: f32| -> f32 {
+            let mut amp = Marshall::new(SR);
+            let out = run_tone(&mut amp, f0, amp_in, gain, 0.5, 0.5, 0.6, 0.5, 0.8);
+            let out = &out[out.len() - WIN..];
+            let fund = goertzel(out, f0, SR).max(1e-9);
+            (goertzel(out, f0 - 100.0, SR) + goertzel(out, f0 + 100.0, SR)) / fund
+        };
+        // Quiet: low input *and* low gain, so the supply is genuinely unloaded
+        // (at high gain the preamp's compression loads the power amp even for
+        // a whisper of input — physical, but not the contrast under test).
+        let quiet = sidebands(0.01, 0.2);
+        let driven = sidebands(0.6, 0.9);
+        assert!(
+            driven > quiet * 2.0,
+            "ghost notes not load-dependent: quiet {quiet:.5} driven {driven:.5}"
+        );
+        // Present but subliminal: well below the note, not a tremolo.
+        assert!(
+            (0.001..0.15).contains(&driven),
+            "driven ghost-note level out of range: {driven:.5}"
+        );
+        // The sidebands must be *ripple* products, not generic spectral skirt:
+        // clearly above equally-offset control bins that are neither harmonics
+        // nor ripple sidebands.
+        let mut amp = Marshall::new(SR);
+        let out = run_tone(&mut amp, f0, 0.6, 0.9, 0.5, 0.5, 0.6, 0.5, 0.8);
+        let out = &out[out.len() - WIN..];
+        let sb = goertzel(out, f0 - 100.0, SR) + goertzel(out, f0 + 100.0, SR);
+        let ctl = goertzel(out, f0 - 62.5, SR) + goertzel(out, f0 + 62.5, SR);
+        assert!(
+            sb > ctl * 2.0,
+            "no distinct ripple sidebands: sb {sb:.6} vs control {ctl:.6}"
+        );
+    }
+
+    // — Grid blocking (crackle-then-recover on a slammed input) ————————————————
+
+    /// Below its conduction threshold the grid block must be perfectly
+    /// transparent — it exists for slammed inputs only, and ordinary playing
+    /// (which CathodeBias already handles) must never touch it.
+    #[test]
+    fn grid_block_is_transparent_below_threshold() {
+        let mut gb = GridBlock::new(SR, 0.25, 30.0, 0.22, 2.6);
+        for i in 0..(SR as usize / 10) {
+            let x = (2.0 * PI * 200.0 * i as f32 / SR).sin() * 2.4; // < 2.6
+            let y = gb.shift(x);
+            assert!((y - x).abs() < 1e-6, "grid block leaked below threshold");
+        }
+    }
+
+    /// The defining behaviour: a slam past conduction charges the coupling cap
+    /// near-instantly (the stage chokes — positive peaks duck hard within
+    /// milliseconds), then the charge bleeds off over the grid-leak RC and a
+    /// quiet probe passes untouched again. Crackle, then recover.
+    #[test]
+    fn grid_block_chokes_fast_and_recovers_slow() {
+        let mut gb = GridBlock::new(SR, 0.25, 30.0, 0.22, 2.6);
+        // Slam: hold the grid at ~2× threshold. The charge is near-instant
+        // (0.25 ms), so within 1 ms the stage is already deeply choked.
+        let one_ms = SR as usize / 1000;
+        let mut choke_1ms = 0.0f32;
+        for _ in 0..one_ms {
+            choke_1ms = 5.0 - gb.shift(5.0);
+        }
+        assert!(
+            choke_1ms > 0.3,
+            "charge not near-instant: choke after 1 ms only {choke_1ms:.3}"
+        );
+        // The bleed is slow (30 ms grid-leak RC): 5 ms after the slam ends, a
+        // sub-threshold probe is still visibly choked — the crackle hasn't
+        // recovered yet…
+        for _ in 0..(5 * one_ms) {
+            gb.shift(0.0);
+        }
+        let probe = gb.shift(1.0);
+        assert!(
+            probe < 0.85,
+            "charge bled off too fast (no crackle window): probe {probe:.3}"
+        );
+        // …but after 150 ms (≫ RC) the same probe passes essentially untouched.
+        for _ in 0..(150 * one_ms) {
+            gb.shift(0.0);
+        }
+        let probe = gb.shift(1.0);
+        assert!(
+            (probe - 1.0).abs() < 0.02,
+            "grid block never recovered: probe {probe:.4}"
+        );
+    }
+
+    // — Dynamic presence (NFB-loop authority collapses under drive) —————————————
+
+    /// At idle the presence knob must own its full range; with the loop loaded
+    /// (deep sag envelope) the knob's authority must shrink as the response
+    /// collapses toward the fixed open-loop lift. We measure the spread between
+    /// knob extremes at a presence-band frequency, quiet vs slammed.
+    #[test]
+    fn presence_authority_shrinks_under_drive() {
+        let band_gain = |knob_db: f32, env: f32| -> f32 {
+            let mut dp = DynamicPresence::new(SR, 3500.0, 4.0, 1.2);
+            dp.set_knob(knob_db);
+            let n = SR as usize / 4;
+            let warm = n / 2;
+            let mut out = Vec::with_capacity(n - warm);
+            for i in 0..n {
+                let x = (2.0 * PI * 6000.0 * i as f32 / SR).sin();
+                let y = dp.process(x, env);
+                if i >= warm {
+                    out.push(y);
+                }
+            }
+            goertzel(&out, 6000.0, SR)
+        };
+        let idle_spread = band_gain(8.5, 0.0) / band_gain(-3.5, 0.0);
+        let driven_spread = band_gain(8.5, 2.5) / band_gain(-3.5, 2.5);
+        assert!(
+            idle_spread > driven_spread * 1.8,
+            "presence authority not drive-dependent: idle {idle_spread:.3} driven {driven_spread:.3}"
+        );
+        // …and under drive the response must still carry the open-loop lift
+        // (top end doesn't just die when the loop lets go).
+        assert!(
+            band_gain(-3.5, 2.5) > band_gain(-3.5, 0.0),
+            "cut presence did not drift up toward the open-loop lift under drive"
         );
     }
 

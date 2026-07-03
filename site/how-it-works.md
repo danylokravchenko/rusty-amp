@@ -95,8 +95,8 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Amp</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
       <div class="flow__sig"><span class="os">8× oversampled</span> nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias “bloom” for touch sensitivity.</div>
-      <div class="flow__sub"><b>JCM800</b> — dual 12AX7 atan soft-clip → passive FMV tone stack → tube sag → speaker-load bloom</div>
-      <div class="flow__sub"><b>Mesa DR</b> — triple gain stage (atan + silicon clip) → passive FMV tone stack → silicon sag → speaker-load bloom</div>
+      <div class="flow__sub"><b>JCM800</b> — dual 12AX7 atan soft-clip + grid-blocking → passive FMV tone stack → tube sag with 100 Hz supply ripple (ghost notes) → speaker-load bloom → dynamic NFB presence</div>
+      <div class="flow__sub"><b>Mesa DR</b> — triple gain stage (atan + silicon clip) + grid-blocking → passive FMV tone stack → silicon sag with 120 Hz supply ripple → speaker-load bloom → dynamic NFB presence</div>
       <div class="flow__sub"><b>Randall</b> — FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load</div>
     </div>
   </div>
@@ -104,7 +104,7 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
   <div class="flow__stage" style="--c:var(--amber)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Cabinet</span><span class="flow__badge flow__badge--mono">Mono → Stereo</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
-      <div class="flow__sig">Nonlinear speaker drive (excursion-driven motor droop · cone breakup · thermal power compression · Doppler FM growl) → blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~93 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring + cone-breakup scatter, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
+      <div class="flow__sig">Nonlinear speaker drive (excursion-driven motor droop · cone breakup · thermal power compression · Doppler FM growl) → neighbour-cone interference from real 4×12 geometry → blended multi-mic impulse-response convolution of a 4×12 — close SM57 dynamic + R121 ribbon + room mic, each a ~93 ms voiced-EQ skeleton + early-reflection comb + late room reflections + deep cone-resonance ring + cone-breakup scatter, decorrelated L/R → natural stereo width &amp; depth · mic-position shelf.</div>
     </div>
   </div>
 
@@ -167,11 +167,17 @@ All three amps share an **8× oversampled** nonlinear core with a linear-phase p
 
 | Model | Character | Tone stack | Rectifier / power | Gain stages |
 | ----- | --------- | ---------- | ----------------- | ----------- |
-| **Marshall JCM800** | Punchy, dynamic, touch-sensitive | Passive FMV (Marshall values) | Tube sag (5 ms / 200 ms) + dynamic speaker-load bloom | 2 × 12AX7 atan soft-clip |
-| **Mesa Dual Rectifier** | Compressed, aggressive, modern | Passive FMV (Fender values) | Silicon sag (0.5 ms / 80 ms) + dynamic speaker-load bloom | 3-stage: atan → atan → exponential |
+| **Marshall JCM800** | Punchy, dynamic, touch-sensitive | Passive FMV (Marshall values) | Tube sag (5 ms / 200 ms) + 100 Hz supply ripple + dynamic speaker-load bloom | 2 × 12AX7 atan soft-clip |
+| **Mesa Dual Rectifier** | Compressed, aggressive, modern | Passive FMV (Fender values) | Silicon sag (0.5 ms / 80 ms) + 120 Hz supply ripple + dynamic speaker-load bloom | 3-stage: atan → atan → exponential |
 | **Randall Warhead** | Tight, crushing, solid-state | Active, independent bands + fixed +3 dB presence | No sag — stiff solid-state rails + static speaker resonance | FET (x/√(1+x²)) → BJT (tanh) → rail-clip |
 
 The **passive FMV tone stack** is a single RC network where bass, mid, and treble interact and the mids inherently scoop — exactly like a real amp — followed by a **power-amp ↔ speaker interaction** model: the speaker's impedance resonance blooms the low end dynamically as the supply sags under hard playing. The Randall keeps an active, independent-band stack and a small static speaker resonance, true to its stiff solid-state design. See [Amps & cabinets](amps-cabs.html#amp) for the per-knob breakdown.
+
+Three further pieces of tube-amp physics live in the two tube models:
+
+- **Ghost notes (supply ripple).** A real B+ rail is rectified mains, so a ripple at twice the mains frequency (100 Hz for the UK-built JCM800, 120 Hz for the US-built Recto) rides on the supply and grows as hard playing loads it down. That ripple amplitude-modulates the power stage, putting faint sidebands ±100/120 Hz around every note — the subliminal "big amp working hard" texture. At idle it all but vanishes.
+- **Grid-blocking distortion.** Beyond the gentle cathode-bias give, a *truly slammed* input (a boost into a cranked front end, a violent transient) drives grid current that charges the coupling cap near-instantly, choking the stage — the note's attack spits, then the charge bleeds off over the grid-leak RC (~30 ms) and the gain recovers into the note. Ordinary playing never touches it.
+- **Dynamic presence.** Presence lives inside the power-amp negative-feedback loop, so it changes with drive: as the power stage saturates the loop loses authority, the knob's range shrinks, and the top end settles toward the amp's fixed open-loop lift — rather than sitting on a static shelf.
 
 ## Cabinet convolution {#cabinet}
 
@@ -188,3 +194,7 @@ The convolution is computed with a **partitioned-FFT (uniformly-partitioned over
 Each cabinet is captured by **three mics** — a close SM57 dynamic, a close R121 ribbon, and a room mic — each with its own voicing and reflection texture (the room mic carries extra pre-delay and denser late reflections for air). The **Blend** and **Room** knobs mix these captures. Because convolution is linear, the blend is just a weighted **sum of the three IRs**, recombined into the live convolver only when a knob moves — so any mic mix costs exactly two convolutions per sample, no more.
 
 The **Mic** knob applies a high-shelf filter (±6 dB at 5 kHz) per channel after convolution, modelling the tonal difference between an on-axis and off-axis close-mic placement. See [cabinet models](amps-cabs.html#cabs) for the per-cab voicing.
+
+### Neighbour cones and the last drop of iron
+
+A close mic on one cone of a 4×12 also hears the **three neighbouring cones** — the same signal arriving late and dull (heard far off-axis, where a 12" cone beams its top end away). rusty-amp derives these arrivals from the actual box geometry: 12" drivers on a ~28 cm pitch with the mic ~5 cm from the near cone put the two adjacent cones ~0.68 ms late and the diagonal one ~1.0 ms late, each lowpassed at ~1.6 kHz and ~15 dB down. The result is the low/mid comb texture of a real multi-speaker box that a single-cone response can't produce. Finally, a genuinely tiny **mic/transformer saturation** (the SM57's output iron, the ribbon's step-up transformer) squeezes the hottest peaks by a fraction of a dB — the last, subtlest nonlinearity in the capture chain.

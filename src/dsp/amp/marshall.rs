@@ -1,6 +1,6 @@
 use super::{
-    Amplifier, Bloom, BrightCap, Cached, CathodeBias, FrontEnd, OutputTransformer, SpeakerLoad,
-    ToneCache, VoiceBalance,
+    Amplifier, Bloom, BrightCap, Cached, CathodeBias, DynamicPresence, FrontEnd, GridBlock,
+    OutputTransformer, SpeakerLoad, SupplyRipple, ToneCache, VoiceBalance,
 };
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
@@ -38,13 +38,16 @@ pub struct Marshall {
     // Dynamic cathode-bias shift on the first triode stage (blocking-distortion
     // bloom / touch sensitivity), runs at 8× rate before the stage-1 waveshaper.
     cathode: CathodeBias,
+    // Hard blocking distortion on the same stage: grid-conduction charge that
+    // only a truly slammed input triggers (crackle-then-recover), at 8× rate.
+    grid: GridBlock,
     // Output-transformer core saturation + push-pull crossover (base rate).
     xfmr: OutputTransformer,
     // Passive FMV tone stack (base rate) — bass/mid/treble interact like the real
     // JCM800 network, with the characteristic mid scoop.
     tone: ToneStack,
-    // Presence — power-amp NFB characteristic (base rate)
-    presence_shelf: Biquad,
+    // Presence — power-amp NFB characteristic, drive-dependent (base rate).
+    presence: DynamicPresence,
     presence_cache: Cached,
     // Structural voicing balance (base rate): low shelf restores low-mid body, high
     // shelf tames the tone stack's treble-forward tilt, so notes stay even across
@@ -54,6 +57,8 @@ pub struct Marshall {
     out_hp: Biquad,
     // Power amp envelope follower (sag simulation)
     envelope: f32,
+    // Mains ripple riding on the sagging supply (ghost notes).
+    ripple: SupplyRipple,
     // Power-amp ↔ speaker impedance interaction (dynamic low-end bloom).
     speaker: SpeakerLoad,
 }
@@ -82,11 +87,17 @@ impl Marshall {
             // back over ~45 ms. Threshold/depth kept light so the dynamic give lives
             // within a note and recovers between notes (no cross-note timbre drift).
             cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.030, 1.0),
+            // Blocking distortion: conduction threshold well above the cathode
+            // stage's (2.6 vs 1.0 drive units) so ordinary playing never touches
+            // it; near-instant charge (0.25 ms), grid-leak recovery ~30 ms.
+            grid: GridBlock::new(sr8, 0.25, 30.0, 0.22, 2.6),
             // Output transformer: lows (core flux) below ~160 Hz compress; modest
             // drive and a trace of crossover for the woolly, complex cranked-PA low end.
             xfmr: OutputTransformer::new(sr, 160.0, 1.4, 0.045),
             tone: ToneStack::new(sr, Components::MARSHALL),
-            presence_shelf: Biquad::high_shelf(sr, 3500.0, 0.0),
+            // Presence in the NFB loop: 3.5 kHz corner, collapsing toward a +4 dB
+            // open-loop lift as the sag envelope loads the loop.
+            presence: DynamicPresence::new(sr, 3500.0, 4.0, 1.2),
             presence_cache: Cached::new(),
             // Body shelf deepened (+3.5 → +8) and measured against a commercial
             // JCM-family rig: a real driven Marshall carries its 110–350 Hz
@@ -95,6 +106,9 @@ impl Marshall {
             voice: VoiceBalance::new(sr, 180.0, 8.0, 750.0, -7.0),
             out_hp: Biquad::highpass(sr, 12.0, 0.707),
             envelope: 0.0,
+            // UK mains → full-wave ripple at 100 Hz; depth sized so ghost-note
+            // sidebands sit ~30 dB under the notes only when the supply is loaded.
+            ripple: SupplyRipple::new(sr, 100.0, 0.05),
             // 8×12 resonance ~95 Hz; tube amp has moderate damping. Dynamic bloom
             // trimmed (0.55→0.30): the big sag-driven low resonance was ringing on
             // after a palm-muted chug, smearing the percussive tightness — a real
@@ -113,8 +127,10 @@ impl Marshall {
     fn update_presence(&mut self, presence: f32) {
         // Presence models the JCM800 output-transformer NFB loop: shelf at
         // 3.5 kHz, ±6 dB around a +2.5 dB static lift (the reference rig holds
-        // its 1.8–5.6 kHz shelf well above the mid pocket even at noon).
-        self.presence_shelf = Biquad::high_shelf(self.sr, 3500.0, (presence - 0.5) * 12.0 + 2.5);
+        // its 1.8–5.6 kHz shelf well above the mid pocket even at noon). This is
+        // the knob's *full-authority* setting; under drive the NFB loop collapses
+        // and the shelf drifts toward the open-loop lift (see DynamicPresence).
+        self.presence.set_knob((presence - 0.5) * 12.0 + 2.5);
     }
 
     #[inline]
@@ -140,7 +156,11 @@ impl Marshall {
         // (0.6 → 1.5) and static drive backed off (2.5 → 1.5) so total
         // compression stays but the harmonic series falls off fast.
         let sag = 1.0 / (1.0 + self.envelope * 1.5);
-        tube_clip_asym(x * sag * 1.5) * 0.62
+        // Mains ripple rides on the loaded supply: the 100 Hz gain modulation
+        // intermodulates with the signal (ghost-note sidebands), fading out as
+        // the supply unloads at idle.
+        let supply = self.ripple.gain(sag, self.envelope);
+        tube_clip_asym(x * supply * 1.5) * 0.62
     }
 }
 
@@ -195,8 +215,10 @@ impl Amplifier for Marshall {
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
             // Dynamic cathode bias shifts the operating point under hard drive
-            // before the stage-1 waveshaper; the inter-stage HP strips its DC.
-            let d = self.cathode.shift((u + bias) * g1);
+            // before the stage-1 waveshaper; a truly slammed input additionally
+            // triggers hard grid-blocking (crackle-then-recover). The inter-stage
+            // HP strips the DC both inject.
+            let d = self.grid.shift(self.cathode.shift((u + bias) * g1));
             let s = tube_clip_asym(d) / g1.sqrt();
             let s = self.stage_hp.process(s);
             *o = tube_clip_asym(s * g2) / g2.sqrt();
@@ -217,8 +239,9 @@ impl Amplifier for Marshall {
         // Speaker impedance interaction — dynamic low-end bloom driven by sag.
         let x = self.speaker.process(x, self.envelope);
 
-        // Presence: output transformer NFB shelf
-        let x = self.presence_shelf.process(x);
+        // Presence: output-transformer NFB shelf, losing authority as the sag
+        // envelope loads the loop.
+        let x = self.presence.process(x, self.envelope);
 
         // Output DC block: the asymmetric power-stage clip injects a small DC offset
         // and (unlike the Mesa/Randall) there is no power-section high-pass after it;

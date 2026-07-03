@@ -1,6 +1,6 @@
 use super::{
-    Amplifier, Bloom, BrightCap, Cached, CathodeBias, FrontEnd, OutputTransformer, SpeakerLoad,
-    ToneCache, VoiceBalance,
+    Amplifier, Bloom, BrightCap, Cached, CathodeBias, DynamicPresence, FrontEnd, GridBlock,
+    OutputTransformer, SpeakerLoad, SupplyRipple, ToneCache, VoiceBalance,
 };
 use crate::dsp::biquad::Biquad;
 use crate::dsp::oversample::Oversampler8;
@@ -37,14 +37,17 @@ pub struct Mesa {
     bright: BrightCap,
     // Dynamic cathode-bias shift on the first triode stage (8× rate).
     cathode: CathodeBias,
+    // Hard blocking distortion on the same stage: grid-conduction charge that
+    // only a truly slammed input triggers (crackle-then-recover), at 8× rate.
+    grid: GridBlock,
     // Output-transformer core saturation + push-pull crossover (base rate).
     xfmr: OutputTransformer,
     // Passive FMV tone stack (base rate) — Fender-type values for the Recto's
     // thicker low end and gentler scoop.
     tone: ToneStack,
     tone_cache: ToneCache,
-    // Presence (base rate)
-    presence_shelf: Biquad,
+    // Presence — power-amp NFB characteristic, drive-dependent (base rate).
+    presence: DynamicPresence,
     presence_cache: Cached,
     // Structural voicing balance (base rate): the FENDER tone stack is treble-heavy
     // and peak-normalised, so the upper mids/treble sit well above the low mids;
@@ -55,6 +58,8 @@ pub struct Mesa {
     voice: VoiceBalance,
     // Silicon-rectifier sag envelope
     envelope: f32,
+    // Mains ripple riding on the sagging supply (ghost notes).
+    ripple: SupplyRipple,
     // Power-amp ↔ speaker impedance interaction.
     speaker: SpeakerLoad,
 }
@@ -93,15 +98,23 @@ impl Mesa {
             // First-stage cathode bias, same fast-charge / RC-recovery shape as the
             // JCM800; the Recto's tighter feel keeps the depth modest.
             cathode: CathodeBias::new(sr8, 1.5, 45.0, 0.055, 0.8),
+            // Blocking distortion: threshold above ordinary playing levels; the
+            // Recto's tighter front end recovers a touch faster than the JCM800.
+            grid: GridBlock::new(sr8, 0.25, 24.0, 0.20, 2.6),
             // Output transformer: the big Recto iron compresses the lows; corner
             // ~140 Hz, gentle drive and a trace of crossover.
             xfmr: OutputTransformer::new(sr, 140.0, 1.5, 0.04),
             tone: ToneStack::new(sr, Components::FENDER),
             tone_cache: ToneCache::new(),
-            presence_shelf: Biquad::high_shelf(sr, 4000.0, 0.0),
+            // Presence in the NFB loop: 4 kHz corner; the Recto's stiffer silicon
+            // supply loads the loop less, so its collapse is gentler than the JCM800.
+            presence: DynamicPresence::new(sr, 4000.0, 3.5, 0.9),
             presence_cache: Cached::new(),
             voice: VoiceBalance::new(sr, 320.0, 9.0, 600.0, -9.5),
             envelope: 0.0,
+            // US mains → full-wave ripple at 120 Hz; the silicon supply is stiffer
+            // than the JCM800's, so a lighter ghost-note depth.
+            ripple: SupplyRipple::new(sr, 120.0, 0.035),
             // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
             // rectifier, so a tight dynamic bloom. Trimmed (0.45→0.22) so palm-muted
             // chugs stay percussive instead of blooming on after the attack.
@@ -117,8 +130,9 @@ impl Mesa {
     }
 
     fn update_presence(&mut self, presence: f32) {
-        // Recto presence: 4 kHz (brighter/tighter than JCM800 3.5 kHz), ±6 dB
-        self.presence_shelf = Biquad::high_shelf(self.sr, 4000.0, (presence - 0.5) * 12.0 + 2.0);
+        // Recto presence: 4 kHz (brighter/tighter than JCM800 3.5 kHz), ±6 dB.
+        // Full-authority setting; drive collapses it toward the open-loop lift.
+        self.presence.set_knob((presence - 0.5) * 12.0 + 2.0);
     }
 
     /// Silicon rectifier sag: tight attack (0.5 ms), moderate release (80 ms).
@@ -136,7 +150,10 @@ impl Mesa {
         // the h2 growth that makes the amp touch-sensitive). The static drive
         // still sits off the plateau — see marshall.rs `power_amp`.
         let sag = 1.0 / (1.0 + self.envelope * 0.45);
-        silicon_clip_asym(x * sag * 1.7) * 0.55
+        // 120 Hz mains ripple rides on the loaded supply (ghost-note sidebands),
+        // fading out as the supply unloads at idle.
+        let supply = self.ripple.gain(sag, self.envelope);
+        silicon_clip_asym(x * supply * 1.7) * 0.55
     }
 }
 
@@ -184,8 +201,9 @@ impl Amplifier for Mesa {
         let mut down = [0.0f32; 8];
         for (o, &u) in down.iter_mut().zip(up.iter()) {
             let u = self.pre_clip_hp.process(u); // cut sub-bass before clipping
-            // Dynamic cathode bias on stage 1 (DC removed by the inter-stage HP).
-            let d = self.cathode.shift((u + bias) * g1);
+            // Dynamic cathode bias on stage 1, plus hard grid-blocking on truly
+            // slammed inputs (DC removed by the inter-stage HP).
+            let d = self.grid.shift(self.cathode.shift((u + bias) * g1));
             let s = tube_clip_asym(d) / g1.sqrt();
             let s = self.stage_hp_1.process(s);
             let s = tube_clip_asym(s * g2) / g2.sqrt();
@@ -209,7 +227,8 @@ impl Amplifier for Mesa {
         // Second subsonic stage after the asymmetric clipper, which regenerates a
         // low difference-tone "fart" from the chord's intervals.
         let x = self.power_hp2.process(x);
-        let x = self.presence_shelf.process(x);
+        // Presence: NFB shelf losing authority as the sag envelope loads the loop.
+        let x = self.presence.process(x, self.envelope);
 
         // Output trim: level-match the Recto to the hotter solid-state Randall so
         // switching amp models doesn't produce a volume jump.

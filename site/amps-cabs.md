@@ -45,14 +45,14 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
     <div class="specs">
       <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–40× into dual 12AX7</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Marshall values)</div></div>
-      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep tube sag (5 ms / 60 ms) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep tube sag (5 ms / 60 ms) + 100 Hz supply ripple (ghost notes) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
     </div>
     <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–40× into dual 12AX7.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV tone stack — bass/mid/treble interact like the real network (Marshall values).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Sets the depth of the stack's inherent scoop.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Interacts with mid/bass, lossy &amp; peak-normalised.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 3.5 kHz (+2.5 dB fixed offset, ±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">Dynamic NFB shelf at 3.5 kHz (+2.5 dB fixed offset, ±6 dB) — its authority shrinks as the power amp is driven, like a real feedback loop.</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 
@@ -60,14 +60,14 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
     <div class="specs">
       <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–36× into three stages</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Fender values)</div></div>
-      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Silicon sag (0.5 ms / 80 ms) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Silicon sag (0.5 ms / 80 ms) + 120 Hz supply ripple (ghost notes) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">3-stage: atan → atan → exponential</div></div>
     </div>
     <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–36× into three stages.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV stack (Fender-type values: fuller lows, gentler scoop).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Gentler scoop than the Marshall.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Same interacting network.</span></div>
-    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">High shelf at 4 kHz (+2 dB fixed offset, ±6 dB).</span></div>
+    <div class="kv"><span class="kv__k">Presence</span><span class="kv__v">Dynamic NFB shelf at 4 kHz (+2 dB fixed offset, ±6 dB) — authority shrinks as the power amp is driven; the stiff silicon supply keeps the collapse gentler than the JCM800's.</span></div>
     <div class="kv"><span class="kv__k">Master</span><span class="kv__v">Post-amp output level.</span></div>
   </div>
 
@@ -88,6 +88,8 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
 </div>
 
 The tube amps (Marshall, Mesa) drive a **passive FMV tone stack** — a single RC network where the three controls interact and the mids inherently scoop, exactly like a real amp — followed by a **power-amp ↔ speaker interaction** model: the speaker's impedance resonance blooms the low end dynamically as the supply sags under hard playing. The Randall keeps an active (independent-band) stack and a small static speaker resonance, true to its stiff solid-state design.
+
+The tube models also carry three deeper pieces of power- and preamp physics: **supply-ripple ghost notes** (rectified-mains ripple — 100 Hz UK, 120 Hz US — rides on the sagging rail and puts faint sidebands around every note when the amp works hard), **grid-blocking distortion** (a truly slammed input chokes the first stage near-instantly and recovers over the ~30 ms grid-leak RC — the classic crackle-then-recover, untouched by ordinary playing), and **dynamic presence** (the presence shelf lives in the power-amp feedback loop, so its range shrinks and drifts toward the open-loop lift as the amp is driven). See [How it works](how-it-works.html#amp) for the physics.
 
 ## External amp plugins <span class="muted">(macOS · <kbd>U</kbd> · <kbd>Z</kbd>)</span> {#external-amp}
 
@@ -192,6 +194,8 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
 </div>
 
 Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~93 ms (~4500 taps at 48 kHz), so the low-end ring and room decay fully develop, and a seeded cone-breakup scatter adds the jagged 2–7.5 kHz ripple texture real captures show. Two slightly different L/R IRs decorrelate the stereo image for natural width.
+
+Before the mics, the drive signal also picks up **neighbour-cone interference** derived from real 4×12 geometry: the close mic hears the three other cones arriving ~0.7–1.0 ms late, lowpassed and ~15 dB down — the low/mid comb texture of a real multi-speaker box. After the mics, a genuinely tiny **mic/transformer saturation** squeezes only the hottest peaks.
 
 Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB high shelf at 5 kHz per channel after convolution, modelling on-axis vs off-axis placement. For the partitioned-FFT convolution engine, see [How it works](how-it-works.html#cabinet).
 
