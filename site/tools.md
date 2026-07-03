@@ -1,14 +1,15 @@
 ---
 layout: page.njk
 permalink: tools.html
-title: "Tuner & recording · rusty-amp"
-ogTitle: "rusty-amp · tuner & recording"
-description: "The built-in chromatic tuner and one-key WAV recording in rusty-amp — how to use them and what they capture."
-eyebrow: "Tuner & recording"
-heading: "Tuner & recording"
-lead: "Two built-in utilities you can reach at any time — a chromatic tuner that mutes the rig to a clean signal, and one-key recording of the processed output."
+title: "Tools · rusty-amp"
+ogTitle: "rusty-amp · tools"
+description: "The built-in chromatic tuner, practice metronome, and one-key WAV recording in rusty-amp — how to use them and what they capture."
+eyebrow: "Tools"
+heading: "Tools"
+lead: "Built-in utilities you can reach at any time — a chromatic tuner that mutes the rig to a clean signal, a practice metronome that stays out of your recordings, and one-key recording of the processed output."
 toc:
   - { href: "#tuner", label: "Tuner" }
+  - { href: "#metronome", label: "Metronome" }
   - { href: "#recording", label: "Recording" }
 prev: { href: "plugins.html", label: "CLAP plugins" }
 next: { href: "how-it-works.html", label: "How it works (under the hood)" }
@@ -18,7 +19,7 @@ next: { href: "how-it-works.html", label: "How it works (under the hood)" }
 
 <figure class="shot">
   <div class="shot__bar"><i></i><i></i><i></i></div>
-  <img src="assets/tuner.png" alt="rusty-amp pedal tuner" />
+  <img src="assets/tuner.png" alt="rusty-amp guitar tuner" />
 </figure>
 
 Press <kbd>T</kbd> to open the chromatic tuner. While it's open the **entire rig is bypassed** — every pedal, the amp, and the cabinet are taken out of the path and the dry guitar passes straight to the output, so you hear (and tune against) a clean signal. Pitch is estimated with the McLeod normalised square-difference function (NSDF), accurate to a few cents.
@@ -34,6 +35,27 @@ The tuner shows:
 Standard tuning reference:
 <b>E2</b> 82.41 Hz · <b>A2</b> 110.00 · <b>D3</b> 146.83 · <b>G3</b> 196.00 · <b>B3</b> 246.94 · <b>E4</b> 329.63.
 Press <kbd>Esc</kbd> / <kbd>T</kbd> to close and restore the full rig.
+</div>
+
+## Metronome <span class="muted">(<kbd>M</kbd>)</span> {#metronome}
+
+<figure class="shot">
+  <div class="shot__bar"><i></i><i></i><i></i></div>
+  <img src="assets/metronome.png" alt="rusty-amp metronome" />
+</figure>
+
+Press <kbd>M</kbd> to open the practice metronome. It plays a steady click through your monitor so you can lock in your timing while you play — the rig stays fully live, so you keep hearing your tone alongside the beat.
+
+The modal shows:
+
+- **The current tempo** — a big BPM readout that turns green while the click is running.
+- **A tempo slider** — from **40** to **240 BPM**. Adjust it with <kbd>←</kbd> / <kbd>→</kbd> (or <kbd>↑</kbd> / <kbd>↓</kbd>), one BPM at a time.
+- **A start/stop toggle** — <kbd>Space</kbd> (or <kbd>Enter</kbd>) turns the click on and off.
+
+The metronome keeps ticking after you close the modal, so you can dial in a tempo, press <kbd>Esc</kbd> / <kbd>M</kbd>, and play along with the full board and meters on screen. Re-open it any time to change tempo or stop the click.
+
+<div class="note note--info">
+<b>Never on the tape.</b> The click is mixed into the monitor output <em>after</em> the recording tap, so an active metronome is <b>never captured</b> in your WAV — you can practise to the beat and record a clean take at the same time.
 </div>
 
 ## Recording <span class="muted">(<kbd>R</kbd>)</span> {#recording}

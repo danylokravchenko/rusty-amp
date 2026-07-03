@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::cab::ExternalIrCab;
+use crate::dsp::metronome::{Metronome, MetronomeVoice};
 use crate::dsp::tuner::{Tuner, TunerDetector};
 use crate::dsp::{DspChain, Levels, Params, StereoInsert};
 use crate::recording::RecordingState;
@@ -147,6 +148,7 @@ pub fn list_devices() -> Result<DeviceInfo> {
     Ok(DeviceInfo { inputs, outputs })
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start(
     input_idx: usize,
     guitar_ch: usize,
@@ -155,6 +157,7 @@ pub fn start(
     levels: Arc<Levels>,
     recording: Arc<RecordingState>,
     tuner: Arc<Tuner>,
+    metronome: Arc<Metronome>,
 ) -> Result<AudioEngine> {
     let host = cpal::default_host();
 
@@ -186,6 +189,7 @@ pub fn start(
         levels,
         recording,
         tuner,
+        metronome,
     )
 }
 
@@ -226,6 +230,7 @@ fn build_engine(
     levels: Arc<Levels>,
     recording: Arc<RecordingState>,
     tuner: Arc<Tuner>,
+    metronome: Arc<Metronome>,
 ) -> Result<AudioEngine> {
     recording.sample_rate.store(sr as u32, Relaxed);
 
@@ -237,6 +242,10 @@ fn build_engine(
     // Tuner: when engaged, the rig is bypassed and the dry guitar feeds both the
     // output (a clean signal to tune against) and the pitch/spectrum detector.
     let mut tuner_detector = TunerDetector::new(sr);
+
+    // Metronome: when engaged, a click is mixed into the monitor output only —
+    // added *after* the recording tap so it is never captured in the WAV.
+    let mut metro_voice = MetronomeVoice::new(sr);
 
     // Lock-free handoff for swapping the plugin insert in/out without touching the
     // running stream: commands flow UI → audio, displaced inserts flow back to be
@@ -313,6 +322,9 @@ fn build_engine(
                 chain.process_block(&in_buf, &mut out_l, &mut out_r);
             }
 
+            let metro_active = metronome.active.load(Relaxed);
+            let metro_bpm = metronome.bpm.load(Relaxed);
+
             for ((&sample, &l), &r) in in_buf.iter().zip(out_l.iter()).zip(out_r.iter()) {
                 let a = sample.abs();
                 in_env += if a > in_env { attack } else { release } * (a - in_env);
@@ -325,21 +337,27 @@ fn build_engine(
                 if recording.active.load(Relaxed)
                     && let Ok(mut buf) = recording.buffer.try_lock()
                 {
-                    // Interleaved stereo (L, R).
+                    // Interleaved stereo (L, R) — captured before the metronome
+                    // click is added, so an active metronome never lands in the WAV.
                     buf.push(l);
                     buf.push(r);
                 }
+
+                // Metronome click is mixed into the monitor path only (post-record).
+                let click = metro_voice.next_sample(metro_active, metro_bpm);
+                let (out_left, out_right) = (l + click, r + click);
+                let out_mono = mono + click;
 
                 // Fan the stereo pair out to the device channels: L→0, R→1,
                 // any extra channels get the mono sum; a mono device gets the sum.
                 for ch in 0..out_channels {
                     let s = if out_channels == 1 {
-                        mono
+                        out_mono
                     } else {
                         match ch {
-                            0 => l,
-                            1 => r,
-                            _ => mono,
+                            0 => out_left,
+                            1 => out_right,
+                            _ => out_mono,
                         }
                     };
                     let _ = producer.push(s);

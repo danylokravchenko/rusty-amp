@@ -966,6 +966,8 @@ fn render_help(f: &mut Frame, area: Rect, status: Option<&str>) {
     row2.push(Span::styled(" presets  ", Style::default().fg(DIM)));
     row2.push(Span::styled("T", Style::default().fg(AMBER)));
     row2.push(Span::styled(" tuner  ", Style::default().fg(DIM)));
+    row2.push(Span::styled("M", Style::default().fg(AMBER)));
+    row2.push(Span::styled(" metro  ", Style::default().fg(DIM)));
     #[cfg(feature = "clap")]
     {
         row2.push(Span::styled("V", Style::default().fg(AMBER)));

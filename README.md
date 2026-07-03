@@ -18,6 +18,7 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
 - 🎚️ **AU amp host (macOS)** — load an Audio Unit amp sim (e.g. a Marshall plugin) as an amp-position override, either amp+cab or amp-only (keeping the built-in cab/IR), with unit-aware params and latency-aligned A/B
 - 🎵 **Built-in tuner** — a chromatic tuner with a ±cents needle and a live note spectrum
+- 🥁 **Practice metronome** — an adjustable-tempo click you hear while playing but that never bleeds into your recordings
 - ⏺️ **One-key recording** straight to a stereo WAV file
 - 🖥️ **Cross-platform** — runs on macOS, Windows, and Linux
 
@@ -61,7 +62,8 @@ The complete docs live at **[danylokravchenko.github.io/rusty-amp](https://danyl
 
 | Topic | What's there |
 | ----- | ------------ |
-| [Get started](https://danylokravchenko.github.io/rusty-amp/getting-started.html) | Install, startup flow, full controls, tuner, recording |
+| [Get started](https://danylokravchenko.github.io/rusty-amp/getting-started.html) | Install, startup flow, full controls |
+| [Tools](https://danylokravchenko.github.io/rusty-amp/tools.html) | Tuner, metronome, recording |
 | [Pedals & effects](https://danylokravchenko.github.io/rusty-amp/pedals.html) | Every pedal and knob, with reference tables |
 | [Amps & cabinets](https://danylokravchenko.github.io/rusty-amp/amps-cabs.html) | Amp models, cabinet mics, loading external `.wav` IRs |
 | [Presets](https://danylokravchenko.github.io/rusty-amp/presets.html) | Browser, save dialog, bundled tones, the TOML format |

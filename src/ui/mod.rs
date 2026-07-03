@@ -4,6 +4,7 @@ mod config;
 mod draw;
 mod input;
 mod ir_browser;
+mod metronome;
 #[cfg(feature = "clap")]
 mod plugins;
 mod presets;
@@ -21,7 +22,7 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-use crate::dsp::{Levels, Params, Tuner};
+use crate::dsp::{Levels, Metronome, Params, Tuner};
 use crate::preset::Preset;
 use crate::recording::RecordingState;
 
@@ -45,6 +46,7 @@ pub fn run(
     params: Arc<Params>,
     levels: Arc<Levels>,
     tuner: Arc<Tuner>,
+    metronome: Arc<Metronome>,
     presets: Vec<Preset>,
     recording: Arc<RecordingState>,
 ) -> Result<()> {
@@ -78,6 +80,7 @@ pub fn run(
         Arc::clone(&levels),
         Arc::clone(&recording),
         Arc::clone(&tuner),
+        Arc::clone(&metronome),
     )?;
 
     // ── Plugin browser (CLAP insert) ──────────────────────────────────────────
@@ -112,6 +115,7 @@ pub fn run(
     let mut tick: u64 = 0;
     let mut save_msg: Option<(String, std::time::Instant)> = None;
     let mut tuner_open = false;
+    let mut metronome_open = false;
 
     loop {
         tick = tick.wrapping_add(1);
@@ -206,6 +210,9 @@ pub fn run(
             if tuner_open {
                 tuner::render_tuner(f, &tuner);
             }
+            if metronome_open {
+                metronome::render_metronome(f, &metronome, blink);
+            }
         })?;
 
         if event::poll(Duration::from_millis(30))?
@@ -235,6 +242,24 @@ pub fn run(
                         tuner
                             .active
                             .store(false, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    _ => {}
+                }
+            } else if metronome_open {
+                // The metronome keeps running after the modal is closed, so the
+                // player can play along; only `active` is toggled here.
+                match key.code {
+                    KeyCode::Esc | KeyCode::Char('m') | KeyCode::Char('M') => {
+                        metronome_open = false;
+                    }
+                    KeyCode::Char(' ') | KeyCode::Enter => {
+                        metronome.toggle();
+                    }
+                    KeyCode::Right | KeyCode::Up | KeyCode::Char('+') | KeyCode::Char('=') => {
+                        metronome.nudge_bpm(1);
+                    }
+                    KeyCode::Left | KeyCode::Down | KeyCode::Char('-') => {
+                        metronome.nudge_bpm(-1);
                     }
                     _ => {}
                 }
@@ -389,6 +414,9 @@ pub fn run(
                         tuner
                             .active
                             .store(true, std::sync::atomic::Ordering::Relaxed);
+                    }
+                    KeyCode::Char('m') | KeyCode::Char('M') => {
+                        metronome_open = true;
                     }
                     #[cfg(feature = "clap")]
                     KeyCode::Char('v') | KeyCode::Char('V') => browser.open(),

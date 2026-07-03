@@ -12,7 +12,7 @@ toc:
   - { href: "#chain", label: "Full signal chain" }
   - { href: "#amp", label: "Amp stages" }
   - { href: "#cabinet", label: "Cabinet convolution" }
-prev: { href: "tools.html", label: "Tuner &amp; recording" }
+prev: { href: "tools.html", label: "Tools" }
 next: { href: "https://github.com/danylokravchenko/rusty-amp/blob/main/CONTRIBUTING.md", label: "Contributing on GitHub ↗" }
 ---
 

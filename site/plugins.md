@@ -16,7 +16,7 @@ toc:
   - { href: "#au-load", label: "Loading an AU amp" }
   - { href: "#au-limits", label: "AU limitations" }
 prev: { href: "presets.html", label: "Presets" }
-next: { href: "tools.html", label: "Tuner &amp; recording" }
+next: { href: "tools.html", label: "Tools" }
 ---
 
 ## CLAP effects {#overview}

@@ -97,6 +97,7 @@ The app launches immediately with default values. Press <kbd>P</kbd> at any time
 | <kbd>D</kbd> | Remove the focused pedal from the board (bypassed and hidden — re-add it from `+ ADD`) |
 | <kbd>P</kbd> | Open the preset browser overlay |
 | <kbd>T</kbd> | Open the [tuner](tools.html#tuner) — bypasses the rig for a clean signal |
+| <kbd>M</kbd> | Open the [metronome](tools.html#metronome) — an adjustable click that plays along but stays out of recordings |
 | <kbd>V</kbd> | Open the CLAP [plugin browser](plugins.html) |
 | <kbd>S</kbd> | Save the current state as a new user preset |
 | <kbd>R</kbd> | Start / stop [recording](tools.html#recording) — saves a WAV file to your home directory when stopped |
@@ -105,5 +106,5 @@ The app launches immediately with default values. Press <kbd>P</kbd> at any time
 Focus starts on the **selector row** (amp + cabinet). <kbd>Tab</kbd> moves down through the amp, cabinet mics, each pedal on the board, and finally the `+ ADD` tile. See [the pedalboard](pedals.html#board) for add/remove details, and [Presets](presets.html) for the browser and save dialog.
 
 <div class="note note--info">
-Looking for the <b>chromatic tuner</b> (<kbd>T</kbd>) or <b>one-key recording</b> (<kbd>R</kbd>)? They have their own page — see <a href="tools.html">Tuner &amp; recording</a>.
+Looking for the <b>chromatic tuner</b> (<kbd>T</kbd>), the <b>metronome</b> (<kbd>M</kbd>), or <b>one-key recording</b> (<kbd>R</kbd>)? They have their own page — see <a href="tools.html">Tools</a>.
 </div>
