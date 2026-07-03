@@ -58,8 +58,8 @@ const TEX_L: Texture = Texture {
         seed: 11,
         count: 22,
         band: (2200.0, 7600.0),
-        t60_ms: (2.0, 5.0),
-        gain: 0.014,
+        t60_ms: (5.0, 12.0),
+        gain: 0.022,
     }),
 };
 const TEX_R: Texture = Texture {
@@ -84,8 +84,8 @@ const TEX_R: Texture = Texture {
         seed: 12,
         count: 22,
         band: (2200.0, 7600.0),
-        t60_ms: (2.0, 5.0),
-        gain: 0.014,
+        t60_ms: (5.0, 12.0),
+        gain: 0.022,
     }),
 };
 
@@ -149,8 +149,12 @@ impl MesaCab {
             Biquad::low_shelf(sr, 100.0, 3.0),
             Biquad::peak_eq(sr, 120.0, 1.1, 6.5),
             Biquad::peak_eq(sr, 220.0, 0.7, 5.0),
-            Biquad::peak_eq(sr, 500.0, 0.8, 3.0),
-            Biquad::peak_eq(sr, 1450.0, 0.55, -3.0),
+            // 500 Hz widened/raised (+3→+4.5, Q 0.8→0.7) and the pocket deepened
+            // (−3→−4.5): measured against God's Cab SM57, our 0.5–1 kHz sat ~3.5 dB
+            // below the reference while 1–2 kHz sat ~4.5 dB above — the pocket was
+            // an octave too low. This pair moves it up where the capture has it.
+            Biquad::peak_eq(sr, 500.0, 0.7, 5.5),
+            Biquad::peak_eq(sr, 1300.0, 0.95, -4.0),
             // Downward 0.5–2 kHz tilt: real captures slope *down* through the
             // pocket into presence; without this the band rises instead.
             Biquad::high_shelf(sr, 1350.0, -3.0),
@@ -158,7 +162,9 @@ impl MesaCab {
             // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
             // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
             Biquad::peak_eq(sr, 3500.0, 1.0, 4.0),
-            Biquad::peak_eq(sr, 4500.0, 1.3, 4.0),
+            // 4.5 kHz raised (+4→+6.5): the reference holds its level through
+            // 4.2–4.8 kHz where ours fell ~3 dB early — the missing SM57/V30 edge.
+            Biquad::peak_eq(sr, 4500.0, 1.1, 5.5),
             Biquad::high_shelf(sr, 6800.0, -17.0),
             Biquad::lowpass(sr, 8000.0, 0.707),
         ];

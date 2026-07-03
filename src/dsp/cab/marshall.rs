@@ -50,8 +50,8 @@ const TEX_L: Texture = Texture {
         seed: 21,
         count: 22,
         band: (1800.0, 6400.0),
-        t60_ms: (2.0, 5.0),
-        gain: 0.016,
+        t60_ms: (5.0, 12.0),
+        gain: 0.022,
     }),
 };
 const TEX_R: Texture = Texture {
@@ -76,8 +76,8 @@ const TEX_R: Texture = Texture {
         seed: 22,
         count: 22,
         band: (1800.0, 6400.0),
-        t60_ms: (2.0, 5.0),
-        gain: 0.016,
+        t60_ms: (5.0, 12.0),
+        gain: 0.022,
     }),
 };
 
@@ -136,13 +136,18 @@ impl MarshallCab {
             Biquad::low_shelf(sr, 120.0, 2.0),
             Biquad::peak_eq(sr, 115.0, 1.1, 6.0),
             Biquad::peak_eq(sr, 210.0, 0.7, 5.0),
-            Biquad::peak_eq(sr, 480.0, 0.9, 3.0),
-            Biquad::peak_eq(sr, 800.0, 1.5, 2.0),
-            Biquad::peak_eq(sr, 1500.0, 0.6, -2.0),
+            Biquad::peak_eq(sr, 480.0, 0.8, 4.0),
+            Biquad::peak_eq(sr, 800.0, 1.5, 1.0),
+            // Pocket deepened (−2→−3.5): measured against God's Cab, the 1–2 kHz
+            // band sat ~5 dB above the reference — honk, not Greenback crunch
+            // (the GB's upper-mid identity lives in the 2.5 kHz peak below).
+            Biquad::peak_eq(sr, 1400.0, 0.7, -6.0),
             // Greenback presence: broadened and trimmed (Q 1.8→1.4, +5→+4 dB) for a
             // smoother top — Greenbacks are inherently softer up here than V30s.
             Biquad::peak_eq(sr, 2500.0, 1.0, 5.5),
-            Biquad::peak_eq(sr, 4300.0, 1.2, 3.5),
+            // 4.3 kHz raised (+3.5→+5): the 4–8 k band measured ~8 dB under the
+            // reference — a Greenback is darker than a V30, but not by that much.
+            Biquad::peak_eq(sr, 4300.0, 1.2, 6.0),
             Biquad::high_shelf(sr, 6600.0, -15.0),
             Biquad::lowpass(sr, 7200.0, 0.707),
         ];

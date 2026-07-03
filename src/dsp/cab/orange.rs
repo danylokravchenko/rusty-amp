@@ -54,8 +54,8 @@ const TEX_L: Texture = Texture {
         seed: 31,
         count: 22,
         band: (2100.0, 7400.0),
-        t60_ms: (2.0, 5.0),
-        gain: 0.018,
+        t60_ms: (5.0, 12.0),
+        gain: 0.024,
     }),
 };
 const TEX_R: Texture = Texture {
@@ -80,8 +80,8 @@ const TEX_R: Texture = Texture {
         seed: 32,
         count: 22,
         band: (2100.0, 7400.0),
-        t60_ms: (2.0, 5.0),
-        gain: 0.018,
+        t60_ms: (5.0, 12.0),
+        gain: 0.024,
     }),
 };
 
@@ -143,14 +143,19 @@ impl OrangeCab {
             Biquad::low_shelf(sr, 110.0, 6.0),
             Biquad::peak_eq(sr, 118.0, 1.4, 6.0),
             Biquad::peak_eq(sr, 230.0, 0.8, 3.5),
-            Biquad::peak_eq(sr, 550.0, 0.9, 2.5),
-            Biquad::peak_eq(sr, 1450.0, 0.55, -2.5),
+            // 550 Hz raised and the pocket deepened (+2.5→+3.5, −2.5→−4): the
+            // measured pocket sat an octave too low vs the God's Cab reference
+            // (see mesa.rs `voicing_sm57`).
+            Biquad::peak_eq(sr, 550.0, 0.8, 5.0),
+            Biquad::peak_eq(sr, 1300.0, 0.95, -4.0),
             // Downward 0.5–2 kHz tilt (see the Mesa voicing note).
             Biquad::high_shelf(sr, 1350.0, -3.0),
             // V30 presence, broadened and tamed (Q 2.0→1.4, +5→+3.5 dB) so the
             // forward Orange mid grind stays but the top loses its ice-pick edge.
-            Biquad::peak_eq(sr, 3200.0, 1.1, 3.0),
-            Biquad::peak_eq(sr, 4500.0, 1.3, 3.5),
+            // 4.5 kHz then raised (+3.5→+5.5) after measuring ~4 dB under the
+            // reference's 4–6 kHz edge.
+            Biquad::peak_eq(sr, 3200.0, 1.1, 4.0),
+            Biquad::peak_eq(sr, 4500.0, 1.3, 5.5),
             Biquad::high_shelf(sr, 6600.0, -16.0),
             Biquad::lowpass(sr, 7600.0, 0.707),
         ];
