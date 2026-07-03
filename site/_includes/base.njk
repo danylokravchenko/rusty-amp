@@ -5,13 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
 <meta name="theme-color" content="#0a0806" />
+<meta name="google-site-verification" content="9yO3zKGyf4RVCb2KLAZ2tFZD1lHyTpDgn7F1tPwuyHU" />
 <title>{{ title }}</title>
 <meta name="description" content="{{ description }}" />
+<link rel="canonical" href="{{ site.url }}{{ page.url }}" />
 <meta property="og:title" content="{{ ogTitle or title }}" />
 <meta property="og:description" content="{{ description }}" />
-<meta property="og:image" content="assets/social-preview.png" />
+<meta property="og:image" content="{{ site.url }}/assets/social-preview.png" />
+<meta property="og:url" content="{{ site.url }}{{ page.url }}" />
 <meta property="og:type" content="website" />
+<meta property="og:site_name" content="rusty-amp" />
 <meta name="twitter:card" content="summary_large_image" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "rusty-amp",
+  "description": "{{ description }}",
+  "url": "{{ site.url }}/",
+  "applicationCategory": "MultimediaApplication",
+  "operatingSystem": "macOS, Linux, Windows",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "license": "https://www.apache.org/licenses/LICENSE-2.0"
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet" />
