@@ -282,6 +282,119 @@ pub fn cone_spread_response(sr: f32, len: usize) -> Vec<f32> {
         .collect()
 }
 
+// ── Stage 1c: dust-cap & grille micro-reflections ───────────────────────────────
+
+// The last acoustic surfaces between the cone and the mic capsule are the speaker's
+// own front geometry. Two very short reflections colour the top: because their delays
+// are an order of magnitude shorter than the neighbour-cone arrivals [`ConeSpread`]
+// models (mm–cm, not the 28 cm cone pitch), they comb the *presence/air* band rather
+// than the body — the same class of physics one octave up.
+//
+//   • grille reflection — the front grille (perforated metal + cloth/frame) sits a
+//     couple of cm proud of the cone. Treble radiated forward reflects off it, back
+//     to the cone, and re-radiates to the mic: a ~0.13 ms round-trip echo. Long
+//     wavelengths simply diffract around the perforations — the grille is acoustically
+//     transparent in the lows — so only the top is combed, the metallic sheen/"air" a
+//     close capture picks up off the grille. This is the effect God's Cab's grill knob
+//     leans on.
+//   • dust-cap reflection — the rigid central dome sits proud of the surrounding cone
+//     and beams the extreme top from ~1.5 cm nearer the capsule than the cone around
+//     it: a ~45 µs path difference that ripples only the very top (>8 kHz), the fine
+//     dome "sizzle".
+//
+// Both are summed back into the mono drive just before the mic capture (the mic hears
+// the grille bounce, not the amp), the reflected copy high-passed so the lows stay
+// clean, and the whole stage power-normalised (like [`ConeSpread`]) so it adds comb
+// *structure*, not overall level. The taps are fractional: at 48 kHz the dust-cap echo
+// is ~2 samples, so integer rounding would misplace its comb by kHz — linear
+// interpolation pins it.
+
+/// Cone→grille standoff (metres); the echo is the 2× round trip cone→grille→cone.
+const GRILLE_STANDOFF_M: f32 = 0.022;
+/// Net gain of the double bounce. Negative places the first comb *peak* in the
+/// presence band (~3.9 kHz) and its null up in the fizz region (~7.8 kHz) — an airy
+/// sheen that also tames the top, rather than a hollow presence notch. Tuned so the
+/// added 2–8 kHz ripple tracks a real grille-position capture (God's Cab's grill_dark
+/// measures ~2.7/8.5 dB std-dev in the 2–4k/4–8k octaves — see `examples/cab_analysis`).
+const GRILLE_GAIN: f32 = -0.24;
+/// The grille is transparent below here (long waves diffract past the perforations),
+/// so only the treble reflection is combed.
+const GRILLE_HP_HZ: f32 = 1600.0;
+
+/// Dust-cap "proud" path difference (metres): the dome radiates the top from nearer
+/// the capsule than the surrounding cone.
+const DUSTCAP_PATH_M: f32 = 0.015;
+/// Gentle: the dome ripple is a fine top-end texture, not a voicing move.
+const DUSTCAP_GAIN: f32 = 0.13;
+/// Only the beamy extreme top is radiated off the dome, so comb just the very top.
+const DUSTCAP_HP_HZ: f32 = 4000.0;
+
+/// The dust-cap and grille micro-reflections summed back into the drive just before
+/// the mic capture. Fractional-delay feed-forward taps, high-passed (grille
+/// transparent in the lows) and power-normalised so only the presence/air comb
+/// structure is added, not level.
+struct GrilleEcho {
+    buf: Vec<f32>,
+    pos: usize,
+    d_grille: f32,
+    d_dust: f32,
+    grille_hp: Biquad,
+    dust_hp: Biquad,
+    norm: f32,
+}
+
+impl GrilleEcho {
+    fn new(sr: f32) -> Self {
+        let samples = |m: f32| m / SOUND_SPEED_M_S * sr;
+        let d_grille = samples(2.0 * GRILLE_STANDOFF_M);
+        let d_dust = samples(DUSTCAP_PATH_M);
+        let maxd = d_grille.max(d_dust).ceil() as usize + 2;
+        Self {
+            buf: vec![0.0; maxd.max(2)],
+            pos: 0,
+            d_grille,
+            d_dust,
+            grille_hp: Biquad::highpass(sr, GRILLE_HP_HZ, 0.707),
+            dust_hp: Biquad::highpass(sr, DUSTCAP_HP_HZ, 0.707),
+            norm: 1.0 / (1.0 + GRILLE_GAIN * GRILLE_GAIN + DUSTCAP_GAIN * DUSTCAP_GAIN).sqrt(),
+        }
+    }
+
+    /// Linear-interpolated read `d` fractional samples back from the write head.
+    /// `d ≥ 1` (both taps are > 2 samples), so this never reads the just-written x.
+    #[inline]
+    fn frac_tap(&self, d: f32) -> f32 {
+        let len = self.buf.len();
+        let i = d.floor() as usize;
+        let frac = d - i as f32;
+        let a = self.buf[(self.pos + len - i) % len];
+        let b = self.buf[(self.pos + len - i - 1) % len];
+        a * (1.0 - frac) + b * frac
+    }
+
+    #[inline]
+    fn process(&mut self, x: f32) -> f32 {
+        self.buf[self.pos] = x;
+        let g = self.frac_tap(self.d_grille);
+        let d = self.frac_tap(self.d_dust);
+        let grille = self.grille_hp.process(g);
+        let dust = self.dust_hp.process(d);
+        self.pos = (self.pos + 1) % self.buf.len();
+        (x + GRILLE_GAIN * grille + DUSTCAP_GAIN * dust) * self.norm
+    }
+}
+
+/// Impulse response of a fresh [`GrilleEcho`] — analysis-tool access to the isolated
+/// dust-cap/grille comb, otherwise buried under the mic IRs in the full cab path.
+/// Not part of the public API.
+#[doc(hidden)]
+pub fn grille_echo_response(sr: f32, len: usize) -> Vec<f32> {
+    let mut ge = GrilleEcho::new(sr);
+    (0..len)
+        .map(|i| ge.process(if i == 0 { 1.0 } else { 0.0 }))
+        .collect()
+}
+
 // ── Stage 2: multi-mic blend convolution ────────────────────────────────────────
 
 /// The three-mic blend rendered as a single pair of convolvers. Each capture is a
@@ -464,7 +577,8 @@ fn mic_sat(x: f32) -> f32 {
 ///   1. [`SpeakerDrive`] — the speaker's cone-breakup saturation and thermal power
 ///      compression on the mono drive (the parts of a real cab a fixed IR can't hold),
 ///      then [`ConeSpread`] — the three neighbouring cones' late, dull arrivals,
-///      derived from real 4×12 geometry;
+///      derived from real 4×12 geometry, then [`GrilleEcho`] — the much shorter
+///      dust-cap and grille micro-reflections that comb the presence/air band;
 ///   2. [`MicBlend`] — the linear capture: a blend of three mic IRs (close SM57
 ///      dynamic, close R121 ribbon, ambient room) convolved per channel;
 ///   3. [`MicPosition`] — the physical edge↔centre mic-position colouration on each
@@ -476,6 +590,7 @@ fn mic_sat(x: f32) -> f32 {
 pub struct BlendedCab {
     speaker: SpeakerDrive,
     spread: ConeSpread,
+    grille: GrilleEcho,
     blend: MicBlend,
     mic: MicPosition,
 }
@@ -487,6 +602,7 @@ impl BlendedCab {
         Self {
             speaker: SpeakerDrive::new(sr),
             spread: ConeSpread::new(sr),
+            grille: GrilleEcho::new(sr),
             blend: MicBlend::new(irs),
             mic: MicPosition::new(sr),
         }
@@ -497,7 +613,9 @@ impl BlendedCab {
         self.blend.set(blend, room);
         self.mic.set(mic_pos);
 
-        let drive = self.spread.process(self.speaker.process(sample));
+        let drive = self
+            .grille
+            .process(self.spread.process(self.speaker.process(sample)));
         let (l, r) = self.blend.process(drive);
         let (l, r) = self.mic.process(l, r);
         (mic_sat(l), mic_sat(r))
@@ -834,6 +952,63 @@ mod tests {
             side + diag < 0.5,
             "neighbour arrivals too loud: {}",
             side + diag
+        );
+    }
+
+    /// The dust-cap/grille echo must comb only the *top*: the reflected copies are
+    /// high-passed, so a low tone passes essentially clean (flat at the normalisation
+    /// gain), while the presence band shows a real comb — a peak near the grille
+    /// crest well above the null an octave up. This is the airy sheen a close capture
+    /// picks up off the grille, and it must not touch the body.
+    #[test]
+    fn grille_echo_combs_only_the_top() {
+        let h = grille_echo_response(SR, 2048);
+        // Transfer magnitude |H(f)| of the impulse response (goertzel's sine
+        // normalisation is wrong for an impulse — measure the raw DFT bin).
+        let mag = |f: f32| {
+            let w = 2.0 * PI * f / SR;
+            let (mut re, mut im) = (0.0f32, 0.0f32);
+            for (n, &x) in h.iter().enumerate() {
+                re += x * (w * n as f32).cos();
+                im -= x * (w * n as f32).sin();
+            }
+            (re * re + im * im).sqrt()
+        };
+
+        // Grille round trip ≈ 0.128 ms → first comb peak ~3.9 kHz, null ~7.8 kHz.
+        let d = 2.0 * GRILLE_STANDOFF_M / SOUND_SPEED_M_S; // seconds
+        let peak = mag(0.5 / d);
+        let null = mag(1.0 / d);
+        assert!(
+            peak > null * 1.15,
+            "grille comb absent: peak {peak:.4} vs null {null:.4}"
+        );
+
+        // The lows are below both high-pass corners, so they pass at unit gain
+        // (only the normalisation scales them) — the body is untouched.
+        let low = mag(200.0);
+        let norm = 1.0 / (1.0 + GRILLE_GAIN * GRILLE_GAIN + DUSTCAP_GAIN * DUSTCAP_GAIN).sqrt();
+        assert!(
+            (low - norm).abs() < 0.02,
+            "grille echo colours the lows: 200 Hz {low:.4} vs norm {norm:.4}"
+        );
+    }
+
+    /// The echo delays must fall where the front geometry puts them: the grille round
+    /// trip at ~6 samples and the dust-cap "proud" path at ~2 samples (48 kHz). Guards
+    /// the comb frequencies against a geometry constant drifting.
+    #[test]
+    fn grille_echo_delays_match_geometry() {
+        let ge = GrilleEcho::new(SR);
+        assert!(
+            (5.5..7.0).contains(&ge.d_grille),
+            "grille delay off-geometry: {}",
+            ge.d_grille
+        );
+        assert!(
+            (1.8..2.6).contains(&ge.d_dust),
+            "dust-cap delay off-geometry: {}",
+            ge.d_dust
         );
     }
 
