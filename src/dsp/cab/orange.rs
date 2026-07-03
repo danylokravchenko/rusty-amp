@@ -14,15 +14,15 @@ use crate::dsp::biquad::Biquad;
 /// V30-in-birch close-mic (SM57) signature (the skeleton):
 /// Voiced against measured commercial 4×12 captures (see the note in the Mesa
 /// `voicing_sm57`):
-///   • Resonant sub HP at 64 Hz (tight, closed-back low end — but with real depth)
+///   • Resonant sub HP at 74 Hz (tight, closed-back low end — but with real depth)
 ///   • +6 dB low shelf at 110 Hz + a +6 dB hump at 118 Hz (the "chest thump")
-///   • +3.5 dB wide mound at 230 Hz + +2.5 dB at 550 Hz (low-mid "wall" / body)
-///   • -2.5 dB at 1450 Hz over a −3 dB shelf from 1.35 kHz (mid pocket — the
+///   • +3.5 dB wide mound at 230 Hz + +5 dB at 550 Hz (low-mid "wall" / body)
+///   • −4 dB at 1300 Hz over a −3 dB shelf from 1.35 kHz (mid pocket — the
 ///     grind stays but doesn't crowd the body)
-///   • +3.5 dB at 3200 Hz and +2 dB at 4.4 kHz (V30 presence, a touch
+///   • +4 dB at 3200 Hz and +5.5 dB at 4.5 kHz (V30 presence, a touch
 ///     lower/smoother than Mesa, held through the 3–5 kHz band)
-///   • -13 dB high shelf at 5200 Hz (closed-back cone rolloff)
-///   • LP at 8500 Hz (fizz cut)
+///   • −16 dB high shelf at 6600 Hz (closed-back cone rolloff)
+///   • LP at 7.6 kHz (fizz cut)
 pub struct OrangeCab {
     inner: BlendedCab,
 }
@@ -143,17 +143,16 @@ impl OrangeCab {
             Biquad::low_shelf(sr, 110.0, 6.0),
             Biquad::peak_eq(sr, 118.0, 1.4, 6.0),
             Biquad::peak_eq(sr, 230.0, 0.8, 3.5),
-            // 550 Hz raised and the pocket deepened (+2.5→+3.5, −2.5→−4): the
-            // measured pocket sat an octave too low vs the God's Cab reference
+            // Body carried up through ~700 Hz with the pocket at 1.3 kHz: real
+            // captures hold their 0.5–1 kHz level and dip in the 1–2 kHz octave
             // (see mesa.rs `voicing_sm57`).
             Biquad::peak_eq(sr, 550.0, 0.8, 5.0),
             Biquad::peak_eq(sr, 1300.0, 0.95, -4.0),
             // Downward 0.5–2 kHz tilt (see the Mesa voicing note).
             Biquad::high_shelf(sr, 1350.0, -3.0),
-            // V30 presence, broadened and tamed (Q 2.0→1.4, +5→+3.5 dB) so the
-            // forward Orange mid grind stays but the top loses its ice-pick edge.
-            // 4.5 kHz then raised (+3.5→+5.5) after measuring ~4 dB under the
-            // reference's 4–6 kHz edge.
+            // V30 presence, a touch lower/smoother than the Mesa so the forward
+            // Orange mid grind leads without an ice-pick edge; the 4.5 kHz peak
+            // keeps the 4–5 kHz level real captures hold before the rolloff.
             Biquad::peak_eq(sr, 3200.0, 1.1, 4.0),
             Biquad::peak_eq(sr, 4500.0, 1.3, 5.5),
             Biquad::high_shelf(sr, 6600.0, -16.0),

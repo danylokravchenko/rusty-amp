@@ -14,13 +14,15 @@ use crate::dsp::biquad::Biquad;
 /// captures (see the note in `voicing_sm57`):
 ///   • Resonant sub HP at 72 Hz (ported cab alignment)
 ///   • +3 dB low shelf at 100 Hz + a +6.5 dB resonant hump at 120 Hz (cab depth)
-///   • +5 dB wide mound at 220 Hz and +3 dB at 500 Hz (low-mid body plateau)
-///   • −3 dB wide dip at 1450 Hz over a −3 dB shelf from 1.35 kHz (the mid
-///     "pocket": real captures slope *down* through 0.5–2 kHz)
-///   • +4.5 dB at 3500 Hz and +2 dB at 4.3 kHz (V30 presence, held to ~5 kHz —
+///   • +4 dB wide mound at 220 Hz and +5.5 dB at 500 Hz (low-mid body plateau,
+///     carried up through ~700 Hz)
+///   • −4 dB dip at 1300 Hz over a −3 dB shelf from 1.35 kHz (the mid
+///     "pocket": real captures hold their 0.5–1 kHz level, then dip through
+///     the 1–2 kHz octave)
+///   • +4 dB at 3500 Hz and +5.5 dB at 4.5 kHz (V30 presence, held to ~5 kHz —
 ///     real captures keep their treble through 2.3–5 kHz, then crash)
-///   • -14 dB high shelf at 6500 Hz (speaker cone rolloff)
-///   • LP at 9 kHz (fizz cut + cone break-up noise removal)
+///   • −17 dB high shelf at 6800 Hz (speaker cone rolloff)
+///   • LP at 8 kHz (fizz cut + cone break-up noise removal)
 pub struct MesaCab {
     inner: BlendedCab,
 }
@@ -30,7 +32,7 @@ pub struct MesaCab {
 //
 // Early taps (< 4 ms) are the cone-to-grille / panel comb that colours the body —
 // timed so their comb notches land in the 800 Hz–2 kHz mid pocket rather than in
-// the 400–600 Hz body; the later taps (6–28 ms) are cabinet-edge and near-wall
+// the 400–600 Hz body; the later taps (6–21 ms) are cabinet-edge and near-wall
 // reflections that put the speaker in a space and give the note depth and air.
 // The two low modes near 100–120 Hz add a subtle thump ring on top of the EQ hump
 // (they sit where the direct sound is strong: an additive resonance placed where
@@ -139,31 +141,33 @@ impl MesaCab {
     fn voicing_sm57(sr: f32) -> impl FnMut(f32) -> f32 {
         let mut bands = [
             // The low end is voiced to the shape real close-mic'd 4×12 captures
-            // (e.g. God's Cab) measure: a steep resonant rise into a big ~120 Hz
-            // hump — a shelf alone is flat below its corner; the hump is what
-            // reads as "deep" — then a broad +5…+10 dB body plateau from ~120 to
-            // ~600 Hz relative to the 800 Hz–2 kHz band, which instead carries a
-            // wide, shallow pocket. That plateau-vs-pocket tilt, not sub-bass, is
-            // what makes a capture sound deep and juicy.
+            // measure: a steep resonant rise into a big ~120 Hz hump — a shelf
+            // alone is flat below its corner; the hump is what reads as "deep" —
+            // then a broad +5…+10 dB body plateau from ~120 to ~700 Hz relative
+            // to the 1–2 kHz band, which instead carries a wide, shallow pocket.
+            // That plateau-vs-pocket tilt, not sub-bass, is what makes a capture
+            // sound deep and juicy.
             Biquad::highpass(sr, 72.0, 1.2),
             Biquad::low_shelf(sr, 100.0, 3.0),
             Biquad::peak_eq(sr, 120.0, 1.1, 6.5),
             Biquad::peak_eq(sr, 220.0, 0.7, 4.0),
-            // 500 Hz widened/raised (+3→+4.5, Q 0.8→0.7) and the pocket deepened
-            // (−3→−4.5): measured against God's Cab SM57, our 0.5–1 kHz sat ~3.5 dB
-            // below the reference while 1–2 kHz sat ~4.5 dB above — the pocket was
-            // an octave too low. This pair moves it up where the capture has it.
+            // The body plateau is carried up through ~700 Hz (wide +5.5 dB at
+            // 500 Hz) and the pocket sits at 1.3 kHz: real captures hold their
+            // 0.5–1 kHz level and put the dip in the 1–2 kHz octave. Q 0.95
+            // keeps the pocket's skirts off the body below and the presence
+            // above.
             Biquad::peak_eq(sr, 500.0, 0.7, 5.5),
             Biquad::peak_eq(sr, 1300.0, 0.95, -4.0),
             // Downward 0.5–2 kHz tilt: real captures slope *down* through the
             // pocket into presence; without this the band rises instead.
             Biquad::high_shelf(sr, 1350.0, -3.0),
-            // V30 presence: broadened (Q 2.0→1.3) and tamed (+7→+4 dB). The narrow
-            // +7 spike sat exactly on the 2–5 kHz "ice-pick" band and made high
-            // notes shrill; a gentler, wider lift keeps the V30 bite without harsh.
+            // V30 presence: a wide, moderate lift — broad enough to read as bite
+            // without a narrow spike in the 2–5 kHz "ice-pick" band that would
+            // make high notes shrill.
             Biquad::peak_eq(sr, 3500.0, 1.0, 4.0),
-            // 4.5 kHz raised (+4→+6.5): the reference holds its level through
-            // 4.2–4.8 kHz where ours fell ~3 dB early — the missing SM57/V30 edge.
+            // The SM57-on-V30 edge: real captures hold their level through
+            // 4.2–4.8 kHz right up to the cone's crash, so this peak carries the
+            // presence out to the rolloff shelf.
             Biquad::peak_eq(sr, 4500.0, 1.1, 5.5),
             Biquad::high_shelf(sr, 6800.0, -17.0),
             Biquad::lowpass(sr, 8000.0, 0.707),

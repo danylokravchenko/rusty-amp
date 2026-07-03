@@ -204,21 +204,20 @@ impl SpeakerDrive {
 // axis too). The IRs' early reflections gesture at this, but here the arrivals
 // are derived from the actual box geometry: 12" drivers on a ~28 cm pitch, mic
 // capsule ~10 cm from the near cone ("an inch from the grille" plus the grille
-// standoff and the cone's recess — verified against the God's Cab capture,
-// whose echo-delay scan peaks at ~0.6 ms, matching this distance). Two
-// equidistant side/below neighbours share one tap; the diagonal cone is
-// farther and quieter.
+// standoff and the cone's recess — this distance matches the ~0.6 ms echo-delay
+// peak measured on real 4×12 captures). Two equidistant side/below neighbours
+// share one tap; the diagonal cone is farther and quieter.
 const CONE_PITCH_M: f32 = 0.28;
 const MIC_DIST_M: f32 = 0.10;
 const SOUND_SPEED_M_S: f32 = 343.0;
 /// Off-axis + cardioid-rejection loss applied on top of 1/r spreading,
 /// calibrated so the summed tap gains (~0.30 side / ~0.09 diagonal) reproduce
-/// the ~3 dB echo-scan comb the God's Cab capture measures at τ ≈ 0.6 ms.
+/// the ~3 dB echo-scan comb real 4×12 captures measure at τ ≈ 0.6 ms.
 const NEIGHBOR_AXIS_LOSS_SIDE: f32 = 0.45;
 const NEIGHBOR_AXIS_LOSS_DIAG: f32 = 0.36;
 /// Neighbour arrivals are heard ~80° off the cone's axis: strong beaming loss,
-/// but the reference capture keeps comb ripple through the 1–2 kHz octave, so
-/// the corner sits at 2.2 kHz rather than a brick wall at the beaming onset.
+/// but real captures keep comb ripple through the 1–2 kHz octave, so the
+/// corner sits at 2.2 kHz rather than a brick wall at the beaming onset.
 const NEIGHBOR_LP_HZ: f32 = 2200.0;
 
 /// The three neighbour-cone arrivals summed back into the drive signal.
@@ -801,7 +800,7 @@ mod tests {
 
     /// The neighbour-cone taps must land where the 4×12 geometry puts them: an
     /// impulse comes out as the direct arrival at t=0, silence until the first
-    /// neighbour arrival (~0.68 ms), then lowpassed energy at the side- and
+    /// neighbour arrival (~0.58 ms), then lowpassed energy at the side- and
     /// diagonal-cone delays — late, dull, and well below the direct sound.
     #[test]
     fn neighbor_cones_arrive_late_dull_and_quiet() {
@@ -883,10 +882,10 @@ mod tests {
                     }
                 }
                 // Bound sized to the voiced low-end: the cabs peak ~+9 dB near
-                // 100–140 Hz (commercial captures like God's Cab measure +12 dB
-                // there), so a 1.2-amplitude 110 Hz tone legitimately leaves the
-                // cab near 3×. The guard is against instability/runaway, not the
-                // voicing itself.
+                // 100–140 Hz (commercial captures measure +12 dB there), so a
+                // 1.2-amplitude 110 Hz tone legitimately leaves the cab near 3×.
+                // The guard is against instability/runaway, not the voicing
+                // itself.
                 assert!(max_abs < 4.0, "cab runaway at pos {pos}: {max_abs}");
                 let dc = (sum / count as f64).abs();
                 assert!(dc < 0.02, "cab leaks DC at pos {pos}: {dc:.4}");
