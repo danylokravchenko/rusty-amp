@@ -129,6 +129,16 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
         <p class="sample__desc">Lead tone — sustain-focused, delay + reverb, on-axis mic for pick-attack clarity.</p>
         <audio controls preload="none" src="assets/audio/solo_seeker.wav"></audio>
       </div>
+      <div class="sample" style="--c:var(--magenta)">
+        <div class="sample__head"><span class="sample__name">Metalcore shred</span><span class="sample__rig">Mesa Dual Rectifier · Mesa V30</span></div>
+        <p class="sample__desc">Tight djent-adjacent rhythm and singing high-gain leads — Tube Screamer slamming the front end, pre-amp EQ tightening the chug.</p>
+        <audio controls preload="none" src="assets/audio/metalcore.wav"></audio>
+      </div>
+      <div class="sample" style="--c:var(--purple)">
+        <div class="sample__head"><span class="sample__name">Crowbar sludge</span><span class="sample__rig">Marshall JCM800 · Orange PPC412</span></div>
+        <p class="sample__desc">Downtuned NOLA sludge — a massive low-mid wall of raw Marshall grind, Tube Screamer firming the drop tuning, cavernous Orange weight.</p>
+        <audio controls preload="none" src="assets/audio/crowbar.wav"></audio>
+      </div>
       <div class="sample sample--soon">
         <div class="sample__head"><span class="sample__name">More coming soon</span></div>
         <p class="sample__desc">The other bundled presets are getting their own clips — check back.</p>
