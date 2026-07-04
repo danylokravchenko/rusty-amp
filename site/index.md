@@ -21,13 +21,15 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <a class="btn btn--primary" href="getting-started.html">▶ Get started</a>
       <a class="btn" href="https://github.com/danylokravchenko/rusty-amp/releases/latest">⬇ Download binary</a>
       <a class="btn" href="how-it-works.html">⚙ How it works</a>
-      <a class="btn" href="#demo">🎬 Watch demo</a>
       <a class="btn" href="#hear">🔊 Hear samples</a>
     </div>
 
     <figure class="shot">
       <div class="shot__bar"><i></i><i></i><i></i></div>
-      <img src="assets/screenshot.png" alt="rusty-amp running in a terminal: amp head, pedalboard, and live meters" />
+      <video controls muted loop playsinline preload="none" poster="assets/screenshot.png" style="width:100%;display:block">
+        <source src="assets/demo.mp4" type="video/mp4" />
+        <img src="assets/demo.gif" alt="rusty-amp demo: switching amps and stacking pedals from the terminal" />
+      </video>
     </figure>
   </div>
 </header>
@@ -106,18 +108,6 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="card"><div class="ico">⏺️</div><h3>One-key recording</h3><p>Capture the fully-processed signal straight to a stereo WAV file with a single keystroke.</p></div>
       <div class="card"><div class="ico">🖥️</div><h3>Cross-platform</h3><p>Runs natively on macOS, Windows, and Linux via <a href="https://github.com/RustAudio/cpal">cpal</a>.</p></div>
     </div>
-  </section>
-
-  <section id="demo">
-    <h2>Demo</h2>
-    <p class="lead">A quick tour of the rig — switching amps, stacking pedals, and live metering, all from the keyboard.</p>
-    <figure class="shot">
-      <div class="shot__bar"><i></i><i></i><i></i></div>
-      <video controls muted loop playsinline preload="none" poster="assets/screenshot.png" style="width:100%;display:block">
-        <source src="assets/demo.mp4" type="video/mp4" />
-        <img src="assets/demo.gif" alt="rusty-amp demo: switching amps and stacking pedals from the terminal" />
-      </video>
-    </figure>
   </section>
 
   <section id="hear">
