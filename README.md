@@ -8,15 +8,32 @@ Plug in your guitar, pick an amp, and play. rusty-amp recreates classic tube and
 
 > 📖 **Full documentation:** **[danylokravchenko.github.io/rusty-amp](https://danylokravchenko.github.io/rusty-amp/)** — install guide, every pedal and knob, amps & cabinets, presets, plugins, and how it all works under the hood.
 
+## Demo
+
+![Demo](/site/assets/demo.gif)
+
+## Motivation
+
+Every person who plays guitar knows the routine: you need to boot up heavyweight software, load a plugin for amp and cabinet simulation, and wait. That software is great for professional studio work, but what if you just want to play your instrument without any complications? In addition, it's usually platform-locked, the licenses cost real money, and they limit how many devices you can authorize.
+
+🎸 rusty-amp — a complete guitar amp and pedalboard rig that's a single ~1.5 MB binary. No installer. No license server. No subscription. No "activate this device". You download one tiny file, plug in your guitar, and you're playing on any platform right in your terminal.
+
+> [!IMPORTANT]
+> Rusty-amp does not try to replace professional studio software.
+
+What's important that it doesn't cut corners on tone. Inside that tiny binary: amplifiers, multi-mic'd cabinets, and a full pedalboard, with artist-inspired presets to land a great tone. Under the hood, it's real DSP, not a toy. Each amp is modeled on the actual circuit, so the controls push and pull on each other the way they do on a real analog tone stack, and the low end "blooms" dynamically as you dig in, with the power amp and speaker interacting just like the real thing. The cabinets aren't just an EQ curve either. A real cab in a room has a "fingerprint": its size, the cone resonance, the mic, and the early reflections. rusty-amp captures all of it as an impulse response, over a thousand taps long, so every reflection and resonance rings out, and the tone comes through deep and juicy instead of flat and sterile.
+
+On top of that sit complex effects which add width and depth to sound. All of it runs in real time on a single audio thread, and the whole rig consumes only about 15% CPU, thanks to Rust, convolution, and FFT.
+
 ## Highlights
 
 - 🔊 **3 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, and Randall Warhead, switchable while you play
-- 📦 **3 cabinets + your own IRs** — Mesa, Marshall, and Orange 4×12s, each captured with three blendable mics; load your own `.wav` IR and A/B it live
+- 📦 **3 cabinets + your own IRs** — Mesa, Marshall, and Orange 4×12s, each captured with three blendable mics; load your own favourite external `wav` IR
 - 🎛️ **A full pedalboard** — noise gate, compressor, fuzz, Tube Screamer, DS-1, EQ, flanger, chorus, ping-pong delay, and stereo reverb; add, remove, and bypass on the fly
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI
-- 🎚️ **AU amp host (macOS)** — load an Audio Unit amp sim (e.g. a Marshall plugin) as an amp-position override, either amp+cab or amp-only (keeping the built-in cab/IR), with unit-aware params and latency-aligned A/B
+- 🎚️ **AU amp host (macOS)** — load an Audio Unit amp sim (e.g. a Marshall plugin) as an amp-position override, either amp+cab or amp-only (keeping the built-in cab/IR), with unit-aware params and latency-aligned
 - 🎵 **Built-in tuner** — a chromatic tuner with a ±cents needle and a live note spectrum
 - 🥁 **Practice metronome** — an adjustable-tempo click you hear while playing but that never bleeds into your recordings
 - ⏺️ **One-key recording** straight to a stereo WAV file

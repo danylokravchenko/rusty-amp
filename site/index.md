@@ -21,6 +21,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <a class="btn btn--primary" href="getting-started.html">▶ Get started</a>
       <a class="btn" href="https://github.com/danylokravchenko/rusty-amp/releases/latest">⬇ Download binary</a>
       <a class="btn" href="how-it-works.html">⚙ How it works</a>
+      <a class="btn" href="#demo">🎬 Watch demo</a>
       <a class="btn" href="#hear">🔊 Hear samples</a>
     </div>
 
@@ -41,7 +42,8 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
         <span class="arr">→</span> FUZZ <span class="arr">→</span> TS-808
         <span class="arr">→</span> DS-1 <span class="arr">→</span> PRE-EQ
         <span class="arr">→</span> <b>AMP</b> <span class="arr">→</span> <b>CAB</b>
-        <span class="arr">→</span> EQ <span class="arr">→</span> DELAY
+        <span class="arr">→</span> EQ <span class="arr">→</span> FLANGER
+        <span class="arr">→</span> CHORUS <span class="arr">→</span> DELAY
         <span class="arr">→</span> REVERB <span class="arr">→</span> <b>OUTPUT</b>
       </p>
       <div class="meter"></div>
@@ -49,6 +51,44 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
         Sample-by-sample DSP · 8× oversampled amp stages · partitioned-FFT cabinet convolution · true stereo out
       </p>
     </div>
+  </section>
+
+  <section>
+    <h2>Motivation</h2>
+    <p>
+      Every person who plays guitar knows the routine: you need to boot up heavyweight
+      software, load a plugin for amp and cabinet simulation, and wait. That software is
+      great for professional studio work, but what if you just want to play your instrument
+      without any complications? In addition, it's usually platform-locked, the licenses cost
+      real money, and they limit how many devices you can authorize.
+    </p>
+    <p>
+      🎸 rusty-amp — a complete guitar amp and pedalboard rig that's a single ~1.5&nbsp;MB
+      binary. No installer. No license server. No subscription. No “activate this device”.
+      You download one tiny file, plug in your guitar, and you're playing on any platform
+      right in your terminal.
+    </p>
+    <div class="panel panel--accent" style="--accent:var(--gold)">
+      <span class="panel__label">Important</span>
+      <p style="margin:0">rusty-amp does not try to replace professional studio software.</p>
+    </div>
+    <p>
+      What's important is that it doesn't cut corners on tone. Inside that tiny binary:
+      amplifiers, multi-mic'd cabinets, and a full pedalboard, with artist-inspired presets to
+      land a great tone. Under the hood, it's real DSP, not a toy. Each amp is modeled on the
+      actual circuit, so the controls push and pull on each other the way they do on a real
+      analog tone stack, and the low end “blooms” dynamically as you dig in, with the power amp
+      and speaker interacting just like the real thing. The cabinets aren't just an EQ curve
+      either. A real cab in a room has a “fingerprint”: its size, the cone resonance, the mic,
+      and the early reflections. rusty-amp captures all of it as an impulse response, over a
+      thousand taps long, so every reflection and resonance rings out, and the tone comes
+      through deep and juicy instead of flat and sterile.
+    </p>
+    <p>
+      On top of that sit complex effects which add width and depth to sound. All of it runs in
+      real time on a single audio thread, and the whole rig consumes only about 15% CPU, thanks
+      to Rust, convolution, and FFT.
+    </p>
   </section>
 
   <section>
@@ -66,6 +106,18 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="card"><div class="ico">⏺️</div><h3>One-key recording</h3><p>Capture the fully-processed signal straight to a stereo WAV file with a single keystroke.</p></div>
       <div class="card"><div class="ico">🖥️</div><h3>Cross-platform</h3><p>Runs natively on macOS, Windows, and Linux via <a href="https://github.com/RustAudio/cpal">cpal</a>.</p></div>
     </div>
+  </section>
+
+  <section id="demo">
+    <h2>Demo</h2>
+    <p class="lead">A quick tour of the rig — switching amps, stacking pedals, and live metering, all from the keyboard.</p>
+    <figure class="shot">
+      <div class="shot__bar"><i></i><i></i><i></i></div>
+      <video controls muted loop playsinline preload="none" poster="assets/screenshot.png" style="width:100%;display:block">
+        <source src="assets/demo.mp4" type="video/mp4" />
+        <img src="assets/demo.gif" alt="rusty-amp demo: switching amps and stacking pedals from the terminal" />
+      </video>
+    </figure>
   </section>
 
   <section id="hear">
