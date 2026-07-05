@@ -137,6 +137,16 @@ const DOPPLER_DEPTH: f32 = 0.45;
 /// Base delay for the Doppler line so modulation never reads the future.
 const DOPPLER_BASE: f32 = 2.0;
 
+/// Input sensitivity of the speaker-drive stage. The nonlinearities here are
+/// calibrated around unit-level drive, but the amps deliver only ~0.05–0.16 RMS
+/// (0.12–0.49 peak) at real settings (see the engagement table in
+/// `examples/cab_analysis.rs`) — at unit sensitivity every "alive" stage sat
+/// dormant and the cab degenerated to a static IR player. This gain shifts the
+/// operating point to where the amps actually play — the stages stay subtle at
+/// default knobs and engage solidly when cranked — and the output is scaled
+/// back down, so small-signal level through the cab is unchanged.
+const SPKR_SENS: f32 = 3.5;
+
 /// The driver nonlinearities a fixed IR can't hold, applied to the mono drive
 /// before the mic picks the sound up: displacement-driven motor droop, stateless
 /// [`cone_breakup`] saturation, voice-coil thermal power compression, and
@@ -168,6 +178,9 @@ impl SpeakerDrive {
     /// release (so transients pass and only sustained level compresses).
     #[inline]
     fn process(&mut self, x: f32) -> f32 {
+        // Shift the operating point to the amps' real output range (undone at
+        // the end, so the stage stays unit-gain for small signals).
+        let x = x * SPKR_SENS;
         // Instantaneous cone displacement (bounded so a hot amp can't blow up
         // the droop/Doppler maths).
         let d = self.disp_lp.process(x).clamp(-1.5, 1.5);
@@ -192,7 +205,7 @@ impl SpeakerDrive {
         let i0 = (self.dop_pos + len - ipart) % len;
         let i1 = (self.dop_pos + len - ipart - 1) % len;
         self.dop_pos = (self.dop_pos + 1) % len;
-        self.dop_buf[i0] * (1.0 - frac) + self.dop_buf[i1] * frac
+        (self.dop_buf[i0] * (1.0 - frac) + self.dop_buf[i1] * frac) / SPKR_SENS
     }
 }
 
@@ -211,10 +224,12 @@ const CONE_PITCH_M: f32 = 0.28;
 const MIC_DIST_M: f32 = 0.10;
 const SOUND_SPEED_M_S: f32 = 343.0;
 /// Off-axis + cardioid-rejection loss applied on top of 1/r spreading,
-/// calibrated so the summed tap gains (~0.30 side / ~0.09 diagonal) reproduce
-/// the ~3 dB echo-scan comb real 4×12 captures measure at τ ≈ 0.6 ms.
-const NEIGHBOR_AXIS_LOSS_SIDE: f32 = 0.45;
-const NEIGHBOR_AXIS_LOSS_DIAG: f32 = 0.36;
+/// calibrated so the summed tap gains (~0.22 side / ~0.07 diagonal) keep the
+/// echo-scan comb real 4×12 captures measure at τ ≈ 0.6 ms at ~±2 dB of
+/// *ripple*: at the old 0.45/0.36 the comb measured 1.1–1.3 dB std-dev through
+/// 250–500 Hz where the reference captures stay smooth (0.3–0.4 dB).
+const NEIGHBOR_AXIS_LOSS_SIDE: f32 = 0.32;
+const NEIGHBOR_AXIS_LOSS_DIAG: f32 = 0.28;
 /// Neighbour arrivals are heard ~80° off the cone's axis: strong beaming loss,
 /// but real captures keep comb ripple through the 1–2 kHz octave, so the
 /// corner sits at 2.2 kHz rather than a brick wall at the beaming onset.
@@ -224,13 +239,25 @@ const NEIGHBOR_LP_HZ: f32 = 2200.0;
 /// Power-normalised: the IR voicings were measured against real captures (which
 /// already include the neighbours' steady-state energy), so this stage adds the
 /// comb/arrival *time structure* without re-tilting the overall level.
+///
+/// Each neighbour is an *extended* source — a 12" cone, not a point — so its
+/// energy arrives smeared over a few hundred microseconds (nearest rim first,
+/// far rim last), modelled as a short cluster of sub-taps per neighbour. A
+/// single point tap put a full-depth comb null at 1/(2τ) ≈ 700–870 Hz, carving
+/// the 0.5–1 kHz body real echo-scans show only *rippling* by ~3 dB; the
+/// cluster keeps the same total neighbour energy but softens the null into
+/// that shallow ripple.
 struct ConeSpread {
     buf: Vec<f32>,
     pos: usize,
+    /// Used only in tests
+    #[allow(dead_code)]
     d_side: usize,
+    /// Used only in tests
+    #[allow(dead_code)]
     d_diag: usize,
-    g_side: f32,
-    g_diag: f32,
+    /// (delay, gain) sub-taps for both neighbour clusters.
+    taps: [(usize, f32); 5],
     norm: f32,
     lp: Biquad,
 }
@@ -242,19 +269,30 @@ impl ConeSpread {
         let side_path = path(CONE_PITCH_M);
         let diag_path = path(CONE_PITCH_M * std::f32::consts::SQRT_2);
         // 1/r spreading relative to the near cone, times the off-axis loss;
-        // the two equidistant neighbours (beside + below) share one tap.
+        // the two equidistant neighbours (beside + below) share one cluster.
         let g_side = 2.0 * (MIC_DIST_M / side_path) * NEIGHBOR_AXIS_LOSS_SIDE;
         let g_diag = (MIC_DIST_M / diag_path) * NEIGHBOR_AXIS_LOSS_DIAG;
         let d_side = delay(side_path).max(1);
         let d_diag = delay(diag_path).max(d_side + 1);
+        // Sub-tap spreads (samples ≈ the extra path across the cone face); the
+        // nearest-rim tap leads each cluster so `d_side`/`d_diag` stay the
+        // first-arrival delays. Gains split the neighbour total irregularly so
+        // the sub-cluster does not build its own periodic comb.
+        let taps = [
+            (d_side, g_side * 0.50),
+            (d_side + 3, g_side * 0.32),
+            (d_side + 7, g_side * 0.18),
+            (d_diag, g_diag * 0.60),
+            (d_diag + 4, g_diag * 0.40),
+        ];
+        let power: f32 = taps.iter().map(|&(_, g)| g * g).sum();
         Self {
-            buf: vec![0.0; d_diag + 2],
+            buf: vec![0.0; d_diag + 6],
             pos: 0,
             d_side,
             d_diag,
-            g_side,
-            g_diag,
-            norm: 1.0 / (1.0 + g_side * g_side + g_diag * g_diag).sqrt(),
+            taps,
+            norm: 1.0 / (1.0 + power).sqrt(),
             lp: Biquad::lowpass(sr, NEIGHBOR_LP_HZ, 0.707),
         }
     }
@@ -263,8 +301,10 @@ impl ConeSpread {
     fn process(&mut self, x: f32) -> f32 {
         let len = self.buf.len();
         self.buf[self.pos] = x;
-        let tap = |d: usize| self.buf[(self.pos + len - d) % len];
-        let neighbors = self.g_side * tap(self.d_side) + self.g_diag * tap(self.d_diag);
+        let mut neighbors = 0.0;
+        for &(d, g) in &self.taps {
+            neighbors += g * self.buf[(self.pos + len - d) % len];
+        }
         self.pos = (self.pos + 1) % len;
         (x + self.lp.process(neighbors)) * self.norm
     }
@@ -313,10 +353,11 @@ pub fn cone_spread_response(sr: f32, len: usize) -> Vec<f32> {
 const GRILLE_STANDOFF_M: f32 = 0.022;
 /// Net gain of the double bounce. Negative places the first comb *peak* in the
 /// presence band (~3.9 kHz) and its null up in the fizz region (~7.8 kHz) — an airy
-/// sheen that also tames the top, rather than a hollow presence notch. Tuned so the
-/// added 2–8 kHz ripple tracks a real grille-position capture (God's Cab's grill_dark
-/// measures ~2.7/8.5 dB std-dev in the 2–4k/4–8k octaves — see `examples/cab_analysis`).
-const GRILLE_GAIN: f32 = -0.24;
+/// sheen that also tames the top, rather than a hollow presence notch. Kept gentle:
+/// at −0.24 the comb's lower side measured a −1.2…−1.9 dB carve through 1.6–2.6 kHz
+/// on every cab — the octave real captures hold as they climb out of the mid pocket
+/// (see `examples/cab_analysis`).
+const GRILLE_GAIN: f32 = -0.16;
 /// The grille is transparent below here (long waves diffract past the perforations),
 /// so only the treble reflection is combed.
 const GRILLE_HP_HZ: f32 = 1600.0;
@@ -393,6 +434,59 @@ pub fn grille_echo_response(sr: f32, len: usize) -> Vec<f32> {
     (0..len)
         .map(|i| ge.process(if i == 0 { 1.0 } else { 0.0 }))
         .collect()
+}
+
+/// How much of [`SpeakerDrive`]'s nonlinear range a drive signal actually
+/// exercises — analysis-tool access (see `examples/cab_analysis.rs`).
+///
+/// The speaker nonlinearities are tuned to emerge only when the cab is pushed,
+/// which creates an implicit gain-staging contract with the amps: if a real
+/// amp's output never reaches the thermal knee or meaningful cone displacement,
+/// power compression, motor droop and Doppler contribute nothing and the cab
+/// degenerates to a static IR player. This measures that contract on a real
+/// drive signal. Not part of the public API.
+#[doc(hidden)]
+pub struct SpeakerDriveStats {
+    /// Fraction of samples with the thermal envelope above the compression knee.
+    pub thermal_engaged: f32,
+    /// Peak thermal gain reduction reached (dB).
+    pub max_compression_db: f32,
+    /// Mean |cone displacement| (signal units; droop scales with d², Doppler with d).
+    pub mean_abs_disp: f32,
+}
+
+#[doc(hidden)]
+pub fn speaker_drive_stats(sr: f32, drive: &[f32]) -> SpeakerDriveStats {
+    // Mirrors SpeakerDrive::process (same module constants, so thresholds can't
+    // drift) while recording the envelope and displacement it develops.
+    let coeff = |ms: f32| 1.0 - (-1.0 / (sr * ms / 1000.0)).exp();
+    let (atk, rel) = (coeff(PC_ATK_MS), coeff(PC_REL_MS));
+    let mut disp_lp = Biquad::lowpass(sr, DISP_FC, DISP_Q);
+    let mut env = 0.0f32;
+    let mut engaged = 0usize;
+    let mut max_over = 0.0f32;
+    let mut dsum = 0.0f64;
+    for &x in drive {
+        let x = x * SPKR_SENS;
+        let d = disp_lp.process(x).clamp(-1.5, 1.5);
+        dsum += f64::from(d.abs());
+        let x = x / (1.0 + BL_DROOP_K * d * d);
+        let x = cone_breakup(x);
+        let a = x.abs();
+        let c = if a > env { atk } else { rel };
+        env += (a - env) * c;
+        let over = (env - PC_THRESHOLD).max(0.0);
+        if over > 0.0 {
+            engaged += 1;
+        }
+        max_over = max_over.max(over);
+    }
+    let n = drive.len().max(1) as f32;
+    SpeakerDriveStats {
+        thermal_engaged: engaged as f32 / n,
+        max_compression_db: 20.0 * (1.0 + PC_RATIO_K * max_over).log10(),
+        mean_abs_disp: (dsum / f64::from(n)) as f32,
+    }
 }
 
 // ── Stage 2: multi-mic blend convolution ────────────────────────────────────────
@@ -768,10 +862,15 @@ mod tests {
     /// Power compression: at high SPL the cab must compress (sub-linear gain), so a
     /// loud tone's output/input gain is lower than a quiet tone's. The "push back"
     /// of a driven cab.
+    ///
+    /// Probe levels match what the amps actually deliver (see the engagement
+    /// table in `examples/cab_analysis.rs`): "loud" is a cranked amp's ~0.4
+    /// peak, not a unit-amplitude sine the rig never produces — the speaker
+    /// stage's sensitivity is calibrated to that range.
     #[test]
     fn loud_signal_is_power_compressed() {
-        let quiet_gain = tone_rms(110.0, 0.05, 0.5) / 0.05;
-        let loud_gain = tone_rms(110.0, 1.0, 0.5) / 1.0;
+        let quiet_gain = tone_rms(110.0, 0.02, 0.5) / 0.02;
+        let loud_gain = tone_rms(110.0, 0.4, 0.5) / 0.4;
         let ratio = loud_gain / quiet_gain;
         assert!(
             ratio < 0.9,
@@ -898,8 +997,10 @@ mod tests {
             let sb = goertzel(&out, 2200.0 - 95.0, SR) + goertzel(&out, 2200.0 + 95.0, SR);
             sb / carrier
         };
-        let quiet = sideband_ratio(0.08);
-        let driven = sideband_ratio(1.0);
+        // Levels match the amps' real output range (the speaker sensitivity is
+        // calibrated to it): "driven" ≈ a cranked amp's peak, not a unit sine.
+        let quiet = sideband_ratio(0.03);
+        let driven = sideband_ratio(0.4);
         assert!(
             driven > quiet * 3.0,
             "no drive-dependent growl: sidebands quiet {quiet:.4} driven {driven:.4}"
@@ -1009,6 +1110,42 @@ mod tests {
             (1.8..2.6).contains(&ge.d_dust),
             "dust-cap delay off-geometry: {}",
             ge.d_dust
+        );
+    }
+
+    /// The engagement probe must report what the speaker stages actually do:
+    /// a loud sustained drive engages the thermal knee and develops real cone
+    /// displacement, a quiet one reports (near-)zero on both — so the analysis
+    /// tooling can detect an amp whose output never reaches the nonlinear range.
+    #[test]
+    fn speaker_drive_stats_track_engagement() {
+        let loud: Vec<f32> = (0..SR as usize)
+            .map(|i| (2.0 * PI * 95.0 * i as f32 / SR).sin() * 1.2)
+            .collect();
+        let quiet: Vec<f32> = loud.iter().map(|x| x * 0.008).collect();
+        let ls = speaker_drive_stats(SR, &loud);
+        let qs = speaker_drive_stats(SR, &quiet);
+        assert!(
+            ls.thermal_engaged > 0.5,
+            "loud drive barely engages the thermal knee: {}",
+            ls.thermal_engaged
+        );
+        assert!(
+            ls.max_compression_db > 0.5,
+            "loud drive shows no compression: {} dB",
+            ls.max_compression_db
+        );
+        assert!(
+            ls.mean_abs_disp > 0.3,
+            "loud drive develops no displacement: {}",
+            ls.mean_abs_disp
+        );
+        assert_eq!(qs.thermal_engaged, 0.0, "quiet drive crossed the knee");
+        assert!(
+            qs.max_compression_db < 0.05 && qs.mean_abs_disp < 0.05,
+            "quiet drive not near-transparent: {} dB, disp {}",
+            qs.max_compression_db,
+            qs.mean_abs_disp
         );
     }
 

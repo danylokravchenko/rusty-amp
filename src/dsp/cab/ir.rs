@@ -12,8 +12,10 @@
 //!   • speaker modal resonances (low cone "thump" + cone-breakup ring) → the
 //!     decaying tail that a minimum-phase EQ has no way to express.
 //!
-//! Two slightly different textures are used for the left/right speakers, which
-//! decorrelates the stereo image for natural width.
+//! The left/right speakers share one close-mic texture (real close captures are
+//! mono — L/R correlation 1.0 — and heavier decorrelation reads as phasey, not
+//! wide); only the scatter seeds and the room-mic textures differ per channel,
+//! for a whisper of top-end width over a solid centre image.
 
 use std::f32::consts::PI;
 
@@ -26,18 +28,21 @@ pub struct Texture {
     pub reflections: &'static [(f32, f32)],
     /// Speaker resonant modes as (freq_hz, t60_ms, gain).
     pub modes: &'static [(f32, f32, f32)],
-    /// Optional cone-breakup scatter: a seeded cluster of many small high-Q
-    /// modes across the breakup band (see [`Scatter`]).
-    pub scatter: Option<Scatter>,
+    /// Scatter clusters: seeded clusters of many small high-Q modes (see
+    /// [`Scatter`]) — typically one across the cone-breakup band and one
+    /// across the mids for the fine reflection texture.
+    pub scatter: &'static [Scatter],
 }
 
-/// Cone-breakup scatter. Above ~2 kHz a real cone stops moving as a piston and
-/// splits into dozens of small, irregularly-placed resonances; measured captures
-/// show 9–12 dB of spectral ripple per octave up there, where one or two
-/// hand-authored modes leave the response statistically far too smooth
-/// ("airbrushed"). Rather than author dozens of modes by hand, a deterministic
-/// LCG expands this spec into `count` modes with log-uniform random frequencies
-/// in `band`, decays in `t60_ms`, and alternating-sign gains up to `gain`.
+/// Mode scatter. Real captures are statistically *jagged*: above ~2 kHz the
+/// cone stops moving as a piston and splits into dozens of small,
+/// irregularly-placed breakup resonances, and through the mids (0.5–2 kHz)
+/// the dense panel/edge reflection texture ripples the response by a couple
+/// of dB at fine spacing — where one or two hand-authored modes leave the
+/// response statistically far too smooth ("airbrushed"). Rather than author
+/// dozens of modes by hand, a deterministic LCG expands this spec into
+/// `count` modes with log-uniform random frequencies in `band`, decays in
+/// `t60_ms`, and alternating-sign gains up to `gain`.
 /// Different seeds per channel decorrelate L/R exactly like a real pair of
 /// speakers, whose breakup patterns never match.
 #[derive(Clone, Copy)]
@@ -128,8 +133,8 @@ pub fn synth(sr: f32, len: usize, voicing: &mut dyn FnMut(f32) -> f32, tex: &Tex
 
     // 5. Add decaying modal resonances (cone + breakup ring) on top of the
     //    level-matched body — a controlled amount of resonance, not a takeover.
-    //    The authored modes are joined by the expanded breakup scatter (if any).
-    let scatter = tex.scatter.map(|s| s.modes()).unwrap_or_default();
+    //    The authored modes are joined by the expanded scatter clusters.
+    let scatter: Vec<(f32, f32, f32)> = tex.scatter.iter().flat_map(|s| s.modes()).collect();
     for &(f, t60_ms, g) in tex.modes.iter().chain(scatter.iter()) {
         // t60 (−60 dB) → exponential time constant: ln(1000) ≈ 6.908.
         let tau = (t60_ms / 1000.0) * sr / 6.908;
@@ -395,7 +400,7 @@ mod tests {
             predelay: 0,
             reflections: &[],
             modes: &[(110.0, 90.0, 0.05)],
-            scatter: None,
+            scatter: &[],
         };
         let ir = synth(sr, len, &mut flat, &tex);
         // Frequency: 110 Hz dominates its neighbours.
@@ -422,7 +427,7 @@ mod tests {
             predelay: 0,
             reflections: &[(TAU_MS, -0.7)],
             modes: &[],
-            scatter: None,
+            scatter: &[],
         };
         let ir = synth(sr, len, &mut flat, &tex);
         let f_ext = 1000.0 / (2.0 * TAU_MS); // 500 Hz
@@ -447,7 +452,7 @@ mod tests {
             predelay: 4,
             reflections: &[(0.5, -0.3), (2.0, 0.15)],
             modes: &[(95.0, 100.0, 0.01), (3400.0, 4.0, 0.1)],
-            scatter: None,
+            scatter: &[],
         };
         let ir = synth(sr, len, &mut voicing, &tex);
         assert!(ir.iter().all(|v| v.is_finite()), "non-finite IR tap");

@@ -16,19 +16,24 @@ use crate::dsp::biquad::Biquad;
 ///   • +3 dB low shelf at 100 Hz + a +6.5 dB resonant hump at 120 Hz (cab depth)
 ///   • +4 dB wide mound at 220 Hz and +5.5 dB at 500 Hz (low-mid body plateau,
 ///     carried up through ~700 Hz)
-///   • −4 dB dip at 1300 Hz over a −3 dB shelf from 1.35 kHz (the mid
-///     "pocket": real captures hold their 0.5–1 kHz level, then dip through
-///     the 1–2 kHz octave)
-///   • +4 dB at 3500 Hz and +5.5 dB at 4.5 kHz (V30 presence, held to ~5 kHz —
-///     real captures keep their treble through 2.3–5 kHz, then crash)
+///   • −5 dB dip at 1250 Hz over a −1 dB shelf from 1.35 kHz (the mid
+///     "pocket": real captures hold their 0.5–1 kHz level, dip through the
+///     1–2 kHz octave, then recover by 2.5 kHz)
+///   • +4 dB wide mound at 2.5 kHz and +5.5 dB at 4.5 kHz (V30 presence, held
+///     to ~5 kHz — real captures keep their treble through 2.3–5 kHz, then crash)
 ///   • −17 dB high shelf at 6800 Hz (speaker cone rolloff)
-///   • LP at 8 kHz (fizz cut + cone break-up noise removal)
+///   • 4th-order LP at 7 kHz (fizz cut — real captures carry no 8 kHz energy)
 pub struct MesaCab {
     inner: BlendedCab,
 }
 
-// Left/right speaker textures: slightly different reflection times and modes so
-// the two channels decorrelate (stereo width) without smearing a mono sum.
+// Close-mic texture, shared by both channels. The references this cab is tuned
+// against (real close captures — see `examples/cab_analysis.rs`) are effectively
+// mono: L/R correlation 1.00. The old per-channel detuned reflection times and
+// modes measured 0.66 — phasey width that smeared the solid centre image a real
+// capture has. Only the scatter seeds differ per channel now, leaving a whisper
+// of top-end width like a real speaker pair whose breakup patterns never match;
+// the room mics below stay a genuinely decorrelated stereo pair.
 //
 // Early taps (< 4 ms) are the cone-to-grille / panel comb that colours the body —
 // timed so their comb notches land in the 800 Hz–2 kHz mid pocket rather than in
@@ -37,58 +42,86 @@ pub struct MesaCab {
 // The two low modes near 100–120 Hz add a subtle thump ring on top of the EQ hump
 // (they sit where the direct sound is strong: an additive resonance placed where
 // the direct path is weak phase-cancels it just above resonance and carves a
-// notch instead of adding depth); the ~3.4 kHz mode is the V30 breakup.
-const TEX_L: Texture = Texture {
-    predelay: 0,
-    reflections: &[
-        (0.27, -0.24),
-        (0.62, 0.20),
-        (1.24, -0.12),
-        (3.10, 0.08),
-        (6.30, -0.075),
-        (10.80, 0.062),
-        (14.20, -0.050),
-        (17.50, 0.040),
-        (20.50, 0.030),
-    ],
-    modes: &[
-        (98.0, 95.0, 0.004),
-        (118.0, 85.0, 0.004),
-        (3400.0, 4.0, 0.1),
-    ],
-    scatter: Some(ir::Scatter {
+// notch instead of adding depth); their T60s are kept short of the note itself —
+// the reference captures are gated by ~40 ms, and a longer synthetic ring reads
+// as boxy mud, not depth. The ~3.4 kHz mode is the V30 breakup.
+// The 6–21 ms tail is deliberately dense (a tap every ~1.5–2 ms): real
+// captures measure a diffuse 10–20 ms window (echo crest ~3–4), and the old
+// sparse five-tap tail read ~5 — audibly "a few discrete echoes", not a room.
+// Early-tap gains are kept small (~0.1): a ±0.2 tap at 0.62 ms is a *voicing*
+// move (a −5 dB null at 800/2400 Hz and +3 dB peaks at 1.6/3.2 kHz — measured
+// as exactly those deviations vs the refs), and the macro shape belongs to the
+// EQ skeleton; at ~0.1 the combs read as texture, like real captures.
+const TEX_REFL: &[(f32, f32)] = &[
+    (0.27, -0.13),
+    (0.62, 0.11),
+    (1.24, -0.095),
+    (3.10, 0.085),
+    (6.30, -0.075),
+    (8.40, 0.068),
+    (10.80, -0.062),
+    (12.40, 0.056),
+    (14.20, -0.050),
+    (15.90, 0.045),
+    (17.50, -0.040),
+    (19.00, 0.034),
+    (20.50, -0.030),
+];
+// The breakup mode stays at texture scale (0.045): at 0.1 the added resonance
+// out-shouted the voicing — a measured +5 dB peak at its frequency over a
+// −5 dB phase-cancellation notch half an octave below.
+const TEX_MODES: &[(f32, f32, f32)] = &[
+    (98.0, 55.0, 0.004),
+    (118.0, 50.0, 0.004),
+    (3400.0, 4.0, 0.045),
+];
+// Two scatter clusters per channel: the V30 breakup band, plus a mid cluster
+// for the fine 0.5–2 kHz reflection ripple real captures measure (~1.5–2.5 dB
+// of fine-grained texture; the hand-authored taps alone leave the mids
+// statistically airbrushed).
+const SCATTER_L: &[ir::Scatter] = &[
+    ir::Scatter {
         seed: 11,
         count: 22,
-        band: (2200.0, 7600.0),
+        band: (2200.0, 7000.0),
         t60_ms: (5.0, 12.0),
         gain: 0.014,
-    }),
-};
-const TEX_R: Texture = Texture {
-    predelay: 2,
-    reflections: &[
-        (0.31, -0.24),
-        (0.66, 0.22),
-        (1.32, -0.10),
-        (3.40, 0.075),
-        (6.90, -0.070),
-        (11.60, 0.058),
-        (15.10, -0.047),
-        (18.80, 0.037),
-        (20.50, 0.028),
-    ],
-    modes: &[
-        (100.0, 97.0, 0.004),
-        (122.0, 87.0, 0.004),
-        (3550.0, 4.0, 0.10),
-    ],
-    scatter: Some(ir::Scatter {
+    },
+    ir::Scatter {
+        seed: 13,
+        count: 24,
+        band: (550.0, 2300.0),
+        t60_ms: (6.0, 16.0),
+        gain: 0.022,
+    },
+];
+const SCATTER_R: &[ir::Scatter] = &[
+    ir::Scatter {
         seed: 12,
         count: 22,
-        band: (2200.0, 7600.0),
+        band: (2200.0, 7000.0),
         t60_ms: (5.0, 12.0),
         gain: 0.014,
-    }),
+    },
+    ir::Scatter {
+        seed: 14,
+        count: 24,
+        band: (550.0, 2300.0),
+        t60_ms: (6.0, 16.0),
+        gain: 0.022,
+    },
+];
+const TEX_L: Texture = Texture {
+    predelay: 0,
+    reflections: TEX_REFL,
+    modes: TEX_MODES,
+    scatter: SCATTER_L,
+};
+const TEX_R: Texture = Texture {
+    predelay: 0,
+    reflections: TEX_REFL,
+    modes: TEX_MODES,
+    scatter: SCATTER_R,
 };
 
 // Room-mic textures: extra pre-delay (distance) and denser, later reflections so
@@ -103,8 +136,8 @@ const ROOM_TEX_L: Texture = Texture {
         (16.50, 0.08),
         (18.50, -0.06),
     ],
-    modes: &[(82.0, 130.0, 0.006), (180.0, 95.0, 0.005)],
-    scatter: None,
+    modes: &[(82.0, 65.0, 0.005), (180.0, 55.0, 0.004)],
+    scatter: &[],
 };
 const ROOM_TEX_R: Texture = Texture {
     predelay: 138,
@@ -116,8 +149,8 @@ const ROOM_TEX_R: Texture = Texture {
         (16.00, 0.075),
         (18.00, -0.055),
     ],
-    modes: &[(86.0, 135.0, 0.006), (190.0, 100.0, 0.005)],
-    scatter: None,
+    modes: &[(86.0, 65.0, 0.005), (190.0, 55.0, 0.004)],
+    scatter: &[],
 };
 
 impl MesaCab {
@@ -157,20 +190,28 @@ impl MesaCab {
             // keeps the pocket's skirts off the body below and the presence
             // above.
             Biquad::peak_eq(sr, 500.0, 0.7, 5.5),
-            Biquad::peak_eq(sr, 1300.0, 0.95, -4.0),
-            // Downward 0.5–2 kHz tilt: real captures slope *down* through the
-            // pocket into presence; without this the band rises instead.
-            Biquad::high_shelf(sr, 1350.0, -3.0),
-            // V30 presence: a wide, moderate lift — broad enough to read as bite
-            // without a narrow spike in the 2–5 kHz "ice-pick" band that would
-            // make high notes shrill.
-            Biquad::peak_eq(sr, 3500.0, 1.0, 4.0),
+            // Mid pocket kept narrow (Q 1.0 at 1250) and the post-pocket tilt
+            // gentle: the reference captures dip through 1–2 kHz but recover by
+            // 2.5 kHz into the presence mound; the old Q 0.95 dip + −3 dB shelf
+            // dug a measured −5…−7 dB hole through 2–2.5 kHz.
+            Biquad::peak_eq(sr, 1250.0, 1.0, -5.0),
+            Biquad::high_shelf(sr, 1350.0, -1.0),
+            // V30 presence: a wide, low-centred mound (2.5 kHz, Q 0.6) — the
+            // refs recover from the mid pocket by 2–2.5 kHz into a smooth rise,
+            // not a spike at 3.1–3.5 kHz over a 2.5 kHz hole (measured −5…−7 dB
+            // there against them with the old higher, narrower peak).
+            Biquad::peak_eq(sr, 2500.0, 0.65, 4.0),
             // The SM57-on-V30 edge: real captures hold their level through
             // 4.2–4.8 kHz right up to the cone's crash, so this peak carries the
             // presence out to the rolloff shelf.
             Biquad::peak_eq(sr, 4500.0, 1.1, 5.5),
+            // Real V30 captures fall off a cliff above ~7 kHz; the old single
+            // 8 kHz pole left a measured +10 dB of fizz at 8 kHz vs the refs.
+            // The cascaded pair carries the steepness — the shelf stays at −17
+            // so 6.3 kHz doesn't collapse before the cliff.
             Biquad::high_shelf(sr, 6800.0, -17.0),
-            Biquad::lowpass(sr, 8000.0, 0.707),
+            Biquad::lowpass(sr, 7000.0, 0.707),
+            Biquad::lowpass(sr, 7000.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
     }

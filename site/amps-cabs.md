@@ -170,32 +170,32 @@ Three multi-mic'd 4×12s, switchable live with <kbd>C</kbd>. Pick one to see its
     <div class="freqs">
       <span class="freq"><b>+6.5 dB</b> @ 120 Hz · depth hump</span>
       <span class="freq"><b>+4 dB</b> @ 220 Hz · body plateau</span>
-      <span class="freq"><b>−4 dB</b> @ 1.3 kHz · mid pocket</span>
-      <span class="freq"><b>+5.5 dB</b> @ 4.5 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>−5 dB</b> @ 1.25 kHz · mid pocket</span>
+      <span class="freq"><b>+4 dB</b> @ 2.5 kHz &amp; <b>+5.5 dB</b> @ 4.5 kHz · presence held to 5 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-marshall">
     <p class="muted" style="margin:2px 0 4px">Warm and mid-forward with a smooth top end — the classic rock voice.</p>
     <div class="freqs">
       <span class="freq"><b>+6 dB</b> @ 115 Hz · depth hump</span>
-      <span class="freq"><b>+5 dB</b> @ 210 Hz · body plateau</span>
-      <span class="freq"><b>+5.5 dB</b> @ 2.5 kHz · presence held to 5 kHz</span>
-      <span class="freq"><b>soft rolloff</b> above 6 kHz</span>
+      <span class="freq"><b>+4.3 dB</b> @ 210 Hz · body plateau</span>
+      <span class="freq"><b>+3.5 dB</b> @ 2.5 kHz · crunch held to 5 kHz</span>
+      <span class="freq"><b>steep rolloff</b> above 7 kHz</span>
     </div>
   </div>
   <div class="tab-panel" role="tabpanel" data-panel="cab-orange">
     <p class="muted" style="margin:2px 0 4px">Thick and chunky from the closed-back birch enclosure — a wall of low-mids.</p>
     <div class="freqs">
-      <span class="freq"><b>+6 dB</b> @ 118 Hz · chest thump</span>
-      <span class="freq"><b>+3.5 dB</b> @ 230 Hz · low-mid “wall”</span>
-      <span class="freq"><b>+4 dB</b> @ 3.2 kHz · presence held to 5 kHz</span>
+      <span class="freq"><b>+6 dB</b> @ 115 Hz · chest thump</span>
+      <span class="freq"><b>+3.8 dB</b> @ 230 Hz · low-mid “wall”</span>
+      <span class="freq"><b>+3.5 dB</b> @ 2.9 kHz · presence held to 5 kHz</span>
     </div>
   </div>
 </div>
 
-Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections (comb filtering), late cabinet/room reflections, and speaker modal resonances with a deep, long-decaying cone "thump" add the time-domain depth of a real miked cab. Each IR runs ~93 ms (~4500 taps at 48 kHz), so the low-end ring and room decay fully develop, and a seeded cone-breakup scatter adds the jagged 2–7.5 kHz ripple texture real captures show. Two slightly different L/R IRs decorrelate the stereo image for natural width.
+Each cabinet is rendered by **impulse-response convolution** rather than a plain EQ. The built-in IRs are synthesized in-code (nothing to ship or download): the model's voiced EQ provides the magnitude skeleton — including the low resonant hump near 120 Hz and the broad 120–600 Hz body plateau that give a real close-mic'd 4×12 its depth — then early reflections, a dense 6–21 ms reflection tail, speaker modal resonances with a short, controlled cone "thump" ring, and two seeded scatter clusters (fine 0.5–2.3 kHz reflection ripple plus jagged cone-breakup texture) add the time-domain structure real captures show. Each IR runs ~93 ms (~4500 taps at 48 kHz). The close-mic textures are shared between left and right — real close captures are effectively mono, and heavy decorrelation reads as phasey rather than wide — with only the scatter seeds differing per side, plus a genuinely decorrelated stereo room-mic pair for width over a solid centre.
 
-Before the mics, the drive signal also picks up **neighbour-cone interference** derived from real 4×12 geometry: the close mic hears the three other cones arriving ~0.6–0.9 ms late, lowpassed above ~2 kHz and 15–20 dB down — the low/mid comb texture of a real multi-speaker box, matching the ~3 dB echo comb real captures measure. One octave up, **dust-cap & grille echoes** add the presence/air sheen a close capture picks up off the speaker's own front geometry: a ~0.13 ms round-trip reflection off the metal grille (highpassed — the lows diffract past the perforations, so only the treble is combed) and a ~45 µs ripple off the proud central dust cap. Both are highpassed and power-normalised so they comb only the 2–8 kHz band and never touch the body — tuned so the added ripple tracks a real grille-position capture. After the mics, a genuinely tiny **mic/transformer saturation** squeezes only the hottest peaks.
+Before the mics, the drive signal passes the **nonlinear speaker stage** — excursion-driven motor droop, cone breakup, thermal power compression and Doppler "growl", with its operating point calibrated to the levels the amps actually deliver so a cranked amp genuinely pushes back. It also picks up **neighbour-cone interference** derived from real 4×12 geometry: the close mic hears the three other cones arriving ~0.6–0.9 ms late, lowpassed above ~2 kHz and 13–23 dB down. Each neighbour is an extended source (a 12" cone, not a point), so its arrival is smeared across a short sub-tap cluster — the comb ripples the body by a couple of dB like a real echo scan instead of carving a notch through it. One octave up, **dust-cap & grille echoes** add the presence/air sheen a close capture picks up off the speaker's own front geometry: a ~0.13 ms round-trip reflection off the metal grille (highpassed — the lows diffract past the perforations, so only the treble is combed) and a ~45 µs ripple off the proud central dust cap. Both are highpassed and power-normalised so they comb only the 2–8 kHz band and never touch the body. After the mics, a genuinely tiny **mic/transformer saturation** squeezes only the hottest peaks.
 
 Cycle cabinets with <kbd>C</kbd> at any time. The **Mic** knob applies a ±6 dB high shelf at 5 kHz per channel after convolution, modelling on-axis vs off-axis placement. For the partitioned-FFT convolution engine, see [How it works](how-it-works.html#cabinet).
 

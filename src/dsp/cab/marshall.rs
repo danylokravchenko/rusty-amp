@@ -12,75 +12,98 @@ use crate::dsp::biquad::Biquad;
 /// Greenback close-mic (SM57) signature (the skeleton), voiced against measured
 /// commercial 4×12 captures (see the note in the Mesa `voicing_sm57`):
 ///   • Resonant sub HP at 74 Hz (keeps the low-E fundamental, cuts the rumble)
-///   • +2 dB low shelf at 120 Hz + a +6 dB resonant hump at 115 Hz (cab depth)
-///   • +5 dB wide mound at 210 Hz and +5.5 dB at 480 Hz (low-mid body plateau)
-///   • +1 dB at 800 Hz (a hint of the GB "vintage" honk)
-///   • −6 dB dip at 1400 Hz (the mid "pocket" of a real capture)
-///   • +5.5 dB at 2500 Hz and +6 dB at 4.3 kHz (GB presence — the crunch peak
+///   • +3.5 dB low shelf at 120 Hz + a +6 dB resonant hump at 115 Hz (cab depth)
+///   • +4.3 dB wide mound at 210 Hz and +5.5 dB at 480 Hz (low-mid body plateau)
+///   • +2 dB at 800 Hz (a hint of the GB "vintage" honk)
+///   • −7 dB dip at 1400 Hz (the mid "pocket" of a real capture)
+///   • +3.5 dB at 2500 Hz and +4.3 dB at 4.3 kHz (GB presence — the crunch peak
 ///     sits lower than the V30's, but the level holds through 3–5 kHz like a
 ///     real capture)
-///   • −15 dB high shelf at 6600 Hz (cone rolloff)
-///   • LP at 7.2 kHz (fizz cut — GBs are inherently smoother on top)
+///   • −19 dB high shelf at 6600 Hz (cone rolloff)
+///   • 4th-order LP at 7 kHz (fizz cut — GBs are inherently smoother on top)
 pub struct MarshallCab {
     inner: BlendedCab,
 }
 
-// Slightly later, tail-gentler reflections than the V30 cabs (smoother
-// Greenback cone), timed so the early comb notches land in the mid pocket
-// rather than the body (see the Mesa texture note); breakup mode lower at
-// ~2.5 kHz. The two low modes near 90–115 Hz add a subtle thump ring where the
-// direct sound is strong.
-const TEX_L: Texture = Texture {
-    predelay: 0,
-    reflections: &[
-        (0.30, -0.26),
-        (0.62, 0.17),
-        (1.24, -0.09),
-        (3.40, 0.075),
-        (7.10, -0.070),
-        (12.40, 0.058),
-        (15.20, -0.047),
-        (17.00, 0.038),
-        (20.00, 0.029),
-    ],
-    modes: &[
-        (92.0, 95.0, 0.004),
-        (110.0, 85.0, 0.004),
-        (2500.0, 5.0, 0.009),
-    ],
-    scatter: Some(ir::Scatter {
+// Close-mic texture, shared by both channels (references are mono — see the
+// Mesa texture note; only the scatter seeds differ per channel, the room pair
+// below carries the true stereo decorrelation). Slightly later, tail-gentler
+// reflections than the V30 cabs (smoother Greenback cone), timed so the early
+// comb notches land in the mid pocket rather than the body; breakup mode lower
+// at ~2.5 kHz, at the shared texture gain (it was 0.009, a decimal typo that
+// left this cab with no audible cone ring at all). The two low modes near
+// 90–110 Hz add a subtle thump ring where the direct sound is strong, T60s
+// kept short of the note (gated references — see the Mesa note).
+// Dense 7–20 ms tail (see the Mesa TEX_REFL note): real captures are diffuse
+// there, not a few discrete echoes.
+// Early-tap gains kept small (~0.1) — see the Mesa TEX_REFL note: hot early
+// taps are a voicing move, not texture.
+const TEX_REFL: &[(f32, f32)] = &[
+    (0.30, -0.14),
+    (0.62, 0.10),
+    (1.24, -0.09),
+    (3.40, 0.08),
+    (7.10, -0.070),
+    (9.60, 0.064),
+    (12.40, -0.058),
+    (13.80, 0.052),
+    (15.20, -0.047),
+    (17.00, 0.038),
+    (18.40, -0.033),
+    (20.00, 0.029),
+];
+// Breakup mode at texture scale (0.045) — audible ring, unlike the 0.009 typo,
+// but not a voicing move; see the Mesa TEX_MODES note.
+const TEX_MODES: &[(f32, f32, f32)] = &[
+    (92.0, 55.0, 0.004),
+    (110.0, 50.0, 0.004),
+    (2500.0, 5.0, 0.045),
+];
+// Greenback breakup scatter plus the mid reflection-ripple cluster (see the
+// Mesa scatter note).
+const SCATTER_L: &[ir::Scatter] = &[
+    ir::Scatter {
         seed: 21,
         count: 22,
         band: (1800.0, 6400.0),
         t60_ms: (5.0, 12.0),
-        gain: 0.030,
-    }),
-};
-const TEX_R: Texture = Texture {
-    predelay: 2,
-    reflections: &[
-        (0.34, -0.23),
-        (0.66, 0.18),
-        (1.32, -0.08),
-        (3.70, 0.072),
-        (7.80, -0.066),
-        (13.30, 0.055),
-        (15.90, -0.044),
-        (17.50, 0.036),
-        (20.50, 0.027),
-    ],
-    modes: &[
-        (94.0, 97.0, 0.004),
-        (114.0, 87.0, 0.004),
-        (2600.0, 5.0, 0.009),
-    ],
-    scatter: Some(ir::Scatter {
+        gain: 0.024,
+    },
+    ir::Scatter {
+        seed: 23,
+        count: 24,
+        band: (550.0, 2300.0),
+        t60_ms: (6.0, 16.0),
+        gain: 0.022,
+    },
+];
+const SCATTER_R: &[ir::Scatter] = &[
+    ir::Scatter {
         seed: 22,
         count: 22,
         band: (1800.0, 6400.0),
         t60_ms: (5.0, 12.0),
-        gain: 0.030,
-    }),
+        gain: 0.024,
+    },
+    ir::Scatter {
+        seed: 24,
+        count: 24,
+        band: (550.0, 2300.0),
+        t60_ms: (6.0, 16.0),
+        gain: 0.022,
+    },
+];
+const TEX_L: Texture = Texture {
+    predelay: 0,
+    reflections: TEX_REFL,
+    modes: TEX_MODES,
+    scatter: SCATTER_L,
+};
+const TEX_R: Texture = Texture {
+    predelay: 0,
+    reflections: TEX_REFL,
+    modes: TEX_MODES,
+    scatter: SCATTER_R,
 };
 
 // Room-mic textures: distance pre-delay + denser late reflections for air.
@@ -94,8 +117,8 @@ const ROOM_TEX_L: Texture = Texture {
         (15.50, 0.075),
         (18.00, -0.055),
     ],
-    modes: &[(72.0, 130.0, 0.006), (170.0, 95.0, 0.005)],
-    scatter: None,
+    modes: &[(72.0, 65.0, 0.005), (170.0, 55.0, 0.004)],
+    scatter: &[],
 };
 const ROOM_TEX_R: Texture = Texture {
     predelay: 150,
@@ -107,8 +130,8 @@ const ROOM_TEX_R: Texture = Texture {
         (15.50, 0.07),
         (17.50, -0.05),
     ],
-    modes: &[(76.0, 135.0, 0.006), (180.0, 100.0, 0.005)],
-    scatter: None,
+    modes: &[(76.0, 65.0, 0.005), (180.0, 55.0, 0.004)],
+    scatter: &[],
 };
 
 impl MarshallCab {
@@ -135,25 +158,35 @@ impl MarshallCab {
             // plateau over a shallow 800 Hz–2 kHz pocket — the deep-and-juicy
             // shape of a real capture (see the Mesa `voicing_sm57` note).
             Biquad::highpass(sr, 74.0, 1.2),
-            Biquad::low_shelf(sr, 120.0, 2.0),
+            // Shelf raised 2 → 3.5 dB: measured 4.9 dB shy of the references'
+            // 63–125 Hz weight (the God's Cab V30 low end is *big*).
+            Biquad::low_shelf(sr, 120.0, 3.5),
             Biquad::peak_eq(sr, 115.0, 1.1, 6.0),
-            Biquad::peak_eq(sr, 210.0, 0.7, 5.0),
-            Biquad::peak_eq(sr, 480.0, 0.8, 5.5),
-            Biquad::peak_eq(sr, 800.0, 1.5, 1.0),
+            Biquad::peak_eq(sr, 210.0, 0.7, 4.3),
+            // Widened (Q 0.8 → 0.65) so the body plateau carries through the
+            // 600–800 Hz octave the refs hold: this cab measured −4.6 dB at
+            // 630 Hz against them.
+            Biquad::peak_eq(sr, 480.0, 0.65, 5.5),
+            Biquad::peak_eq(sr, 800.0, 1.2, 2.0),
             // Deep pocket at 1.4 kHz: real captures dip through the 1–2 kHz
             // octave, and the 2.5 kHz crunch peak's lower skirt fills part of it
             // back in — −6 dB here nets out to the measured shallow pocket
             // (honk-free) while the GB's upper-mid identity stays in the crunch
-            // peak below.
-            Biquad::peak_eq(sr, 1400.0, 0.7, -6.0),
+            // peak below. Q 0.85: wide enough to keep a real pocket (the refs
+            // sit ~0 dB through 1–2 kHz while this cab measured +3.6), narrow
+            // enough not to eat the 800 Hz body or the 2.5 kHz crunch.
+            Biquad::peak_eq(sr, 1400.0, 1.0, -7.0),
             // Greenback crunch: a wide 2.5 kHz peak — the GB's signature
             // upper-mid bark, sitting lower than the V30's presence.
-            Biquad::peak_eq(sr, 2500.0, 1.0, 5.5),
+            Biquad::peak_eq(sr, 2500.0, 1.0, 3.5),
             // A Greenback is darker than a V30 up top, but real captures still
             // hold their level through 4–5 kHz before the cone rolls off.
-            Biquad::peak_eq(sr, 4300.0, 1.2, 6.0),
-            Biquad::high_shelf(sr, 6600.0, -15.0),
-            Biquad::lowpass(sr, 7200.0, 0.707),
+            Biquad::peak_eq(sr, 4300.0, 1.2, 4.3),
+            // Real captures carry no 8 kHz energy (this cab measured +9.6 dB of
+            // fizz there with the old single pole).
+            Biquad::high_shelf(sr, 6600.0, -19.0),
+            Biquad::lowpass(sr, 7000.0, 0.707),
+            Biquad::lowpass(sr, 7000.0, 0.707),
         ];
         move |x| bands.iter_mut().fold(x, |acc, b| b.process(acc))
     }

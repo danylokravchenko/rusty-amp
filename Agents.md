@@ -58,6 +58,20 @@ Startup prompts for input device → input channel → output device. The proces
 
 ---
 
+## Sound analysis tools
+
+The repository includes several standalone analysis utilities under `examples/` for inspecting DSP behavior, cabinet response, and signal-chain characteristics. These are useful when debugging amp models, cabinet simulation, and tone-shaping stages:
+
+- `examples/amp_analysis.rs` — analyzes amp-model behavior
+- `examples/cab_analysis.rs` — inspects cabinet response curves
+- `examples/cab_spectrum.rs` — visualizes cabinet frequency content
+- `examples/au_cab_extract.rs` and `examples/au_params.rs` — inspect AudioUnit cabinet and parameter data
+- `examples/cone_interference.rs`, `examples/di_compare.rs`, `examples/knob_match.rs`, and `examples/rig_loudness.rs` — compare signal paths, input stages, and loudness behavior
+
+External impulse responses (IRs) for cabinet simulation are stored in `~/.config/rusty-amp/irs/`.
+
+---
+
 ## Documentation website
 
 The user-facing docs live in [`site/`](site/) and publish to GitHub Pages at
