@@ -58,12 +58,12 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
 
   <div class="tab-panel" role="tabpanel" data-panel="mesa">
     <div class="specs">
-      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–36× into three stages</div></div>
+      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–31× into three stages</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Fender values)</div></div>
       <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Silicon sag (0.5 ms / 80 ms) + 120 Hz supply ripple (ghost notes) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">3-stage: atan → atan → exponential</div></div>
     </div>
-    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–36× into three stages.</span></div>
+    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–31× into three stages.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Passive FMV stack (Fender-type values: fuller lows, gentler scoop).</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Gentler scoop than the Marshall.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">Same interacting network.</span></div>
@@ -73,12 +73,12 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
 
   <div class="tab-panel" role="tabpanel" data-panel="randall">
     <div class="specs">
-      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–46× into FET+BJT stages</div></div>
+      <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–35× into FET+BJT stages</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Active, independent bands + fixed +3 dB presence</div></div>
       <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">No sag — stiff solid-state rails + static speaker resonance</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">FET (x/√(1+x²)) → BJT (tanh) → rail-clip</div></div>
     </div>
-    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–46× into FET+BJT stages.</span></div>
+    <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–35× into FET+BJT stages.</span></div>
     <div class="kv"><span class="kv__k">Bass</span><span class="kv__v">Active tone stack — low shelf at 80 Hz.</span></div>
     <div class="kv"><span class="kv__k">Mid</span><span class="kv__v">Peak EQ at 500 Hz.</span></div>
     <div class="kv"><span class="kv__k">Treble</span><span class="kv__v">High shelf at 4.5 kHz.</span></div>
@@ -260,7 +260,7 @@ Practically any guitar IR works as-is.
 [God's Cab](https://wilkinsonaudio.com/products/gods-cab) is a large, free (donationware) IR pack laid out as `Gods_Cab_1.4/<rate>/<mic>/<NO-TS|TS>/<name>.wav`. Pick the sample-rate folder matching your interface, prefer the **NO-TS** captures (no Tube Screamer baked in, so rusty-amp's own TS-808 isn't stacked on top), and copy a few mics into `irs/`:
 
 ```bash
-SRC=~/.config/rusty-amp/IR/Gods_Cab_1.4/48   # use 44.1 / 48 / 96 to taste
+SRC=~/.config/rusty-amp/irs/Gods_Cab_1.4/48   # use 44.1 / 48 / 96 to taste
 DST=~/.config/rusty-amp/irs
 mkdir -p "$DST"
 

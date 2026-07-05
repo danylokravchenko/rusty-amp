@@ -96,7 +96,7 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
       <div class="flow__head"><span class="flow__name">Amp</span><span class="flow__badge flow__badge--live">Switchable live</span></div>
       <div class="flow__sig"><span class="os">8× oversampled</span> nonlinear stages (linear-phase polyphase-FIR anti-alias) + dynamic grid-bias “bloom” for touch sensitivity.</div>
       <div class="flow__sub"><b>JCM800</b> — dual 12AX7 atan soft-clip + grid-blocking → passive FMV tone stack → tube sag with 100 Hz supply ripple (ghost notes) → speaker-load bloom → dynamic NFB presence</div>
-      <div class="flow__sub"><b>Mesa DR</b> — triple gain stage (atan + silicon clip) + grid-blocking → passive FMV tone stack → silicon sag with 120 Hz supply ripple → speaker-load bloom → dynamic NFB presence</div>
+      <div class="flow__sub"><b>Mesa DR</b> — triple gain stage (atan → atan → exponential) + grid-blocking → passive FMV tone stack → silicon sag with 120 Hz supply ripple → speaker-load bloom → dynamic NFB presence</div>
       <div class="flow__sub"><b>Randall</b> — FET → BJT → rail-clip → active tone stack → stiff solid-state power section → static speaker load</div>
     </div>
   </div>
