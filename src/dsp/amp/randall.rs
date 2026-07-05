@@ -142,6 +142,8 @@ impl Amplifier for Randall {
             let s = self.stage_hp_1.process(s);
             let s = bjt_clip(s * g2) / g2.sqrt();
             let s = self.stage_hp_2.process(s);
+            // Rail drive kept at 2.2 (the softer knee alone restores the crest): the third
+            // clipper's job is grit, not a second brickwall over the BJT.
             *o = rail_clip(s * 2.2) / 2.2_f32.sqrt();
         }
         let x = self.os.downsample(down);
@@ -154,10 +156,12 @@ impl Amplifier for Randall {
         // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
         let x = self.voice.process(x);
 
-        // Solid-state power section — stiff rails, no sag.
+        // Solid-state power section — stiff rails, no sag. Drive eased
+        // (2.0 → 1.85, makeup-compensated): with the rail-clip knee it stacked
+        // a second hard ceiling that crushed pick transients (see rail_clip).
         // HP before tanh: prevents the output stage from distorting sub-bass.
         let x = self.power_hp.process(x);
-        let x = (x * 2.0).tanh() * 0.5;
+        let x = (x * 1.85).tanh() * 0.54;
         let x = self.speaker.process(x, 0.0);
         // Second subsonic stage after the tanh: the clipper regenerates a low
         // difference-tone "fart" from the chord's intervals; strip it here.
@@ -187,7 +191,13 @@ fn bjt_clip(x: f32) -> f32 {
     x.tanh()
 }
 
-/// Op-amp rail limiter — hard clip with a brief soft knee above 0.85.
+/// Op-amp rail limiter — hard clip with a soft knee above 0.85.
+///
+/// The knee is deliberately not instant (excess/(1+excess·5), was ·8): the
+/// near-brickwall version flattened every pick transient to the rail — the
+/// pluck probes in `examples/amp_analysis.rs` measured the attack crest
+/// crushed to 1.6× vs the DI's 2.2× (and a professional reference's 2.3×),
+/// which reads as a choked, "palm muted" attack rather than solid-state bite.
 #[inline]
 fn rail_clip(x: f32) -> f32 {
     let lim = 0.85_f32;
@@ -196,7 +206,7 @@ fn rail_clip(x: f32) -> f32 {
         x
     } else {
         let excess = abs_x - lim;
-        let knee = excess / (1.0 + excess * 8.0);
+        let knee = excess / (1.0 + excess * 5.0);
         x.signum() * (lim + knee * (1.0 - lim))
     }
 }

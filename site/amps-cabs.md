@@ -45,7 +45,7 @@ Three amp models, switchable live with <kbd>A</kbd> (or <kbd>↑</kbd>/<kbd>↓<
     <div class="specs">
       <div class="spec"><div class="spec__k">Gain range</div><div class="spec__v">1×–40× into dual 12AX7</div></div>
       <div class="spec"><div class="spec__k">Tone stack</div><div class="spec__v">Passive FMV (Marshall values)</div></div>
-      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep tube sag (5 ms / 60 ms) + 100 Hz supply ripple (ghost notes) + dynamic speaker-load bloom</div></div>
+      <div class="spec"><div class="spec__k">Rectifier &amp; power</div><div class="spec__v">Deep tube sag (5 ms / 150 ms) + 100 Hz supply ripple (ghost notes) + dynamic speaker-load bloom</div></div>
       <div class="spec"><div class="spec__k">Gain stages</div><div class="spec__v">2 × 12AX7 atan soft-clip</div></div>
     </div>
     <div class="kv"><span class="kv__k">Gain</span><span class="kv__v">Preamp gain 1×–40× into dual 12AX7.</span></div>

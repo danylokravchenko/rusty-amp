@@ -1,11 +1,23 @@
 //! Nonlinear characterisation of the amp models — the measurements that a
-//! frequency sweep can't show: gain compression, harmonic fingerprint, and
-//! sag/bloom dynamics. Optionally loads an external Audio Unit (macOS) and
-//! runs the identical probes through it for a side-by-side reference.
+//! frequency sweep can't show: gain compression, harmonic fingerprint,
+//! sag/bloom dynamics, and (crucially) **note shape**: how a plucked,
+//! decaying note comes through, which steady-state sines can't reveal.
+//! Optionally loads an external Audio Unit (macOS) and runs the identical
+//! probes through it for a side-by-side professional reference.
 //!
 //!     cargo run --release --example amp_analysis                # built-ins
+//!     cargo run --release --example amp_analysis -- --cab       # through cabs
 //!     cargo run --release --example amp_analysis -- --list-au   # show AUs
-//!     cargo run --release --example amp_analysis -- --au marshall
+//!     cargo run --release --example amp_analysis -- --au marshall --cab
+//!
+//! The note-shape section is the "voicy vs choked" detector. A note that
+//! reads as *palm muted* shows up as some mix of: a crushed attack crest
+//! (transient flattened by hard limiting), a deep post-attack choke (sag or
+//! grid-bias ducking right after the pick), a short t20 (the note dies
+//! early), and a fast harmonic-centroid collapse (the overtones stop singing
+//! while the fundamental hangs on — thump without voice). A voicy amp keeps
+//! crest close to the DI's, chokes little, *adds* sustain via compression,
+//! and holds its harmonic centroid through the decay.
 //!
 //! Knobs are fixed at the test-suite defaults (gain 0.65, bass 0.5, mid 0.45,
 //! treble 0.65, presence 0.5, master 0.5) so runs are comparable over time.
@@ -214,11 +226,125 @@ fn spectrum(dut: &mut dyn Dut) {
     }
 }
 
+// ── Note shape: the "voicy vs palm muted" probes ────────────────────────────
+
+/// Notes for the pluck probes: the low E every riff leans on, and an
+/// upper-register melody note.
+const NOTES: [(f32, &str); 2] = [(82.41, "E2"), (220.0, "A3")];
+const NOTE_SECS: f32 = 0.6;
+
+/// Deterministic plucked-string DI at realistic interface level (~0.4 peak):
+/// a damped harmonic series (higher partials decay faster, like a string)
+/// plus a short broadband pick click. Not a sine — the decaying envelope is
+/// exactly what the steady-state probes can't exercise.
+fn pluck_di(f0: f32) -> Vec<f32> {
+    let n = (SR * NOTE_SECS) as usize;
+    (0..n)
+        .map(|i| {
+            let t = i as f32 / SR;
+            let mut s = 0.0f32;
+            for k in 1..=6u32 {
+                let kf = k as f32;
+                let tau = 0.5 / kf; // seconds; k-th partial dies k× faster
+                s += (-t / tau).exp() / kf * (2.0 * PI * f0 * kf * t).sin();
+            }
+            let click = (-t / 0.004).exp() * (2.0 * PI * 2500.0 * t).sin() * 0.3;
+            0.28 * s + 0.08 * click
+        })
+        .collect()
+}
+
+/// RMS envelope in dB, `hop_ms` hops.
+fn env_db(sig: &[f32], hop_ms: f32) -> Vec<f32> {
+    let hop = (SR * hop_ms / 1000.0) as usize;
+    sig.chunks(hop.max(1)).map(|c| db(rms(c))).collect()
+}
+
+struct NoteStats {
+    choke_db: f32,        // 60 ms level − attack (negative = ducks after the pick)
+    sustain_db: f32,      // 300 ms level − attack
+    crest: f32,           // peak/RMS over the first 120 ms (transient preservation)
+    centroid: (f32, f32), // harmonic centroid (in harmonic number) early → late
+    upper_drop: f32,      // (k≥3)/(k≤2) harmonic energy, late − early (dB)
+}
+
+fn note_stats(f0: f32, sig: &[f32]) -> NoteStats {
+    let env = env_db(sig, 10.0);
+    let attack_db = env[..5].iter().cloned().fold(f32::MIN, f32::max);
+    let at = |ms: f32| env[((ms / 10.0) as usize).min(env.len() - 1)];
+
+    let n120 = (SR * 0.12) as usize;
+    let head = &sig[..n120.min(sig.len())];
+    let peak = head.iter().fold(0.0f32, |m, &x| m.max(x.abs()));
+    let crest = peak / rms(head).max(1e-9);
+
+    // Harmonic centroid + upper-harmonic energy over equal-length windows
+    // after the attack (early) and deep in the decay (late).
+    let win = |a_ms: f32, b_ms: f32| {
+        let (a, b) = (
+            (SR * a_ms / 1000.0) as usize,
+            ((SR * b_ms / 1000.0) as usize).min(sig.len()),
+        );
+        &sig[a..b]
+    };
+    let harm = |seg: &[f32]| -> (f32, f32) {
+        let (mut num, mut den) = (0.0f32, 0.0f32);
+        let (mut hi, mut lo) = (0.0f32, 0.0f32);
+        for k in 1..=10u32 {
+            let m = goertzel(seg, f0 * k as f32);
+            num += k as f32 * m;
+            den += m;
+            if k >= 3 {
+                hi += m * m;
+            } else {
+                lo += m * m;
+            }
+        }
+        (num / den.max(1e-9), 10.0 * (hi / lo.max(1e-12)).log10())
+    };
+    let (c_early, u_early) = harm(win(20.0, 140.0));
+    let (c_late, u_late) = harm(win(280.0, 400.0));
+
+    NoteStats {
+        choke_db: at(60.0) - attack_db,
+        sustain_db: at(300.0) - attack_db,
+        crest,
+        centroid: (c_early, c_late),
+        upper_drop: u_late - u_early,
+    }
+}
+
+/// Pluck a note through the DUT and report its shape next to the DI's own —
+/// what the amp *does to the note*, not to a sine.
+fn note_shape(dut: &mut dyn Dut) {
+    for &(f0, name) in &NOTES {
+        let di = pluck_di(f0);
+        let di_stats = note_stats(f0, &di);
+        dut.reset();
+        let out: Vec<f32> = di.iter().map(|&x| dut.process(x)).collect();
+        let s = note_stats(f0, &out);
+        println!(
+            "  pluck {name}: choke {:+5.1} dB @60ms (DI {:+.1}) · sustain {:+5.1} dB @300ms (DI {:+.1}) · crest {:.1}× (DI {:.1}×)",
+            s.choke_db, di_stats.choke_db, s.sustain_db, di_stats.sustain_db, s.crest, di_stats.crest
+        );
+        println!(
+            "            harmonic centroid {:.2} → {:.2} (hang {:.2}; DI {:.2}) · upper-harmonic drop {:+5.1} dB (DI {:+.1})",
+            s.centroid.0,
+            s.centroid.1,
+            s.centroid.1 / s.centroid.0.max(1e-9),
+            di_stats.centroid.1 / di_stats.centroid.0.max(1e-9),
+            s.upper_drop,
+            di_stats.upper_drop
+        );
+    }
+}
+
 fn analyse(dut: &mut dyn Dut) {
     println!("── {} ──", dut.name());
     gain_curve(dut);
     harmonics(dut);
     sag(dut);
+    note_shape(dut);
     spectrum(dut);
     println!();
 }

@@ -147,13 +147,17 @@ impl Mesa {
         self.envelope += coeff * (abs_x - self.envelope);
         // Silicon supply: stiff, true to the Recto (deep sag also scales the
         // asymmetric clip's drive down under sustained level, which would kill
-        // the h2 growth that makes the amp touch-sensitive). The static drive
-        // still sits off the plateau — see marshall.rs `power_amp`.
+        // the h2 growth that makes the amp touch-sensitive).
         let sag = 1.0 / (1.0 + self.envelope * 0.45);
         // 120 Hz mains ripple rides on the loaded supply (ghost-note sidebands),
         // fading out as the supply unloads at idle.
         let supply = self.ripple.gain(sag, self.envelope);
-        silicon_clip_asym(x * supply * 1.7) * 0.55
+        // Static drive 2.4 (was 1.7): a gentler version of the marshall.rs
+        // power-drive move — the memoryless curve compresses a note's decay
+        // for sustain (see the pluck probes in `examples/amp_analysis.rs`)
+        // without ducking the attack; kept modest so the Recto's tight,
+        // percussive feel is untouched.
+        silicon_clip_asym(x * supply * 2.4) * 0.55
     }
 }
 
@@ -230,9 +234,9 @@ impl Amplifier for Mesa {
         // Presence: NFB shelf losing authority as the sag envelope loads the loop.
         let x = self.presence.process(x, self.envelope);
 
-        // Output trim: level-match the Recto to the hotter solid-state Randall so
-        // switching amp models doesn't produce a volume jump.
-        x * master * 14.2
+        // Output trim: level-match the Recto to the other models so switching
+        // doesn't jump in volume (re-measured after the power-drive increase).
+        x * master * 10.0
     }
 }
 

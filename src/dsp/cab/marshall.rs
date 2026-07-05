@@ -172,10 +172,12 @@ impl MarshallCab {
             // octave, and the 2.5 kHz crunch peak's lower skirt fills part of it
             // back in — −6 dB here nets out to the measured shallow pocket
             // (honk-free) while the GB's upper-mid identity stays in the crunch
-            // peak below. Q 0.85: wide enough to keep a real pocket (the refs
-            // sit ~0 dB through 1–2 kHz while this cab measured +3.6), narrow
-            // enough not to eat the 800 Hz body or the 2.5 kHz crunch.
-            Biquad::peak_eq(sr, 1400.0, 1.0, -7.0),
+            // peak below. Q 1.25: the pocket recovers by ~1.8 kHz the way the
+            // reference captures do — the wider skirt held 1.8–2.4 kHz down
+            // (measured −5 dB vs refs at 2 kHz), which is exactly the band an
+            // A3's overtones speak in; with it suppressed the note read as
+            // fundamental thump ("palm muted").
+            Biquad::peak_eq(sr, 1400.0, 1.25, -7.0),
             // Greenback crunch: a wide 2.5 kHz peak — the GB's signature
             // upper-mid bark, sitting lower than the V30's presence.
             Biquad::peak_eq(sr, 2500.0, 1.0, 3.5),

@@ -167,7 +167,7 @@ All three amps share an **8× oversampled** nonlinear core with a linear-phase p
 
 | Model | Character | Tone stack | Rectifier / power | Gain stages |
 | ----- | --------- | ---------- | ----------------- | ----------- |
-| **Marshall JCM800** | Punchy, dynamic, touch-sensitive | Passive FMV (Marshall values) | Tube sag (5 ms / 60 ms) + 100 Hz supply ripple + dynamic speaker-load bloom | 2 × 12AX7 atan soft-clip |
+| **Marshall JCM800** | Punchy, dynamic, touch-sensitive | Passive FMV (Marshall values) | Tube sag (5 ms / 150 ms) + 100 Hz supply ripple + dynamic speaker-load bloom | 2 × 12AX7 atan soft-clip |
 | **Mesa Dual Rectifier** | Compressed, aggressive, modern | Passive FMV (Fender values) | Silicon sag (0.5 ms / 80 ms) + 120 Hz supply ripple + dynamic speaker-load bloom | 3-stage: atan → atan → exponential |
 | **Randall Warhead** | Tight, crushing, solid-state | Active, independent bands + fixed +3 dB presence | No sag — stiff solid-state rails + static speaker resonance | FET (x/√(1+x²)) → BJT (tanh) → rail-clip |
 
