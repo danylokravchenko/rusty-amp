@@ -325,7 +325,12 @@ fn note_shape(dut: &mut dyn Dut) {
         let s = note_stats(f0, &out);
         println!(
             "  pluck {name}: choke {:+5.1} dB @60ms (DI {:+.1}) · sustain {:+5.1} dB @300ms (DI {:+.1}) · crest {:.1}× (DI {:.1}×)",
-            s.choke_db, di_stats.choke_db, s.sustain_db, di_stats.sustain_db, s.crest, di_stats.crest
+            s.choke_db,
+            di_stats.choke_db,
+            s.sustain_db,
+            di_stats.sustain_db,
+            s.crest,
+            di_stats.crest
         );
         println!(
             "            harmonic centroid {:.2} → {:.2} (hang {:.2}; DI {:.2}) · upper-harmonic drop {:+5.1} dB (DI {:+.1})",

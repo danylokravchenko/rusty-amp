@@ -85,10 +85,9 @@ impl Mesa {
             // Between stage 2 and 3: ~320 Hz (silicon stage compresses harder, so a
             // tighter corner) — the chug-tightening cut, still below the fundamentals.
             stage_hp_2: Biquad::highpass(sr8, 320.0, 0.707),
-            // Subsonic cut at 55 Hz, cascaded → 24 dB/oct. Lowered from 70 Hz so the
-            // 82 Hz low-E fundamental passes with full weight (it was ~6 dB down),
-            // while the 24 dB/oct slope still kills the inaudible difference-tone
-            // fart well below it.
+            // Subsonic cut at 55 Hz, cascaded → 24 dB/oct. This keeps the 82 Hz
+            // low-E fundamental full and weighty while still removing the
+            // inaudible difference-tone fart well below it.
             power_hp: Biquad::highpass(sr, 55.0, 0.707),
             power_hp2: Biquad::highpass(sr, 55.0, 0.707),
             bloom: Bloom::new(sr, 8.0, 55.0),
@@ -115,9 +114,8 @@ impl Mesa {
             // US mains → full-wave ripple at 120 Hz; the silicon supply is stiffer
             // than the JCM800's, so a lighter ghost-note depth.
             ripple: SupplyRipple::new(sr, 120.0, 0.035),
-            // Recto 4×12 resonance ~100 Hz; silicon supply sags less than a tube
-            // rectifier, so a tight dynamic bloom. Trimmed (0.45→0.22) so palm-muted
-            // chugs stay percussive instead of blooming on after the attack.
+            // Recto 4×12 resonance ~100 Hz; the speaker load is kept fairly tight
+            // so palm-muted chugs stay percussive instead of blooming after the attack.
             speaker: SpeakerLoad::new(sr, 100.0, 1.0, 0.06, 0.22, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
@@ -152,11 +150,9 @@ impl Mesa {
         // 120 Hz mains ripple rides on the loaded supply (ghost-note sidebands),
         // fading out as the supply unloads at idle.
         let supply = self.ripple.gain(sag, self.envelope);
-        // Static drive 2.4 (was 1.7): a gentler version of the marshall.rs
-        // power-drive move — the memoryless curve compresses a note's decay
-        // for sustain (see the pluck probes in `examples/amp_analysis.rs`)
-        // without ducking the attack; kept modest so the Recto's tight,
-        // percussive feel is untouched.
+        // The static drive stays around 2.4 so the power stage adds a little
+        // sustain without flattening the attack; the gentler curve preserves
+        // the Recto's tight, percussive feel while still compressing the note.
         silicon_clip_asym(x * supply * 2.4) * 0.55
     }
 }
@@ -186,18 +182,16 @@ impl Amplifier for Mesa {
         let x = self.bright.process(x, gain);
 
         let pregain = 1.0 + gain * 30.0;
-        // Bias depth halved and bloom release shortened (above) so a note attacks
-        // the same whether played alone or right after others — see marshall.rs.
+        // The bloom amount is kept light so the first stage adds touch-sensitive
+        // compression without smearing the note attack or making successive hits
+        // feel inconsistent.
         let bias = self.bloom.follow(x) * 0.09;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
-        // Per-stage drives kept moderate: three cascaded clippers multiply harmonic
-        // content fast, and the old ×5/×3 inter-stage gains pushed the spectrum so
-        // high that the played note was buried under its own overtones. ×2.6/×2.0
-        // still saturates hard at high gain but lets the fundamental lead.
-        // Pregain split across the three stages (see marshall.rs): the Recto
-        // keeps a hotter final silicon stage than the tube amps — its modern
-        // aggression — but no single stage runs deep on its plateau any more.
+        // The per-stage gains stay moderate so the cascade saturates hard without
+        // burying the fundamental under its own overtones. The final silicon stage
+        // is still hotter than the tube amp stages, which gives the Recto its
+        // modern aggression without letting any one stage run too deep.
         let g1 = pregain.powf(0.62) * 1.4;
         let g2 = pregain.powf(0.22) * 1.8;
         let g3 = (pregain / (pregain.powf(0.62) * pregain.powf(0.22))) * 1.3;

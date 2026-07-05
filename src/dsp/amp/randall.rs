@@ -120,18 +120,16 @@ impl Amplifier for Randall {
         let x = self.front.process(sample);
 
         let pregain = 1.0 + gain * 34.0;
-        // Bias depth more than halved and bloom release shortened (above): the
-        // Randall showed the most attack carryover note-to-note; a lighter, faster
-        // bloom makes every note attack the same — see marshall.rs.
+        // The bloom is kept light and fast so the Randall does not carry the
+        // previous note's attack into the next hit, keeping each note's attack
+        // consistent.
         let bias = self.bloom.follow(x) * 0.022;
 
         // ── 8× oversampled nonlinear section ──────────────────────────────────
-        // Drives trimmed (BJT ×6→×3.6, rail ×3→×2.2): the hard BJT/rail clippers are
-        // strong odd-harmonic generators, and at the old drives the 3rd–7th
-        // harmonics overran the fundamental, giving the buzzy, square-ish edge.
-        // Milder gain split than the tube amps (FET keeps p^0.7): a solid-state
-        // head genuinely runs its front end harder and stays buzzier — that is
-        // its character — but the worst plateau squaring still comes off.
+        // The BJT and rail stages are kept a little milder so the 3rd–7th
+        // harmonics do not overpower the fundamental. The gain split is still
+        // more aggressive than the tube amps, which preserves the Randall's
+        // buzzy, solid-state edge without over-squaring the waveform.
         let g1 = pregain.powf(0.7) * 1.55;
         let g2 = (pregain / pregain.powf(0.7)) * 2.4;
         let up = self.os.upsample(x);
@@ -142,8 +140,8 @@ impl Amplifier for Randall {
             let s = self.stage_hp_1.process(s);
             let s = bjt_clip(s * g2) / g2.sqrt();
             let s = self.stage_hp_2.process(s);
-            // Rail drive kept at 2.2 (the softer knee alone restores the crest): the third
-            // clipper's job is grit, not a second brickwall over the BJT.
+            // The rail stage stays at a moderate drive so it adds grit rather than
+            // turning the third clipper into a second brickwall over the BJT.
             *o = rail_clip(s * 2.2) / 2.2_f32.sqrt();
         }
         let x = self.os.downsample(down);
@@ -156,10 +154,10 @@ impl Amplifier for Randall {
         // Structural voicing balance: restore low-mid body, tame the upper-mid tilt.
         let x = self.voice.process(x);
 
-        // Solid-state power section — stiff rails, no sag. Drive eased
-        // (2.0 → 1.85, makeup-compensated): with the rail-clip knee it stacked
-        // a second hard ceiling that crushed pick transients (see rail_clip).
-        // HP before tanh: prevents the output stage from distorting sub-bass.
+        // The solid-state power section uses stiff rails and no sag. The drive is
+        // kept slightly below the raw rail-clip level so the stage stays punchy
+        // without flattening every pick transient. The HP before the clipper also
+        // keeps the output stage from distorting sub-bass.
         let x = self.power_hp.process(x);
         let x = (x * 1.85).tanh() * 0.54;
         let x = self.speaker.process(x, 0.0);
@@ -193,11 +191,10 @@ fn bjt_clip(x: f32) -> f32 {
 
 /// Op-amp rail limiter — hard clip with a soft knee above 0.85.
 ///
-/// The knee is deliberately not instant (excess/(1+excess·5), was ·8): the
-/// near-brickwall version flattened every pick transient to the rail — the
-/// pluck probes in `examples/amp_analysis.rs` measured the attack crest
-/// crushed to 1.6× vs the DI's 2.2× (and a professional reference's 2.3×),
-/// which reads as a choked, "palm muted" attack rather than solid-state bite.
+/// The knee is deliberately not instant so the limiter adds a rounded
+/// transition instead of snapping every pick transient straight to the rail.
+/// That keeps the attack crest from collapsing into a choked, palm-muted
+/// sound and preserves the solid-state bite.
 #[inline]
 fn rail_clip(x: f32) -> f32 {
     let lim = 0.85_f32;

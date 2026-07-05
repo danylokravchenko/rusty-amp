@@ -113,10 +113,9 @@ impl Marshall {
             // UK mains → full-wave ripple at 100 Hz; depth sized so ghost-note
             // sidebands sit ~30 dB under the notes only when the supply is loaded.
             ripple: SupplyRipple::new(sr, 100.0, 0.05),
-            // 8×12 resonance ~95 Hz; tube amp has moderate damping. Dynamic bloom
-            // trimmed (0.55→0.30): the big sag-driven low resonance was ringing on
-            // after a palm-muted chug, smearing the percussive tightness — a real
-            // power amp blooms, but not so much the chug stops feeling muted.
+            // 8×12 resonance ~95 Hz; tube amp has moderate damping. The bloom is
+            // kept light so the low resonance supports the note without hanging
+            // over the next palm-muted chug, preserving a percussive, muted feel.
             speaker: SpeakerLoad::new(sr, 95.0, 1.0, 0.06, 0.30, 0.8),
         };
         m.update_tone_stack(0.5, 0.45, 0.65);
@@ -155,22 +154,18 @@ impl Marshall {
             1.0 - (-6.7 / self.sr).exp()
         };
         self.envelope += coeff * (abs_x - self.envelope);
-        // Deep sag (0.6 → 1.5): a real driven power amp gets a slow gain
-        // reduction from the supply sagging, which compresses level without
-        // bending the waveform, keeping the attack percussive.
+        // The sag term stays strong so the supply compression reduces level
+        // without bending the waveform, which keeps the attack percussive
+        // while adding a little sustain under load.
         let sag = 1.0 / (1.0 + self.envelope * 1.5);
         // Mains ripple rides on the loaded supply: the 100 Hz gain modulation
         // intermodulates with the signal (ghost-note sidebands), fading out as
         // the supply unloads at idle.
         let supply = self.ripple.gain(sag, self.envelope);
-        // Static drive 2.2 (was 1.5, trimmed back at the output): the pluck
-        // probes in `examples/amp_analysis.rs` showed the tail of a decaying
-        // note falling out of the tube curve and dying linearly — part of the
-        // "palm muted" read next to a professional reference. 2.2 keeps the
-        // decay on the curve's knee for tail compression; pushing further
-        // (3.5 was tried) floors the asymmetry's even-harmonic content so
-        // hard that h2 stops growing with picking strength — the amp measures
-        // compressed but stops being touch-sensitive.
+        // The static drive stays around 2.2 so the decay remains on the tube
+        // curve's knee, which adds tail compression without losing the note's
+        // touch-sensitive even-harmonic growth. Pushing it much higher would
+        // flatten the asymmetry and make the amp feel less responsive.
         tube_clip_asym(x * supply * 2.2) * 0.62
     }
 }
