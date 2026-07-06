@@ -10,6 +10,18 @@ enabled   = true
 threshold = 0.18   # moderate — tames hiss without clamping the sustain
 release   = 0.35   # slow — lets the heavy chords ring and bloom
 
+# ── Whammy / Pitch shifter ────────────────────────────────────────────────────
+# An octave *down*, blended under the dry note, adds a fake-baritone sub beneath
+# the downtuned wall — subterranean weight without retuning. It sits in front of
+# the amp, so the octave-down copy is saturated into the grind rather than sitting
+# on top; a blend keeps the real fundamental leading so the pitch tracks cleanly on
+# the slow power chords and single-note riffs.
+[pitch]
+enabled = true
+pitch = 0.00   # −12 semitones — octave down
+mix   = 0.34   # heavy sub weight, but the fundamental still leads
+tone  = 0.42   # dark — the sub stays thick, not fizzy
+
 # ── Compressor ────────────────────────────────────────────────────────────────
 # Sits after the gate, before the drive stages, evening out the slow, deliberate
 # picking and adding sustain going into the amp — sludge lives on chords that ring

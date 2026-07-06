@@ -3,10 +3,10 @@ layout: page.njk
 permalink: pedals.html
 title: "Pedals & effects · rusty-amp"
 ogTitle: "rusty-amp · pedals & effects"
-description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, chorus, phaser, delay, and stereo reverb — with full knob reference tables."
+description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, compressor, fuzz, TS-808, DS-1, ML-2 Metal Core, pre-amp EQ, parametric EQ, flanger, chorus, phaser, delay, and stereo reverb — with full knob reference tables."
 eyebrow: "Pedals & effects"
 heading: "Configuring the board"
-lead: "Thirteen effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
+lead: "Fourteen effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
 toc:
   - { href: "#board", label: "The board" }
   - { href: "#pedals", label: "All pedals" }
@@ -34,7 +34,7 @@ The **Guitar Rig** shows one compact tile per pedal that's on the board, followe
 
 <div class="note">
 <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
-Gate → Whammy → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Phaser → Delay → Reverb.
+Gate → Whammy → Comp → Fuzz → TS-808 → DS-1 → ML-2 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Phaser → Delay → Reverb.
 Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
 </div>
 
@@ -67,6 +67,10 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <button class="tile" style="--c:#e08840" role="tab" aria-selected="false" data-tab="ds1">
       <div class="tile__name"><span class="tile__dot"></span>DS-1</div>
       <div class="tile__sub">Drive · Tone · Level</div>
+    </button>
+    <button class="tile" style="--c:var(--steel)" role="tab" aria-selected="false" data-tab="ml2">
+      <div class="tile__name"><span class="tile__dot"></span>ML-2 Metal Core</div>
+      <div class="tile__sub">Dist · Low · High · Level</div>
     </button>
     <button class="tile" style="--c:var(--lime)" role="tab" aria-selected="false" data-tab="preeq">
       <div class="tile__name"><span class="tile__dot"></span>Pre-amp EQ</div>
@@ -136,6 +140,14 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <p class="muted">More aggressive than the TS, with a cubic clip stage and a seesaw “tilt” tone control that trades bass for treble around 1 kHz.</p>
     <div class="kv"><span class="kv__k">Drive</span><span class="kv__v"><span class="kv__r">0–10</span> Gain into the cubic clip stage (1×–61×). More aggressive than the TS.</span></div>
     <div class="kv"><span class="kv__k">Tone</span><span class="kv__v"><span class="kv__r">0–10</span> Tilt control (bass↔treble seesaw around ~1 kHz). 0 = dark &amp; full, 5 = flat, 10 = bright &amp; cutting.</span></div>
+    <div class="kv"><span class="kv__k">Level</span><span class="kv__v"><span class="kv__r">0–10</span> Output volume of the pedal into the next stage.</span></div>
+  </div>
+
+  <div class="tab-panel" style="--c:var(--steel)" role="tabpanel" data-panel="ml2">
+    <p class="muted">The Boss ML-2 Metal Core — an ultra-high-gain distortion built to make any amp sound metal on its own. Far more gain than the DS-1, from <b>two cascaded clipping stages</b> that saturate then square off into a long, compressed, singing sustain. A fixed mid-scoop gives it that aggressive metal voice, and a powerful active two-band EQ (Low/High, ±15 dB) reshapes the whole tone. Runs last in the drive chain, after the DS-1, so it's the most aggressive stage feeding the pre-amp EQ. Tightened on both sides of the clipper and 8× oversampled so the brutal gain stays articulate, not fizzy.</p>
+    <div class="kv"><span class="kv__k">Dist</span><span class="kv__v"><span class="kv__r">0–10</span> Gain into the two cascaded clip stages (1×–101× on the first, plus a fixed second push). High = a wall of compressed saturation.</span></div>
+    <div class="kv"><span class="kv__k">Low</span><span class="kv__v"><span class="kv__r">0–10</span> Active low shelf at 120 Hz, ±15 dB. 5 = flat, 0 = tight/thin, 10 = a bass-heavy wall.</span></div>
+    <div class="kv"><span class="kv__k">High</span><span class="kv__v"><span class="kv__r">0–10</span> Active high shelf at 3.2 kHz, ±15 dB. 5 = flat, 0 = dark, 10 = bright and cutting.</span></div>
     <div class="kv"><span class="kv__k">Level</span><span class="kv__v"><span class="kv__r">0–10</span> Output volume of the pedal into the next stage.</span></div>
   </div>
 

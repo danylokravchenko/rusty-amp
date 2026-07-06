@@ -6,7 +6,7 @@ use ratatui::style::Color;
 
 use super::styles::{
     PEDAL_BLUE, PEDAL_CYAN, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE,
-    PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_TEAL, PEDAL_YELLOW,
+    PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_STEEL, PEDAL_TEAL, PEDAL_YELLOW,
 };
 use crate::dsp::Params;
 
@@ -63,6 +63,8 @@ pub(super) const PITCH_START: usize = 42;
 pub(super) const PITCH_END: usize = 45;
 pub(super) const PH_START: usize = 45;
 pub(super) const PH_END: usize = 49;
+pub(super) const ML_START: usize = 49;
+pub(super) const ML_END: usize = 53;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -276,6 +278,23 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ph_mix,
     },
+    // 49–52: Boss ML-2 Metal Core
+    Knob {
+        label: "DIST",
+        param: |p| &p.ml_dist,
+    },
+    Knob {
+        label: "LOW",
+        param: |p| &p.ml_low,
+    },
+    Knob {
+        label: "HIGH",
+        param: |p| &p.ml_high,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.ml_level,
+    },
 ];
 
 // Rig pedals in navigation order (mirrors the KNOBS slices above). The tile
@@ -371,6 +390,13 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: PH_START,
         end: PH_END,
         enabled: |p| &p.ph_enabled,
+    },
+    Pedal {
+        name: "ML-2 METAL CORE",
+        color: PEDAL_STEEL,
+        start: ML_START,
+        end: ML_END,
+        enabled: |p| &p.ml_enabled,
     },
 ];
 
@@ -473,7 +499,7 @@ mod tests {
     fn table_sizes_are_stable() {
         // Deliberate tripwire: bump these when you add or remove a pedal/knob so
         // the change is a conscious, reviewed edit rather than an accident.
-        assert_eq!(PEDALS.len(), 13, "pedal count changed");
-        assert_eq!(KNOBS.len(), 49, "knob count changed");
+        assert_eq!(PEDALS.len(), 14, "pedal count changed");
+        assert_eq!(KNOBS.len(), 53, "knob count changed");
     }
 }

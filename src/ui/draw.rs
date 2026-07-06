@@ -154,6 +154,7 @@ fn render_header(
     let fz_on = params.fz_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
     let ds_on = params.ds_enabled.load(Relaxed);
+    let ml_on = params.ml_enabled.load(Relaxed);
     let peq_on = params.peq_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
     let fl_on = params.fl_enabled.load(Relaxed);
@@ -174,6 +175,7 @@ fn render_header(
         ("FUZZ", fz_on),
         ("TS-808", ts_on),
         ("DS-1", ds_on),
+        ("ML-2", ml_on),
         ("PRE-EQ", peq_on),
     ];
     let post_pedals = [

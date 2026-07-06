@@ -32,6 +32,7 @@ pub struct Preset {
     pub fuzz: Option<FuzzSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
+    pub metal_core: Option<MlSection>,
     pub preamp_eq: Option<PeqSection>,
     pub amp: AmpSection,
     pub cabinet: Option<CabSection>,
@@ -95,6 +96,15 @@ pub struct DsSection {
     pub enabled: Option<bool>,
     pub drive: f32,
     pub tone: f32,
+    pub level: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct MlSection {
+    pub enabled: Option<bool>,
+    pub dist: f32,
+    pub low: f32,
+    pub high: f32,
     pub level: f32,
 }
 
@@ -264,6 +274,13 @@ impl Preset {
                 tone: params.ds_tone.load(Relaxed),
                 level: params.ds_level.load(Relaxed),
             }),
+            metal_core: Some(MlSection {
+                enabled: Some(params.ml_enabled.load(Relaxed)),
+                dist: params.ml_dist.load(Relaxed),
+                low: params.ml_low.load(Relaxed),
+                high: params.ml_high.load(Relaxed),
+                level: params.ml_level.load(Relaxed),
+            }),
             preamp_eq: Some(PeqSection {
                 enabled: Some(params.peq_enabled.load(Relaxed)),
                 low: params.peq_low.load(Relaxed),
@@ -402,6 +419,16 @@ impl Preset {
             params.ds_level.store(ds.level.clamp(0.0, 1.0), Relaxed);
         } else {
             params.ds_enabled.store(false, Relaxed);
+        }
+
+        if let Some(ml) = &self.metal_core {
+            params.ml_enabled.store(ml.enabled.unwrap_or(true), Relaxed);
+            params.ml_dist.store(ml.dist.clamp(0.0, 1.0), Relaxed);
+            params.ml_low.store(ml.low.clamp(0.0, 1.0), Relaxed);
+            params.ml_high.store(ml.high.clamp(0.0, 1.0), Relaxed);
+            params.ml_level.store(ml.level.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.ml_enabled.store(false, Relaxed);
         }
 
         if let Some(peq) = &self.preamp_eq {

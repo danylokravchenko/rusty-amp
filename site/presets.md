@@ -102,7 +102,7 @@ The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears i
 | `slipknot.toml` | Mesa Dual Rectifier | Mesa V30 | Mick Thomson / Jim Root — TS boost, modern EQ scoop, full saturation |
 | `death.toml` | Mesa Dual Rectifier | Mesa V30 | Chuck Schuldiner — TS boost, mids-up for note clarity |
 | `slayer.toml` | Marshall JCM800 | Marshall Greenback | Hanneman & King's thrash assault — cranked JCM800, extreme mid-scoop, zero mercy |
-| `metalcore_shred.toml` | Mesa Dual Rectifier | Mesa V30 | Modern metalcore shred — TS tight boost, djent-adjacent EQ, slapback delay |
+| `metalcore_shred.toml` | Mesa Dual Rectifier | Mesa V30 | Modern metalcore shred — ML-2 tight boost, djent-adjacent EQ, slapback delay |
 | `solo_seeker.toml` | Mesa Dual Rectifier | Mesa V30 | Lead tone — sustain-focused, delay + reverb, on-axis mic for pick-attack clarity |
 | `clean_melodic.toml` | Marshall JCM800 | Marshall Greenback | Warm glassy clean — gentle compression, edge-of-breakup gain, delay + hall reverb |
 | `disturbed.toml` | Mesa Dual Rectifier | Mesa V30 | Dan Donegan's nu-metal chug — TS boost, scooped-but-punchy grind, bone-dry rhythm |
@@ -164,6 +164,16 @@ enabled = true
 drive = 0.50
 tone  = 0.55
 level = 0.65
+
+# Boss ML-2 Metal Core — ultra-high-gain distortion with an active two-band EQ.
+# Omit [metal_core] entirely to leave it off,
+# or include it with enabled = false to store values but keep it bypassed.
+[metal_core]
+enabled = false       # optional, defaults to true when the section is present
+dist  = 0.65          # 0.0 – 1.0  (gain into the two cascaded clip stages)
+low   = 0.50          # 0.0 – 1.0  (active low shelf @ 120 Hz, ±15 dB; 0.5 = flat)
+high  = 0.50          # 0.0 – 1.0  (active high shelf @ 3.2 kHz, ±15 dB; 0.5 = flat)
+level = 0.60          # 0.0 – 1.0  (output volume)
 
 # Pre-amp EQ — shapes the signal before the amp's gain stage.
 # Omit [preamp_eq] entirely to leave it off, or include it with enabled = false.

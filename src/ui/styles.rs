@@ -24,3 +24,4 @@ pub(super) const PEDAL_INDIGO: Color = Color::Rgb(122, 124, 224); // Flanger
 pub(super) const PEDAL_PINK: Color = Color::Rgb(235, 120, 190); // Chorus
 pub(super) const PEDAL_CYAN: Color = Color::Rgb(60, 210, 235); // Whammy / Pitch shifter
 pub(super) const PEDAL_YELLOW: Color = Color::Rgb(230, 205, 65); // Phaser (Phase 90)
+pub(super) const PEDAL_STEEL: Color = Color::Rgb(120, 140, 165); // ML-2 Metal Core (gunmetal)

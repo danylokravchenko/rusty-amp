@@ -2,41 +2,66 @@ name        = "Metalcore — Shred Seeker"
 description = "Modern metalcore shred tone: tight djent-adjacent rhythm, singing high-gain leads with harmonic pinches."
 
 # ── Noise Gate ────────────────────────────────────────────────────────────────
-# The Skreamer at this drive level adds its own hiss on top of the amp's noise.
-# Moderate threshold keeps the gate silent between runs without snapping shut
-# on the tail of sustained bends.
+# The ML-2's enormous gain adds a lot of hiss on top of the amp's own noise, so the
+# gate has to work a little harder here. Moderate threshold keeps it silent between
+# runs without snapping shut on the tail of sustained bends.
 [noise_gate]
 enabled   = true
-threshold = 0.24
+threshold = 0.26
 release   = 0.18
 
-# ── Tube Screamer (Skreamer) ──────────────────────────────────────────────────
-# Guitar Rig's Skreamer Drive is cranked to ~7/10 — far more than a clean boost.
-# This pushes the amp's front end hard and adds harmonic density before the
-# preamp stages. Tone at noon; Volume hot so the amp's input is slammed.
-[tube_screamer]
-enabled = true
-drive = 0.68   # ~7/10 on the Skreamer — genuine overdrive, not just a boost
-tone  = 0.52   # neutral tone — the amp's own EQ does the sculpting
-level = 0.82   # hot into the amp — saturates the first gain stage further
+# ── Whammy / Pitch shifter ────────────────────────────────────────────────────
+# Dialed for lead work, not rhythm: an octave *up* for the singing, synthetic
+# harmony leads and dive-bomb squeals the genre lives on. Left BYPASSED (enabled =
+# false) so it's on tap for solos without warbling the tight palm-muted chugs — the
+# granular shifter tracks single-note leads beautifully but smears full-chord
+# rhythm. Flick it on (Space) when you switch to a lead line.
+[pitch]
+enabled = false
+pitch = 1.00   # +12 semitones — octave up
+mix   = 0.50   # equal blend — a strong harmony under the lead, fundamental still leads
+tone  = 0.60   # bright enough for the lead to cut
 
-# DS-1 off — Skreamer is already doing the dirt work in front of the amp.
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# Off — the ML-2 Metal Core takes over the front-end drive role. Values kept so a
+# TS boost is one toggle away if you want to tighten the ML-2 further.
+[tube_screamer]
+enabled = false
+drive = 0.68
+tone  = 0.52
+level = 0.82
+
+# DS-1 off — the ML-2 is the dirt in front of the amp.
 [distortion]
 enabled = false
 drive = 0.40
 tone  = 0.55
 level = 0.65
 
+# ── ML-2 Metal Core ───────────────────────────────────────────────────────────
+# The metal-in-a-box front end, standing in for the Skreamer: the ML-2's cascaded
+# high gain supplies the aggression and harmonic density ahead of the Mesa, while
+# its active EQ does the djent tightening that used to fall to the pre-amp EQ —
+# LOW pulled back to firm the down-tuned bottom, HIGH pushed up for pick-attack
+# bite. DIST kept moderate (not maxed) so, stacked with the cranked Rectifier, the
+# fast chugs stay articulate instead of turning to compressed mush.
+[metal_core]
+enabled = true
+dist  = 0.52   # moderate — plenty stacked with the Mesa, keeps the chug tight
+low   = 0.42   # active low shelf pulled back — firms the down-tuned low end
+high  = 0.60   # active high shelf up — upper-mid/treble bite for fast picking
+level = 0.72   # hot — slams the Rectifier's front end
+
 # ── Pre-amp EQ ────────────────────────────────────────────────────────────────
-# The modern metalcore/djent staple: a graphic EQ in front of the amp to tighten
-# the low end and add upper-mid bite *before* the high-gain preamp clips it. This
-# is what keeps fast, down-tuned chugs articulate instead of woofy. Works with the
-# Skreamer's mid push rather than against it.
+# The ML-2's own active LOW/HIGH EQ now does most of the djent tightening, so this
+# stage is a light touch-up rather than the main shaper — just a gentle low trim and
+# a hint of pick-attack bite on top, so it doesn't fight the pedal's EQ and thin the
+# tone out. Nudge the mid up here if you want more note definition pre-clip.
 [preamp_eq]
 enabled = true
-low  = 0.40   # ≈ −2.4 dB at 100 Hz — tightens the low end going into the amp
-mid  = 0.50   # flat — the Skreamer already supplies the mid hump
-high = 0.56   # ≈ +1.4 dB at 3 kHz — a little extra pick-attack bite pre-clip
+low  = 0.46   # a gentle low trim on top of the ML-2's — avoids over-tightening
+mid  = 0.50   # flat
+high = 0.52   # a touch of extra bite pre-clip
 
 # ── Amp ───────────────────────────────────────────────────────────────────────
 # Guitar Rig's Fire Seeker is a modern high-gain amp in the Diezel / Mesa
@@ -47,15 +72,16 @@ high = 0.56   # ≈ +1.4 dB at 3 kHz — a little extra pick-attack bite pre-cli
 #   Gain ~8/10 → 0.80   Low ~6/10 → 0.60   Mid ~4.5/10 → 0.44
 #   Treble ~6.5/10 → 0.64   Master ~5/10 → 0.52
 #
-# Presence: modern high-gain amps typically run presence high for pick attack
-# definition; the Skreamer's extra mid push at the front means we can keep
-# the presence moderate rather than maxing it.
+# Gain is pulled back from a maxed setting: the ML-2 already supplies a wall of
+# cascaded saturation in front, so the Rectifier is run a little lower to leave the
+# stacked tone articulate rather than compressed to mush. Presence moderate — the
+# ML-2's high shelf is already adding pick-attack bite at the front.
 [amp]
 model    = "mesa"
-gain     = 0.80  # cranked — three-stage Rectifier compression at near-maximum
+gain     = 0.72  # backed off — the ML-2 provides the front-end saturation now
 bass     = 0.60  # slightly above noon — solid low end without flabbiness
 mid      = 0.44  # light scoop — articulate without going full Pantera hollow
-treble   = 0.64  # defined — pick attack cuts through the Skreamer's mid push
+treble   = 0.64  # defined — pick attack cuts through
 presence = 0.62  # moderate — 4 kHz Mesa shelf adds air without harshness
 master   = 0.52
 
@@ -69,9 +95,9 @@ mic_blend = 0.05 # close SM57 with a touch of ribbon for a modern, polished top
 mic_room  = 0.12 # a hint of room for a produced sense of space, still tight
 
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
-# No post-EQ — the Skreamer + Mesa combination is already well-shaped.
-# The TS mid-push into the scooped amp creates a self-balancing EQ curve;
-# adding more sculpting on top would lose the natural character.
+# No post-EQ — the ML-2 + Mesa combination is already well-shaped. The pedal's
+# active EQ plus the amp's own voicing cover the sculpting; adding more on top
+# would lose the natural character.
 [eq]
 enabled = false
 low  = 0.50

@@ -18,8 +18,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering::Relaxed};
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
-    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, Phaser, Pitch,
-    PreampEq, Reverb, TubeScreamer,
+    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, MetalCore, NoiseGate, ParametricEq,
+    Phaser, Pitch, PreampEq, Reverb, TubeScreamer,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -163,6 +163,12 @@ const DEFAULT_DS_DRIVE: f32 = 0.40;
 const DEFAULT_DS_TONE: f32 = 0.50;
 const DEFAULT_DS_LEVEL: f32 = 0.65;
 
+const DEFAULT_ML_ENABLED: bool = false;
+const DEFAULT_ML_DIST: f32 = 0.65;
+const DEFAULT_ML_LOW: f32 = 0.50;
+const DEFAULT_ML_HIGH: f32 = 0.50;
+const DEFAULT_ML_LEVEL: f32 = 0.60;
+
 const DEFAULT_REV_ENABLED: bool = true;
 const DEFAULT_REV_ROOM: f32 = 0.55;
 const DEFAULT_REV_DAMP: f32 = 0.40;
@@ -278,6 +284,13 @@ pub struct Params {
     pub ds_tone: Arc<AtomicF32>,
     pub ds_level: Arc<AtomicF32>,
 
+    // Boss ML-2 Metal Core (high-gain distortion, after the DS-1)
+    pub ml_enabled: Arc<AtomicBool>,
+    pub ml_dist: Arc<AtomicF32>,
+    pub ml_low: Arc<AtomicF32>,
+    pub ml_high: Arc<AtomicF32>,
+    pub ml_level: Arc<AtomicF32>,
+
     // Reverb
     pub rev_enabled: Arc<AtomicBool>,
     pub rev_room: Arc<AtomicF32>,
@@ -391,6 +404,12 @@ impl Params {
             ds_tone: p!(DEFAULT_DS_TONE),
             ds_level: p!(DEFAULT_DS_LEVEL),
 
+            ml_enabled: b!(DEFAULT_ML_ENABLED),
+            ml_dist: p!(DEFAULT_ML_DIST),
+            ml_low: p!(DEFAULT_ML_LOW),
+            ml_high: p!(DEFAULT_ML_HIGH),
+            ml_level: p!(DEFAULT_ML_LEVEL),
+
             rev_enabled: b!(DEFAULT_REV_ENABLED),
             rev_room: p!(DEFAULT_REV_ROOM),
             rev_damp: p!(DEFAULT_REV_DAMP),
@@ -482,6 +501,12 @@ impl Params {
         self.ds_drive.store(DEFAULT_DS_DRIVE, Relaxed);
         self.ds_tone.store(DEFAULT_DS_TONE, Relaxed);
         self.ds_level.store(DEFAULT_DS_LEVEL, Relaxed);
+
+        self.ml_enabled.store(DEFAULT_ML_ENABLED, Relaxed);
+        self.ml_dist.store(DEFAULT_ML_DIST, Relaxed);
+        self.ml_low.store(DEFAULT_ML_LOW, Relaxed);
+        self.ml_high.store(DEFAULT_ML_HIGH, Relaxed);
+        self.ml_level.store(DEFAULT_ML_LEVEL, Relaxed);
 
         self.rev_enabled.store(DEFAULT_REV_ENABLED, Relaxed);
         self.rev_room.store(DEFAULT_REV_ROOM, Relaxed);
@@ -599,6 +624,7 @@ pub struct DspChain {
     fz: Fuzz,
     ts: TubeScreamer,
     ds: Distortion,
+    ml: MetalCore,
     peq: PreampEq,
     amp: AmpBank,
     cab: CabBank,
@@ -636,6 +662,7 @@ impl DspChain {
             fz: Fuzz::new(sr),
             ts: TubeScreamer::new(sr),
             ds: Distortion::new(sr),
+            ml: MetalCore::new(sr),
             peq: PreampEq::new(sr),
             amp: AmpBank::new(sr),
             cab: CabBank::new(sr),
@@ -719,14 +746,15 @@ impl DspChain {
         self.rack(l, r)
     }
 
-    /// Mono pre-amp path: gate → pitch → compressor → fuzz → TS → DS → pre-amp EQ.
+    /// Mono pre-amp path: gate → pitch → compressor → fuzz → TS → DS → ML-2 → pre-amp EQ.
     ///
     /// The pitch shifter sits right after the gate so it transposes a clean, tracked
     /// note and the *shifted* signal is what everything downstream — compressor, drives,
     /// amp — then works on (the classic whammy-in-front placement). Fuzz comes before
-    /// the screamers so it sees the rawest signal; the pre-amp EQ comes last so it
-    /// shapes exactly what the amp's gain stage clips. This is the mono signal fed to
-    /// either the built-in amp or a hosted external amp.
+    /// the screamers so it sees the rawest signal; the ML-2 Metal Core is the most
+    /// aggressive drive, last in the dirt chain, and the pre-amp EQ comes after it so
+    /// it shapes exactly what the amp's gain stage clips. This is the mono signal fed
+    /// to either the built-in amp or a hosted external amp.
     #[inline]
     fn pre_amp(&mut self, sample: f32) -> f32 {
         let p = &self.params;
@@ -755,6 +783,9 @@ impl DspChain {
         let x = mono_stage!(self, p, x, fz_enabled, fz, fz_fuzz, fz_tone, fz_level);
         let x = mono_stage!(self, p, x, ts_enabled, ts, ts_drive, ts_tone, ts_level);
         let x = mono_stage!(self, p, x, ds_enabled, ds, ds_drive, ds_tone, ds_level);
+        let x = mono_stage!(
+            self, p, x, ml_enabled, ml, ml_dist, ml_low, ml_high, ml_level
+        );
         mono_stage!(self, p, x, peq_enabled, peq, peq_low, peq_mid, peq_high)
     }
 

@@ -91,6 +91,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--steel)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">ML-2 Metal Core</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">DC block → 90 Hz HP → fixed 650 Hz mid-scoop → <span class="os">[8× OS: pre-clip HP → two cascaded soft-clip stages]</span> → post-clip HP → active Low/High shelves (±15 dB) → 7 kHz post-clip LP.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--lime)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Pre-amp EQ</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
