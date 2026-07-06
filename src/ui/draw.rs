@@ -149,6 +149,7 @@ fn render_header(
     f.render_widget(Paragraph::new(Line::from(title_spans)), rows[0]);
 
     let ng_on = params.ng_enabled.load(Relaxed);
+    let pitch_on = params.pitch_enabled.load(Relaxed);
     let cmp_on = params.cmp_enabled.load(Relaxed);
     let fz_on = params.fz_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
@@ -167,6 +168,7 @@ fn render_header(
     // anchor the pre-amp pedals to their post-cab counterparts.
     let pre_pedals = [
         ("GATE", ng_on),
+        ("WHAMMY", pitch_on),
         ("COMP", cmp_on),
         ("FUZZ", fz_on),
         ("TS-808", ts_on),

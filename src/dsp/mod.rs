@@ -18,7 +18,7 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering::Relaxed};
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
-    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, PreampEq,
+    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, Pitch, PreampEq,
     Reverb, TubeScreamer,
 };
 
@@ -138,6 +138,11 @@ const DEFAULT_CMP_SUSTAIN: f32 = 0.40;
 const DEFAULT_CMP_ATTACK: f32 = 0.30;
 const DEFAULT_CMP_LEVEL: f32 = 0.50;
 
+const DEFAULT_PITCH_ENABLED: bool = false;
+const DEFAULT_PITCH_PITCH: f32 = 0.50; // unison
+const DEFAULT_PITCH_MIX: f32 = 0.50;
+const DEFAULT_PITCH_TONE: f32 = 0.70;
+
 const DEFAULT_PEQ_ENABLED: bool = false;
 const DEFAULT_PEQ_LOW: f32 = 0.50;
 const DEFAULT_PEQ_MID: f32 = 0.50;
@@ -236,6 +241,12 @@ pub struct Params {
     pub cmp_sustain: Arc<AtomicF32>,
     pub cmp_attack: Arc<AtomicF32>,
     pub cmp_level: Arc<AtomicF32>,
+
+    // Pitch shifter / Whammy (early mono chain, after the gate)
+    pub pitch_enabled: Arc<AtomicBool>,
+    pub pitch_pitch: Arc<AtomicF32>,
+    pub pitch_mix: Arc<AtomicF32>,
+    pub pitch_tone: Arc<AtomicF32>,
 
     // Pre-amp EQ (before the amp)
     pub peq_enabled: Arc<AtomicBool>,
@@ -342,6 +353,11 @@ impl Params {
             cmp_attack: p!(DEFAULT_CMP_ATTACK),
             cmp_level: p!(DEFAULT_CMP_LEVEL),
 
+            pitch_enabled: b!(DEFAULT_PITCH_ENABLED),
+            pitch_pitch: p!(DEFAULT_PITCH_PITCH),
+            pitch_mix: p!(DEFAULT_PITCH_MIX),
+            pitch_tone: p!(DEFAULT_PITCH_TONE),
+
             peq_enabled: b!(DEFAULT_PEQ_ENABLED),
             peq_low: p!(DEFAULT_PEQ_LOW),
             peq_mid: p!(DEFAULT_PEQ_MID),
@@ -422,6 +438,11 @@ impl Params {
         self.cmp_sustain.store(DEFAULT_CMP_SUSTAIN, Relaxed);
         self.cmp_attack.store(DEFAULT_CMP_ATTACK, Relaxed);
         self.cmp_level.store(DEFAULT_CMP_LEVEL, Relaxed);
+
+        self.pitch_enabled.store(DEFAULT_PITCH_ENABLED, Relaxed);
+        self.pitch_pitch.store(DEFAULT_PITCH_PITCH, Relaxed);
+        self.pitch_mix.store(DEFAULT_PITCH_MIX, Relaxed);
+        self.pitch_tone.store(DEFAULT_PITCH_TONE, Relaxed);
 
         self.peq_enabled.store(DEFAULT_PEQ_ENABLED, Relaxed);
         self.peq_low.store(DEFAULT_PEQ_LOW, Relaxed);
@@ -548,6 +569,7 @@ macro_rules! stereo_stage {
 
 pub struct DspChain {
     ng: NoiseGate,
+    pitch: Pitch,
     cmp: Compressor,
     fz: Fuzz,
     ts: TubeScreamer,
@@ -583,6 +605,7 @@ impl DspChain {
     pub fn new(sr: f32, params: Arc<Params>) -> Self {
         Self {
             ng: NoiseGate::new(sr),
+            pitch: Pitch::new(sr),
             cmp: Compressor::new(sr),
             fz: Fuzz::new(sr),
             ts: TubeScreamer::new(sr),
@@ -669,9 +692,12 @@ impl DspChain {
         self.rack(l, r)
     }
 
-    /// Mono pre-amp path: gate → compressor → fuzz → TS → DS → pre-amp EQ.
+    /// Mono pre-amp path: gate → pitch → compressor → fuzz → TS → DS → pre-amp EQ.
     ///
-    /// Fuzz comes first so it sees the rawest signal; the pre-amp EQ comes last so it
+    /// The pitch shifter sits right after the gate so it transposes a clean, tracked
+    /// note and the *shifted* signal is what everything downstream — compressor, drives,
+    /// amp — then works on (the classic whammy-in-front placement). Fuzz comes before
+    /// the screamers so it sees the rawest signal; the pre-amp EQ comes last so it
     /// shapes exactly what the amp's gain stage clips. This is the mono signal fed to
     /// either the built-in amp or a hosted external amp.
     #[inline]
@@ -679,6 +705,16 @@ impl DspChain {
         let p = &self.params;
         let x = sample;
         let x = mono_stage!(self, p, x, ng_enabled, ng, ng_threshold, ng_release);
+        let x = mono_stage!(
+            self,
+            p,
+            x,
+            pitch_enabled,
+            pitch,
+            pitch_pitch,
+            pitch_mix,
+            pitch_tone
+        );
         let x = mono_stage!(
             self,
             p,

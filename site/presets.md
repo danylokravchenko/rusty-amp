@@ -133,6 +133,14 @@ sustain = 0.40      # 0.0 – 1.0  (compression amount)
 attack  = 0.30      # 0.0 – 1.0  (0.5 ms → 50 ms)
 level   = 0.50      # 0.0 – 1.0  (output makeup, 0.5 = unity)
 
+# Omit [pitch] entirely to leave it off (the default for the bundled presets),
+# or include it with enabled = false to store values but keep it bypassed.
+[pitch]
+enabled = false     # optional, defaults to true when the section is present
+pitch = 0.50        # 0.0 – 1.0  (0 = −12 st, 0.5 = unison, 1 = +12 st)
+mix   = 0.50        # 0.0 – 1.0  (dry/wet blend)
+tone  = 0.70        # 0.0 – 1.0  (wet low-pass, 0 = dark, 1 = open)
+
 # Omit [fuzz] entirely to leave it off (the default for the bundled presets),
 # or include it with enabled = false to store values but keep it bypassed.
 [fuzz]

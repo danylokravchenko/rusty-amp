@@ -5,8 +5,8 @@ use atomic_float::AtomicF32;
 use ratatui::style::Color;
 
 use super::styles::{
-    PEDAL_BLUE, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE, PEDAL_PINK,
-    PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_TEAL,
+    PEDAL_BLUE, PEDAL_CYAN, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE,
+    PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_TEAL,
 };
 use crate::dsp::Params;
 
@@ -59,6 +59,8 @@ pub(super) const FL_START: usize = 35;
 pub(super) const FL_END: usize = 39;
 pub(super) const CH_START: usize = 39;
 pub(super) const CH_END: usize = 42;
+pub(super) const PITCH_START: usize = 42;
+pub(super) const PITCH_END: usize = 45;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -242,6 +244,19 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ch_mix,
     },
+    // 42–44: Pitch shifter / Whammy
+    Knob {
+        label: "PITCH",
+        param: |p| &p.pitch_pitch,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.pitch_mix,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.pitch_tone,
+    },
 ];
 
 // Rig pedals in navigation order (mirrors the KNOBS slices above). The tile
@@ -323,6 +338,13 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: CH_START,
         end: CH_END,
         enabled: |p| &p.ch_enabled,
+    },
+    Pedal {
+        name: "WHAMMY",
+        color: PEDAL_CYAN,
+        start: PITCH_START,
+        end: PITCH_END,
+        enabled: |p| &p.pitch_enabled,
     },
 ];
 
@@ -425,7 +447,7 @@ mod tests {
     fn table_sizes_are_stable() {
         // Deliberate tripwire: bump these when you add or remove a pedal/knob so
         // the change is a conscious, reviewed edit rather than an accident.
-        assert_eq!(PEDALS.len(), 11, "pedal count changed");
-        assert_eq!(KNOBS.len(), 42, "knob count changed");
+        assert_eq!(PEDALS.len(), 12, "pedal count changed");
+        assert_eq!(KNOBS.len(), 45, "knob count changed");
     }
 }

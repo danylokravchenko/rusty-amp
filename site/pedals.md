@@ -3,10 +3,10 @@ layout: page.njk
 permalink: pedals.html
 title: "Pedals & effects · rusty-amp"
 ogTitle: "rusty-amp · pedals & effects"
-description: "Every rusty-amp pedal explained: noise gate, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, chorus, delay, and stereo reverb — with full knob reference tables."
+description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, chorus, delay, and stereo reverb — with full knob reference tables."
 eyebrow: "Pedals & effects"
 heading: "Configuring the board"
-lead: "Eleven effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
+lead: "Twelve effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
 toc:
   - { href: "#board", label: "The board" }
   - { href: "#pedals", label: "All pedals" }
@@ -34,7 +34,7 @@ The **Guitar Rig** shows one compact tile per pedal that's on the board, followe
 
 <div class="note">
 <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
-Gate → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Delay → Reverb.
+Gate → Whammy → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Delay → Reverb.
 Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
 </div>
 
@@ -47,6 +47,10 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <button class="tile is-active" style="--c:var(--gray)" role="tab" aria-selected="true" data-tab="gate">
       <div class="tile__name"><span class="tile__dot"></span>Noise Gate</div>
       <div class="tile__sub">Thresh · Release</div>
+    </button>
+    <button class="tile" style="--c:var(--cyan)" role="tab" aria-selected="false" data-tab="whammy">
+      <div class="tile__name"><span class="tile__dot"></span>Whammy</div>
+      <div class="tile__sub">Pitch · Mix · Tone</div>
     </button>
     <button class="tile" style="--c:var(--gold)" role="tab" aria-selected="false" data-tab="comp">
       <div class="tile__name"><span class="tile__dot"></span>Compressor</div>
@@ -94,6 +98,13 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <p class="muted">An envelope follower drives a smooth gain ramp (no clicks) that silences hum and string noise between phrases. Runs first so it cleans the rawest signal.</p>
     <div class="kv"><span class="kv__k">Thresh</span><span class="kv__v"><span class="kv__r">0–10</span> Gate open threshold. 0 = opens at very low levels (−80 dB), 10 = always open. Start around 2–3 for high-gain tones.</span></div>
     <div class="kv"><span class="kv__k">Release</span><span class="kv__v"><span class="kv__r">0–10</span> How long the gate stays open after the signal drops below threshold. Higher = slower, more natural decay.</span></div>
+  </div>
+
+  <div class="tab-panel" style="--c:var(--cyan)" role="tabpanel" data-panel="whammy">
+    <p class="muted">A time-domain pitch shifter that transposes your note up or down by up to an octave. It sits right after the gate — a real whammy's spot, in front of everything — so the <em>shifted</em> note is what the compressor and drives then work on: octave-down for a fake-baritone heaviness, octave-up shrieks and dive-bombs feeding raw into the distortion. Two crossfaded grains sweep a delay line at the pitch ratio; a little warble is inherent to the method and part of the whammy character.</p>
+    <div class="kv"><span class="kv__k">Pitch</span><span class="kv__v"><span class="kv__r">0–10</span> Transpose interval. 0 = −12 semitones (octave down), 5 = unison, 10 = +12 semitones (octave up).</span></div>
+    <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 10 = fully wet (full dive-bomb / pure interval).</span></div>
+    <div class="kv"><span class="kv__k">Tone</span><span class="kv__v"><span class="kv__r">0–10</span> Low-pass on the wet path, taming the granular fizz. 0 = dark (~800 Hz), 10 = open (~10 kHz).</span></div>
   </div>
 
   <div class="tab-panel" style="--c:var(--gold)" role="tabpanel" data-panel="comp">

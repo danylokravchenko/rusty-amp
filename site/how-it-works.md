@@ -56,6 +56,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--cyan)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Whammy</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Two-tap crossfaded varispeed delay line → ±12-semitone transpose → wet tone LP, blended with dry.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--gold)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Compressor</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>

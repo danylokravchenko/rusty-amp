@@ -28,6 +28,7 @@ pub struct Preset {
     pub path: Option<PathBuf>,
     pub noise_gate: Option<NgSection>,
     pub compressor: Option<CmpSection>,
+    pub pitch: Option<PitchSection>,
     pub fuzz: Option<FuzzSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
@@ -54,6 +55,14 @@ pub struct CmpSection {
     pub sustain: f32,
     pub attack: f32,
     pub level: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct PitchSection {
+    pub enabled: Option<bool>,
+    pub pitch: f32,
+    pub mix: f32,
+    pub tone: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -221,6 +230,12 @@ impl Preset {
                 attack: params.cmp_attack.load(Relaxed),
                 level: params.cmp_level.load(Relaxed),
             }),
+            pitch: Some(PitchSection {
+                enabled: Some(params.pitch_enabled.load(Relaxed)),
+                pitch: params.pitch_pitch.load(Relaxed),
+                mix: params.pitch_mix.load(Relaxed),
+                tone: params.pitch_tone.load(Relaxed),
+            }),
             fuzz: Some(FuzzSection {
                 enabled: Some(params.fz_enabled.load(Relaxed)),
                 fuzz: params.fz_fuzz.load(Relaxed),
@@ -333,6 +348,19 @@ impl Preset {
             params.cmp_level.store(cmp.level.clamp(0.0, 1.0), Relaxed);
         } else {
             params.cmp_enabled.store(false, Relaxed);
+        }
+
+        if let Some(pitch) = &self.pitch {
+            params
+                .pitch_enabled
+                .store(pitch.enabled.unwrap_or(true), Relaxed);
+            params
+                .pitch_pitch
+                .store(pitch.pitch.clamp(0.0, 1.0), Relaxed);
+            params.pitch_mix.store(pitch.mix.clamp(0.0, 1.0), Relaxed);
+            params.pitch_tone.store(pitch.tone.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.pitch_enabled.store(false, Relaxed);
         }
 
         if let Some(fz) = &self.fuzz {
