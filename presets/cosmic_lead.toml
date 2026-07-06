@@ -1,0 +1,105 @@
+name        = "Cosmic Lead — Shimmer & Swirl"
+description = "A floating, synth-like lead: an octave-up shimmer under the note, a liquid phaser swirl, and a deep delay-and-reverb wash. Post-metal / shoegaze territory."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# A lead that floats on ambience needs the tail to breathe, so the gate sits light
+# and releases slowly — just enough to keep the high-gain hiss out of the long
+# reverb/delay wash between phrases without choking the sustain.
+[noise_gate]
+enabled   = true
+threshold = 0.16   # light — never clamps the singing sustain
+release   = 0.40   # slow — lets notes bloom into the ambient tail
+
+# ── Compressor ────────────────────────────────────────────────────────────────
+# Evens out the picking and adds sustain so the lead sings and holds long enough
+# for the modulation and delay to develop under it.
+[compressor]
+enabled = true
+sustain = 0.60   # generous — long, even sustain for the floating lead
+attack  = 0.45   # lets the pick transient through before clamping
+level   = 0.55
+
+# ── Whammy / Pitch shifter ────────────────────────────────────────────────────
+# The cosmic ingredient: an octave *up*, blended (not full-wet) under the dry note,
+# so every note carries a 12-string-like shimmer an octave above. Kept a blend so
+# the real fundamental still leads and the granular warble stays subtle; the shifted
+# note is what the amp then saturates, thickening the harmonic into the tone itself.
+[pitch]
+enabled = true
+pitch = 1.00   # +12 semitones — octave up
+mix   = 0.32   # a shimmer under the note, not a replacement
+tone  = 0.62   # rolls off the granular fizz on the octave-up copy
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# A hot, near-clean boost tightening the front end and pushing the Marshall into
+# focused, singing lead saturation.
+[tube_screamer]
+enabled = true
+drive = 0.25   # light clip — mostly a boost
+tone  = 0.62   # a touch bright so the lead cuts through the wash
+level = 0.80   # hot — slams the preamp for sustain
+
+# DS-1 off — the drive is all TS boost + amp.
+[distortion]
+enabled = false
+drive = 0.40
+tone  = 0.50
+level = 0.65
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# Marshall JCM800 — the classic singing-lead voice. Mids kept forward so the lead
+# cuts over the ambient wash instead of disappearing into it, treble/presence up
+# for air and articulation at the top.
+[amp]
+model  = "marshall"
+gain   = 0.78  # high, but leaves headroom for the note to bloom
+bass   = 0.52  # controlled low end — the octave-up shimmer lives up top
+mid    = 0.62  # forward — the lead has to sing over the ambience
+treble = 0.62  # bright and articulate
+presence = 0.55  # air and sparkle for the shimmer
+master = 0.62
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# Mesa 4×12 V30s, miked on-axis for pick-attack clarity, with a little ribbon and
+# room to marry the lead to the ambient wash.
+[cabinet]
+model = "mesa"
+mic_pos = 0.60   # on-axis — clear, articulate lead
+mic_blend = 0.22 # a hair of ribbon rounds the top
+mic_room  = 0.25 # some room — feeds the floating, ambient character
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# Gently reinforces the presence band so the shimmer sparkles, with the low end
+# kept in check so the wash doesn't turn muddy.
+[eq]
+enabled = true
+low  = 0.46   # trims the lows — space for the delay/reverb tails
+mid  = 0.54
+high = 0.58   # lifts the air for the octave-up shimmer
+
+# ── Phaser ────────────────────────────────────────────────────────────────────
+# A liquid swirl under the sustained lead — moderate rate and depth with enough
+# feedback for a vocal, resonant movement, at the deepest (equal) blend.
+[phaser]
+enabled  = true
+rate     = 0.35   # a slow, musical swirl
+depth    = 0.62   # wide sweep across the mids
+feedback = 0.45   # resonant, throaty notches
+mix      = 0.50   # equal dry/wet — deepest phase
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# A rhythmic ping-pong repeat that widens the lead and feeds the wash — enough
+# feedback for a few trailing bounces without turning to soup.
+[delay]
+enabled  = true
+time     = 0.42   # ~210 ms — dotted-eighth-ish trailing repeats
+feedback = 0.42   # a few bounces
+mix      = 0.30
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# The cosmos: a big, fairly bright stereo tail the whole lead floats on top of.
+[reverb]
+enabled = true
+room = 0.62   # large space
+damp = 0.42   # a bright-ish tail so the shimmer carries
+mix  = 0.34   # a generous soak — the ambient bed
