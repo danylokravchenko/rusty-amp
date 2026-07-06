@@ -3,10 +3,10 @@ layout: page.njk
 permalink: pedals.html
 title: "Pedals & effects · rusty-amp"
 ogTitle: "rusty-amp · pedals & effects"
-description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, chorus, delay, and stereo reverb — with full knob reference tables."
+description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, compressor, fuzz, TS-808, DS-1, pre-amp EQ, parametric EQ, flanger, chorus, phaser, delay, and stereo reverb — with full knob reference tables."
 eyebrow: "Pedals & effects"
 heading: "Configuring the board"
-lead: "Twelve effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
+lead: "Thirteen effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
 toc:
   - { href: "#board", label: "The board" }
   - { href: "#pedals", label: "All pedals" }
@@ -34,7 +34,7 @@ The **Guitar Rig** shows one compact tile per pedal that's on the board, followe
 
 <div class="note">
 <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
-Gate → Whammy → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Delay → Reverb.
+Gate → Whammy → Comp → Fuzz → TS-808 → DS-1 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Phaser → Delay → Reverb.
 Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
 </div>
 
@@ -83,6 +83,10 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <button class="tile" style="--c:var(--pink)" role="tab" aria-selected="false" data-tab="chorus">
       <div class="tile__name"><span class="tile__dot"></span>Chorus</div>
       <div class="tile__sub">Rate · Depth · Mix</div>
+    </button>
+    <button class="tile" style="--c:var(--yellow)" role="tab" aria-selected="false" data-tab="phaser">
+      <div class="tile__name"><span class="tile__dot"></span>Phaser</div>
+      <div class="tile__sub">Rate · Depth · Feedback · Mix</div>
     </button>
     <button class="tile" style="--c:var(--purple)" role="tab" aria-selected="false" data-tab="delay">
       <div class="tile__name"><span class="tile__dot"></span>Delay</div>
@@ -162,6 +166,14 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <div class="kv"><span class="kv__k">Rate</span><span class="kv__v"><span class="kv__r">0–10</span> LFO speed, 0.05–5 Hz (exponential). Low = a slow, glassy drift; high = a fast, vibrato-like warble.</span></div>
     <div class="kv"><span class="kv__k">Depth</span><span class="kv__v"><span class="kv__r">0–10</span> Sweep width — how far the delay swings (up to ~12 ms). Higher = more detuning and a thicker, more obvious effect.</span></div>
     <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 5 = classic chorus (equal dry/wet), 10 = fully wet (pitch-vibrato).</span></div>
+  </div>
+
+  <div class="tab-panel" style="--c:var(--yellow)" role="tabpanel" data-panel="phaser">
+    <p class="muted">The third sibling to the flanger and chorus — but where those sweep a delay line, the phaser sweeps a cascade of four all-pass filters and sums the result with the dry signal. The all-pass chain is flat on its own; the notches only appear in the dry+wet sum, gliding up and down the spectrum for that hollow, vocal "whoosh" (Phase 90 / Small Stone territory). Sits after the chorus, before the delay, in stereo — the two channels read one LFO a quarter-cycle apart so the sweep drifts across the image.</p>
+    <div class="kv"><span class="kv__k">Rate</span><span class="kv__v"><span class="kv__r">0–10</span> LFO speed, 0.05–5 Hz (exponential). Low = a slow, deep swirl; high = a fast throb.</span></div>
+    <div class="kv"><span class="kv__k">Depth</span><span class="kv__v"><span class="kv__r">0–10</span> Sweep width — how far the all-pass break frequency glides (~200 Hz up to ~1.6 kHz). Higher = a wider, more dramatic sweep.</span></div>
+    <div class="kv"><span class="kv__k">Feedback</span><span class="kv__v"><span class="kv__r">0–10</span> Regeneration (0–90%). Feeds the wet output back in, sharpening the notches into resonant, throaty peaks.</span></div>
+    <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 5 = deepest phase (equal dry/wet), 10 = fully wet (the notches fade as the dry sum vanishes).</span></div>
   </div>
 
   <div class="tab-panel" style="--c:var(--purple)" role="tabpanel" data-panel="delay">

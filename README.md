@@ -29,7 +29,7 @@ On top of that sit complex effects which add width and depth to sound. All of it
 
 - 🔊 **3 amplifiers** — Marshall JCM800, Mesa Dual Rectifier, and Randall Warhead, switchable while you play
 - 📦 **3 cabinets + your own IRs** — Mesa, Marshall, and Orange 4×12s, each captured with three blendable mics; load your own favourite external `wav` IR
-- 🎛️ **A full pedalboard** — noise gate, whammy pitch shifter, compressor, fuzz, Tube Screamer, DS-1, EQ, flanger, chorus, ping-pong delay, and stereo reverb; add, remove, and bypass on the fly
+- 🎛️ **A full pedalboard** — noise gate, whammy pitch shifter, compressor, fuzz, Tube Screamer, DS-1, EQ, flanger, chorus, phaser, ping-pong delay, and stereo reverb; add, remove, and bypass on the fly
 - 🎧 **True studio-grade stereo** — wide, three-dimensional sound from the cab, delay, and reverb
 - 💾 **Ready-made presets** — instant tones inspired by Metallica, Pantera, Slayer, Death, and more
 - 🔌 **CLAP plugin host** — drop a third-party CLAP effect into the chain and tweak its parameters from the TUI

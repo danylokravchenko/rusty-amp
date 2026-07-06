@@ -208,6 +208,15 @@ rate     = 0.25       # 0.0 – 1.0  (LFO speed, 0.05–5 Hz, exponential)
 depth    = 0.50       # 0.0 – 1.0  (sweep width; delay swings ~8–20 ms)
 mix      = 0.50       # 0.0 = dry, 0.5 = classic chorus, 1.0 = fully wet
 
+# Omit [phaser] entirely to leave it off (the default for the bundled presets),
+# or include it with enabled = false to store values but keep it bypassed.
+[phaser]
+enabled  = false      # optional, defaults to true when the section is present
+rate     = 0.30       # 0.0 – 1.0  (LFO speed, 0.05–5 Hz, exponential)
+depth    = 0.70       # 0.0 – 1.0  (sweep width; break freq glides ~200 Hz–1.6 kHz)
+feedback = 0.40       # 0.0 – 1.0  (regeneration, capped at 90%; higher = resonant)
+mix      = 0.50       # 0.0 = dry, 0.5 = deepest phase, 1.0 = fully wet
+
 [delay]
 enabled  = true       # optional, defaults to true
 time     = 0.30       # 0.0 = 0 ms, 1.0 = 500 ms

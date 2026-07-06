@@ -18,8 +18,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering::Relaxed};
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
-    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, Pitch, PreampEq,
-    Reverb, TubeScreamer,
+    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, NoiseGate, ParametricEq, Phaser, Pitch,
+    PreampEq, Reverb, TubeScreamer,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -189,6 +189,12 @@ const DEFAULT_CH_RATE: f32 = 0.25;
 const DEFAULT_CH_DEPTH: f32 = 0.50;
 const DEFAULT_CH_MIX: f32 = 0.50;
 
+const DEFAULT_PH_ENABLED: bool = false;
+const DEFAULT_PH_RATE: f32 = 0.30;
+const DEFAULT_PH_DEPTH: f32 = 0.70;
+const DEFAULT_PH_FEEDBACK: f32 = 0.40;
+const DEFAULT_PH_MIX: f32 = 0.50;
+
 const DEFAULT_AMP_GAIN: f32 = 0.75;
 const DEFAULT_AMP_BASS: f32 = 1.00;
 const DEFAULT_AMP_MID: f32 = 0.0;
@@ -303,6 +309,13 @@ pub struct Params {
     pub ch_depth: Arc<AtomicF32>,
     pub ch_mix: Arc<AtomicF32>,
 
+    // Phaser (stereo rack, post-cab modulation, after the chorus)
+    pub ph_enabled: Arc<AtomicBool>,
+    pub ph_rate: Arc<AtomicF32>,
+    pub ph_depth: Arc<AtomicF32>,
+    pub ph_feedback: Arc<AtomicF32>,
+    pub ph_mix: Arc<AtomicF32>,
+
     // Amp (shared by all models)
     pub amp_gain: Arc<AtomicF32>,
     pub amp_bass: Arc<AtomicF32>,
@@ -404,6 +417,12 @@ impl Params {
             ch_depth: p!(DEFAULT_CH_DEPTH),
             ch_mix: p!(DEFAULT_CH_MIX),
 
+            ph_enabled: b!(DEFAULT_PH_ENABLED),
+            ph_rate: p!(DEFAULT_PH_RATE),
+            ph_depth: p!(DEFAULT_PH_DEPTH),
+            ph_feedback: p!(DEFAULT_PH_FEEDBACK),
+            ph_mix: p!(DEFAULT_PH_MIX),
+
             amp_gain: p!(DEFAULT_AMP_GAIN),
             amp_bass: p!(DEFAULT_AMP_BASS),
             amp_mid: p!(DEFAULT_AMP_MID),
@@ -489,6 +508,12 @@ impl Params {
         self.ch_rate.store(DEFAULT_CH_RATE, Relaxed);
         self.ch_depth.store(DEFAULT_CH_DEPTH, Relaxed);
         self.ch_mix.store(DEFAULT_CH_MIX, Relaxed);
+
+        self.ph_enabled.store(DEFAULT_PH_ENABLED, Relaxed);
+        self.ph_rate.store(DEFAULT_PH_RATE, Relaxed);
+        self.ph_depth.store(DEFAULT_PH_DEPTH, Relaxed);
+        self.ph_feedback.store(DEFAULT_PH_FEEDBACK, Relaxed);
+        self.ph_mix.store(DEFAULT_PH_MIX, Relaxed);
 
         self.amp_gain.store(DEFAULT_AMP_GAIN, Relaxed);
         self.amp_bass.store(DEFAULT_AMP_BASS, Relaxed);
@@ -580,6 +605,7 @@ pub struct DspChain {
     eq: ParametricEq,
     flanger: Flanger,
     chorus: Chorus,
+    phaser: Phaser,
     delay: Delay,
     reverb: Reverb,
     params: Arc<Params>,
@@ -616,6 +642,7 @@ impl DspChain {
             eq: ParametricEq::new(sr),
             flanger: Flanger::new(sr),
             chorus: Chorus::new(sr),
+            phaser: Phaser::new(sr),
             delay: Delay::new(sr),
             reverb: Reverb::new(sr),
             params,
@@ -777,9 +804,9 @@ impl DspChain {
         }
     }
 
-    /// Stereo rack (parametric EQ → flanger → chorus → ping-pong delay → reverb).
-    /// The flanger and chorus modulate the finished tone ahead of the time-based
-    /// ambience. Runs after both the built-in and external amp paths.
+    /// Stereo rack (parametric EQ → flanger → chorus → phaser → ping-pong delay →
+    /// reverb). The flanger, chorus and phaser modulate the finished tone ahead of
+    /// the time-based ambience. Runs after both the built-in and external amp paths.
     #[inline]
     fn rack(&mut self, l: f32, r: f32) -> (f32, f32) {
         let p = &self.params;
@@ -797,6 +824,18 @@ impl DspChain {
             fl_mix
         );
         let (l, r) = stereo_stage!(self, p, l, r, ch_enabled, chorus, ch_rate, ch_depth, ch_mix);
+        let (l, r) = stereo_stage!(
+            self,
+            p,
+            l,
+            r,
+            ph_enabled,
+            phaser,
+            ph_rate,
+            ph_depth,
+            ph_feedback,
+            ph_mix
+        );
         let (l, r) = stereo_stage!(
             self,
             p,

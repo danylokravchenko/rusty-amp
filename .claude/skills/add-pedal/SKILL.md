@@ -40,7 +40,7 @@ Data-driven HTML blocks inside Markdown — no new page. Use the **same livery c
 
 1. **`site/assets/site.css`** — if the pedal needs a new colour, add a CSS variable to the `:root` block (web twin of the `PEDAL_<NAME>` colour in `styles.rs`; existing ones like `--green`, `--teal`).
 2. **`site/pedals.md`** — in the *All pedals* selector (`<div class="selector" data-tabs data-tabs-hash>`), add a `<button class="tile" data-tab="<id>" style="--c:var(--<colour>)">` **and** a matching `<div class="tab-panel" data-panel="<id>" style="--c:var(--<colour>)">` with an intro `<p class="muted">` and one `.kv` row per knob. Keep the tile in signal-chain order; `<id>` becomes the `pedals.html#<id>` deep link. If you change the chain wording, update the header count in the frontmatter `description`/`lead` and the chain-order `<div class="note">`.
-3. **`site/index.md`** — add a `<div class="pedal" style="--c:var(--<colour>)">` card to the board grid (landing-page overview).
+3. **`site/index.md`** — add a `<div class="pedal" style="--c:var(--<colour>)">` card to the board grid (landing-page overview). Update signal chain.
 4. **`site/how-it-works.md`** — add a `<div class="flow__stage" style="--c:var(--<colour>)">` at the correct point in the signal-chain flow, with a one-line DSP summary.
 5. **`site/presets.md`** — add the new pedal to the bundled preset template.
 6. **`README.md`** — update the documentation to include the new pedal.

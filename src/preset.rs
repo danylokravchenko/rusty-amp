@@ -38,6 +38,7 @@ pub struct Preset {
     pub eq: Option<EqSection>,
     pub flanger: Option<FlangerSection>,
     pub chorus: Option<ChorusSection>,
+    pub phaser: Option<PhaserSection>,
     pub delay: Option<DelaySection>,
     pub reverb: ReverbSection,
 }
@@ -175,6 +176,15 @@ pub struct ChorusSection {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+pub struct PhaserSection {
+    pub enabled: Option<bool>,
+    pub rate: f32,
+    pub depth: f32,
+    pub feedback: f32,
+    pub mix: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ReverbSection {
     pub enabled: Option<bool>,
     pub room: f32,
@@ -299,6 +309,13 @@ impl Preset {
                 rate: params.ch_rate.load(Relaxed),
                 depth: params.ch_depth.load(Relaxed),
                 mix: params.ch_mix.load(Relaxed),
+            }),
+            phaser: Some(PhaserSection {
+                enabled: Some(params.ph_enabled.load(Relaxed)),
+                rate: params.ph_rate.load(Relaxed),
+                depth: params.ph_depth.load(Relaxed),
+                feedback: params.ph_feedback.load(Relaxed),
+                mix: params.ph_mix.load(Relaxed),
             }),
             reverb: ReverbSection {
                 enabled: Some(params.rev_enabled.load(Relaxed)),
@@ -469,6 +486,18 @@ impl Preset {
             params.ch_mix.store(ch.mix.clamp(0.0, 1.0), Relaxed);
         } else {
             params.ch_enabled.store(false, Relaxed);
+        }
+
+        if let Some(ph) = &self.phaser {
+            params.ph_enabled.store(ph.enabled.unwrap_or(true), Relaxed);
+            params.ph_rate.store(ph.rate.clamp(0.0, 1.0), Relaxed);
+            params.ph_depth.store(ph.depth.clamp(0.0, 1.0), Relaxed);
+            params
+                .ph_feedback
+                .store(ph.feedback.clamp(0.0, 1.0), Relaxed);
+            params.ph_mix.store(ph.mix.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.ph_enabled.store(false, Relaxed);
         }
 
         let rev = &self.reverb;
