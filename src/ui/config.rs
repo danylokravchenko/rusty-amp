@@ -30,41 +30,45 @@ pub(super) struct Pedal {
 // KNOBS array below. The amp/mic panels and the PEDALS table reference these
 // bounds.
 //
-// IMPORTANT: ←/→ navigation walks KNOBS linearly, so this order — amp tone
-// stack, cabinet mics, then the pedals in signal-chain order — must match the
-// KNOBS array one-to-one.
+// IMPORTANT: ←/→ navigation walks KNOBS linearly, so this order must match the
+// KNOBS array one-to-one. The layout follows the DSP signal flow: the amp tone
+// stack and cabinet mics first (their own fixed panel), then the pedals in the
+// order the sound actually travels — the pre-amp drive chain, then the post-cab
+// rack — so the board and ←/→ navigation mirror the header ribbon.
 pub(super) const AMP_START: usize = 0;
 pub(super) const AMP_END: usize = 6;
 pub(super) const MIC_START: usize = 6;
 pub(super) const MIC_END: usize = 9;
-pub(super) const TS_START: usize = 9;
-pub(super) const TS_END: usize = 12;
-pub(super) const DS_START: usize = 12;
-pub(super) const DS_END: usize = 15;
-pub(super) const REV_START: usize = 15;
-pub(super) const REV_END: usize = 18;
-pub(super) const DELAY_START: usize = 18;
-pub(super) const DELAY_END: usize = 21;
-pub(super) const CMP_START: usize = 21;
-pub(super) const CMP_END: usize = 24;
-pub(super) const FUZZ_START: usize = 24;
-pub(super) const FUZZ_END: usize = 27;
-pub(super) const NG_START: usize = 27;
-pub(super) const NG_END: usize = 29;
-pub(super) const PEQ_START: usize = 29;
-pub(super) const PEQ_END: usize = 32;
-pub(super) const EQ_START: usize = 32;
-pub(super) const EQ_END: usize = 35;
-pub(super) const FL_START: usize = 35;
-pub(super) const FL_END: usize = 39;
-pub(super) const CH_START: usize = 39;
-pub(super) const CH_END: usize = 42;
-pub(super) const PITCH_START: usize = 42;
-pub(super) const PITCH_END: usize = 45;
-pub(super) const PH_START: usize = 45;
-pub(super) const PH_END: usize = 49;
-pub(super) const ML_START: usize = 49;
-pub(super) const ML_END: usize = 53;
+// Pre-amp pedals (before the amp), in signal order.
+pub(super) const NG_START: usize = 9;
+pub(super) const NG_END: usize = 11;
+pub(super) const PITCH_START: usize = 11;
+pub(super) const PITCH_END: usize = 14;
+pub(super) const CMP_START: usize = 14;
+pub(super) const CMP_END: usize = 17;
+pub(super) const FUZZ_START: usize = 17;
+pub(super) const FUZZ_END: usize = 20;
+pub(super) const TS_START: usize = 20;
+pub(super) const TS_END: usize = 23;
+pub(super) const DS_START: usize = 23;
+pub(super) const DS_END: usize = 26;
+pub(super) const ML_START: usize = 26;
+pub(super) const ML_END: usize = 30;
+pub(super) const PEQ_START: usize = 30;
+pub(super) const PEQ_END: usize = 33;
+// Post-cab rack pedals (after the cab), in signal order.
+pub(super) const EQ_START: usize = 33;
+pub(super) const EQ_END: usize = 36;
+pub(super) const FL_START: usize = 36;
+pub(super) const FL_END: usize = 40;
+pub(super) const CH_START: usize = 40;
+pub(super) const CH_END: usize = 43;
+pub(super) const PH_START: usize = 43;
+pub(super) const PH_END: usize = 47;
+pub(super) const DELAY_START: usize = 47;
+pub(super) const DELAY_END: usize = 50;
+pub(super) const REV_START: usize = 50;
+pub(super) const REV_END: usize = 53;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -105,85 +109,8 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "ROOM",
         param: |p| &p.mic_room,
     },
-    // 9–11: TS-808
-    Knob {
-        label: "DRIVE",
-        param: |p| &p.ts_drive,
-    },
-    Knob {
-        label: "TONE",
-        param: |p| &p.ts_tone,
-    },
-    Knob {
-        label: "LEVEL",
-        param: |p| &p.ts_level,
-    },
-    // 12–14: DS-1
-    Knob {
-        label: "DRIVE",
-        param: |p| &p.ds_drive,
-    },
-    Knob {
-        label: "TONE",
-        param: |p| &p.ds_tone,
-    },
-    Knob {
-        label: "LEVEL",
-        param: |p| &p.ds_level,
-    },
-    // 15–17: Reverb
-    Knob {
-        label: "ROOM",
-        param: |p| &p.rev_room,
-    },
-    Knob {
-        label: "DAMP",
-        param: |p| &p.rev_damp,
-    },
-    Knob {
-        label: "MIX",
-        param: |p| &p.rev_mix,
-    },
-    // 18–20: Delay
-    Knob {
-        label: "TIME",
-        param: |p| &p.delay_time,
-    },
-    Knob {
-        label: "FEEDBACK",
-        param: |p| &p.delay_feedback,
-    },
-    Knob {
-        label: "MIX",
-        param: |p| &p.delay_mix,
-    },
-    // 21–23: Compressor (rig row 2, first)
-    Knob {
-        label: "SUSTAIN",
-        param: |p| &p.cmp_sustain,
-    },
-    Knob {
-        label: "ATTACK",
-        param: |p| &p.cmp_attack,
-    },
-    Knob {
-        label: "LEVEL",
-        param: |p| &p.cmp_level,
-    },
-    // 24–26: Fuzz
-    Knob {
-        label: "FUZZ",
-        param: |p| &p.fz_fuzz,
-    },
-    Knob {
-        label: "TONE",
-        param: |p| &p.fz_tone,
-    },
-    Knob {
-        label: "LEVEL",
-        param: |p| &p.fz_level,
-    },
-    // 27–28: Noise Gate
+    // ── Pre-amp pedals (before the amp), in signal order ──
+    // 9–10: Noise Gate
     Knob {
         label: "THRESH",
         param: |p| &p.ng_threshold,
@@ -192,63 +119,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "RELEASE",
         param: |p| &p.ng_release,
     },
-    // 29–31: Pre-amp EQ
-    Knob {
-        label: "LOW",
-        param: |p| &p.peq_low,
-    },
-    Knob {
-        label: "MID",
-        param: |p| &p.peq_mid,
-    },
-    Knob {
-        label: "HIGH",
-        param: |p| &p.peq_high,
-    },
-    // 32–34: Parametric EQ
-    Knob {
-        label: "LOW",
-        param: |p| &p.eq_low,
-    },
-    Knob {
-        label: "MID",
-        param: |p| &p.eq_mid,
-    },
-    Knob {
-        label: "HIGH",
-        param: |p| &p.eq_high,
-    },
-    // 35–38: Flanger
-    Knob {
-        label: "RATE",
-        param: |p| &p.fl_rate,
-    },
-    Knob {
-        label: "DEPTH",
-        param: |p| &p.fl_depth,
-    },
-    Knob {
-        label: "FEEDBACK",
-        param: |p| &p.fl_feedback,
-    },
-    Knob {
-        label: "MIX",
-        param: |p| &p.fl_mix,
-    },
-    // 39–41: Chorus
-    Knob {
-        label: "RATE",
-        param: |p| &p.ch_rate,
-    },
-    Knob {
-        label: "DEPTH",
-        param: |p| &p.ch_depth,
-    },
-    Knob {
-        label: "MIX",
-        param: |p| &p.ch_mix,
-    },
-    // 42–44: Pitch shifter / Whammy
+    // 11–13: Pitch shifter / Whammy
     Knob {
         label: "PITCH",
         param: |p| &p.pitch_pitch,
@@ -261,24 +132,59 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "TONE",
         param: |p| &p.pitch_tone,
     },
-    // 45–48: Phaser
+    // 14–16: Compressor
     Knob {
-        label: "RATE",
-        param: |p| &p.ph_rate,
+        label: "SUSTAIN",
+        param: |p| &p.cmp_sustain,
     },
     Knob {
-        label: "DEPTH",
-        param: |p| &p.ph_depth,
+        label: "ATTACK",
+        param: |p| &p.cmp_attack,
     },
     Knob {
-        label: "FEEDBACK",
-        param: |p| &p.ph_feedback,
+        label: "LEVEL",
+        param: |p| &p.cmp_level,
+    },
+    // 17–19: Fuzz
+    Knob {
+        label: "FUZZ",
+        param: |p| &p.fz_fuzz,
     },
     Knob {
-        label: "MIX",
-        param: |p| &p.ph_mix,
+        label: "TONE",
+        param: |p| &p.fz_tone,
     },
-    // 49–52: Boss ML-2 Metal Core
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.fz_level,
+    },
+    // 20–22: TS-808
+    Knob {
+        label: "DRIVE",
+        param: |p| &p.ts_drive,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.ts_tone,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.ts_level,
+    },
+    // 23–25: DS-1
+    Knob {
+        label: "DRIVE",
+        param: |p| &p.ds_drive,
+    },
+    Knob {
+        label: "TONE",
+        param: |p| &p.ds_tone,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.ds_level,
+    },
+    // 26–29: Boss ML-2 Metal Core
     Knob {
         label: "DIST",
         param: |p| &p.ml_dist,
@@ -295,38 +201,125 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ml_level,
     },
+    // 30–32: Pre-amp EQ
+    Knob {
+        label: "LOW",
+        param: |p| &p.peq_low,
+    },
+    Knob {
+        label: "MID",
+        param: |p| &p.peq_mid,
+    },
+    Knob {
+        label: "HIGH",
+        param: |p| &p.peq_high,
+    },
+    // ── Post-cab rack pedals (after the cab), in signal order ──
+    // 33–35: Parametric EQ
+    Knob {
+        label: "LOW",
+        param: |p| &p.eq_low,
+    },
+    Knob {
+        label: "MID",
+        param: |p| &p.eq_mid,
+    },
+    Knob {
+        label: "HIGH",
+        param: |p| &p.eq_high,
+    },
+    // 36–39: Flanger
+    Knob {
+        label: "RATE",
+        param: |p| &p.fl_rate,
+    },
+    Knob {
+        label: "DEPTH",
+        param: |p| &p.fl_depth,
+    },
+    Knob {
+        label: "FEEDBACK",
+        param: |p| &p.fl_feedback,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.fl_mix,
+    },
+    // 40–42: Chorus
+    Knob {
+        label: "RATE",
+        param: |p| &p.ch_rate,
+    },
+    Knob {
+        label: "DEPTH",
+        param: |p| &p.ch_depth,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.ch_mix,
+    },
+    // 43–46: Phaser
+    Knob {
+        label: "RATE",
+        param: |p| &p.ph_rate,
+    },
+    Knob {
+        label: "DEPTH",
+        param: |p| &p.ph_depth,
+    },
+    Knob {
+        label: "FEEDBACK",
+        param: |p| &p.ph_feedback,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.ph_mix,
+    },
+    // 47–49: Delay
+    Knob {
+        label: "TIME",
+        param: |p| &p.delay_time,
+    },
+    Knob {
+        label: "FEEDBACK",
+        param: |p| &p.delay_feedback,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.delay_mix,
+    },
+    // 50–52: Reverb
+    Knob {
+        label: "ROOM",
+        param: |p| &p.rev_room,
+    },
+    Knob {
+        label: "DAMP",
+        param: |p| &p.rev_damp,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.rev_mix,
+    },
 ];
 
 // Rig pedals in navigation order (mirrors the KNOBS slices above). The tile
 // grid and detail editor both iterate this table.
 pub(super) const PEDALS: &[Pedal] = &[
+    // Pre-amp drive chain (before the amp), in signal order.
     Pedal {
-        name: "TS-808",
-        color: PEDAL_GREEN,
-        start: TS_START,
-        end: TS_END,
-        enabled: |p| &p.ts_enabled,
+        name: "NOISE GATE",
+        color: PEDAL_SILVER,
+        start: NG_START,
+        end: NG_END,
+        enabled: |p| &p.ng_enabled,
     },
     Pedal {
-        name: "DS-1",
-        color: PEDAL_ORANGE,
-        start: DS_START,
-        end: DS_END,
-        enabled: |p| &p.ds_enabled,
-    },
-    Pedal {
-        name: "SPRING REVERB",
-        color: PEDAL_BLUE,
-        start: REV_START,
-        end: REV_END,
-        enabled: |p| &p.rev_enabled,
-    },
-    Pedal {
-        name: "DELAY",
-        color: PEDAL_PURPLE,
-        start: DELAY_START,
-        end: DELAY_END,
-        enabled: |p| &p.delay_enabled,
+        name: "WHAMMY",
+        color: PEDAL_CYAN,
+        start: PITCH_START,
+        end: PITCH_END,
+        enabled: |p| &p.pitch_enabled,
     },
     Pedal {
         name: "COMP",
@@ -343,11 +336,25 @@ pub(super) const PEDALS: &[Pedal] = &[
         enabled: |p| &p.fz_enabled,
     },
     Pedal {
-        name: "NOISE GATE",
-        color: PEDAL_SILVER,
-        start: NG_START,
-        end: NG_END,
-        enabled: |p| &p.ng_enabled,
+        name: "TS-808",
+        color: PEDAL_GREEN,
+        start: TS_START,
+        end: TS_END,
+        enabled: |p| &p.ts_enabled,
+    },
+    Pedal {
+        name: "DS-1",
+        color: PEDAL_ORANGE,
+        start: DS_START,
+        end: DS_END,
+        enabled: |p| &p.ds_enabled,
+    },
+    Pedal {
+        name: "ML-2 METAL CORE",
+        color: PEDAL_STEEL,
+        start: ML_START,
+        end: ML_END,
+        enabled: |p| &p.ml_enabled,
     },
     Pedal {
         name: "PRE-AMP EQ",
@@ -356,6 +363,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         end: PEQ_END,
         enabled: |p| &p.peq_enabled,
     },
+    // Post-cab rack (after the cab), in signal order.
     Pedal {
         name: "PARAMETRIC EQ",
         color: PEDAL_TEAL,
@@ -378,13 +386,6 @@ pub(super) const PEDALS: &[Pedal] = &[
         enabled: |p| &p.ch_enabled,
     },
     Pedal {
-        name: "WHAMMY",
-        color: PEDAL_CYAN,
-        start: PITCH_START,
-        end: PITCH_END,
-        enabled: |p| &p.pitch_enabled,
-    },
-    Pedal {
         name: "PHASER",
         color: PEDAL_YELLOW,
         start: PH_START,
@@ -392,11 +393,18 @@ pub(super) const PEDALS: &[Pedal] = &[
         enabled: |p| &p.ph_enabled,
     },
     Pedal {
-        name: "ML-2 METAL CORE",
-        color: PEDAL_STEEL,
-        start: ML_START,
-        end: ML_END,
-        enabled: |p| &p.ml_enabled,
+        name: "DELAY",
+        color: PEDAL_PURPLE,
+        start: DELAY_START,
+        end: DELAY_END,
+        enabled: |p| &p.delay_enabled,
+    },
+    Pedal {
+        name: "SPRING REVERB",
+        color: PEDAL_BLUE,
+        start: REV_START,
+        end: REV_END,
+        enabled: |p| &p.rev_enabled,
     },
 ];
 
