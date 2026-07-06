@@ -29,6 +29,7 @@ pub struct Preset {
     pub noise_gate: Option<NgSection>,
     pub compressor: Option<CmpSection>,
     pub pitch: Option<PitchSection>,
+    pub wah: Option<WahSection>,
     pub fuzz: Option<FuzzSection>,
     pub tube_screamer: TsSection,
     pub distortion: Option<DsSection>,
@@ -65,6 +66,15 @@ pub struct PitchSection {
     pub pitch: f32,
     pub mix: f32,
     pub tone: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct WahSection {
+    pub enabled: Option<bool>,
+    pub freq: f32,
+    pub sens: f32,
+    pub q: f32,
+    pub mix: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -256,6 +266,13 @@ impl Preset {
                 mix: params.pitch_mix.load(Relaxed),
                 tone: params.pitch_tone.load(Relaxed),
             }),
+            wah: Some(WahSection {
+                enabled: Some(params.wah_enabled.load(Relaxed)),
+                freq: params.wah_freq.load(Relaxed),
+                sens: params.wah_sens.load(Relaxed),
+                q: params.wah_q.load(Relaxed),
+                mix: params.wah_mix.load(Relaxed),
+            }),
             fuzz: Some(FuzzSection {
                 enabled: Some(params.fz_enabled.load(Relaxed)),
                 fuzz: params.fz_fuzz.load(Relaxed),
@@ -395,6 +412,18 @@ impl Preset {
             params.pitch_tone.store(pitch.tone.clamp(0.0, 1.0), Relaxed);
         } else {
             params.pitch_enabled.store(false, Relaxed);
+        }
+
+        if let Some(wah) = &self.wah {
+            params
+                .wah_enabled
+                .store(wah.enabled.unwrap_or(true), Relaxed);
+            params.wah_freq.store(wah.freq.clamp(0.0, 1.0), Relaxed);
+            params.wah_sens.store(wah.sens.clamp(0.0, 1.0), Relaxed);
+            params.wah_q.store(wah.q.clamp(0.0, 1.0), Relaxed);
+            params.wah_mix.store(wah.mix.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.wah_enabled.store(false, Relaxed);
         }
 
         if let Some(fz) = &self.fuzz {

@@ -6,7 +6,8 @@ use ratatui::style::Color;
 
 use super::styles::{
     PEDAL_BLUE, PEDAL_CYAN, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE,
-    PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_STEEL, PEDAL_TEAL, PEDAL_YELLOW,
+    PEDAL_ORCHID, PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_STEEL, PEDAL_TEAL,
+    PEDAL_YELLOW,
 };
 use crate::dsp::Params;
 
@@ -44,31 +45,33 @@ pub(super) const NG_START: usize = 9;
 pub(super) const NG_END: usize = 11;
 pub(super) const PITCH_START: usize = 11;
 pub(super) const PITCH_END: usize = 14;
-pub(super) const CMP_START: usize = 14;
-pub(super) const CMP_END: usize = 17;
-pub(super) const FUZZ_START: usize = 17;
-pub(super) const FUZZ_END: usize = 20;
-pub(super) const TS_START: usize = 20;
-pub(super) const TS_END: usize = 23;
-pub(super) const DS_START: usize = 23;
-pub(super) const DS_END: usize = 26;
-pub(super) const ML_START: usize = 26;
-pub(super) const ML_END: usize = 30;
-pub(super) const PEQ_START: usize = 30;
-pub(super) const PEQ_END: usize = 33;
+pub(super) const WAH_START: usize = 14;
+pub(super) const WAH_END: usize = 18;
+pub(super) const CMP_START: usize = 18;
+pub(super) const CMP_END: usize = 21;
+pub(super) const FUZZ_START: usize = 21;
+pub(super) const FUZZ_END: usize = 24;
+pub(super) const TS_START: usize = 24;
+pub(super) const TS_END: usize = 27;
+pub(super) const DS_START: usize = 27;
+pub(super) const DS_END: usize = 30;
+pub(super) const ML_START: usize = 30;
+pub(super) const ML_END: usize = 34;
+pub(super) const PEQ_START: usize = 34;
+pub(super) const PEQ_END: usize = 37;
 // Post-cab rack pedals (after the cab), in signal order.
-pub(super) const EQ_START: usize = 33;
-pub(super) const EQ_END: usize = 36;
-pub(super) const FL_START: usize = 36;
-pub(super) const FL_END: usize = 40;
-pub(super) const CH_START: usize = 40;
-pub(super) const CH_END: usize = 43;
-pub(super) const PH_START: usize = 43;
-pub(super) const PH_END: usize = 47;
-pub(super) const DELAY_START: usize = 47;
-pub(super) const DELAY_END: usize = 50;
-pub(super) const REV_START: usize = 50;
-pub(super) const REV_END: usize = 53;
+pub(super) const EQ_START: usize = 37;
+pub(super) const EQ_END: usize = 40;
+pub(super) const FL_START: usize = 40;
+pub(super) const FL_END: usize = 44;
+pub(super) const CH_START: usize = 44;
+pub(super) const CH_END: usize = 47;
+pub(super) const PH_START: usize = 47;
+pub(super) const PH_END: usize = 51;
+pub(super) const DELAY_START: usize = 51;
+pub(super) const DELAY_END: usize = 54;
+pub(super) const REV_START: usize = 54;
+pub(super) const REV_END: usize = 57;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -132,7 +135,24 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "TONE",
         param: |p| &p.pitch_tone,
     },
-    // 14–16: Compressor
+    // 14–17: Auto-wah
+    Knob {
+        label: "FREQ",
+        param: |p| &p.wah_freq,
+    },
+    Knob {
+        label: "SENS",
+        param: |p| &p.wah_sens,
+    },
+    Knob {
+        label: "Q",
+        param: |p| &p.wah_q,
+    },
+    Knob {
+        label: "MIX",
+        param: |p| &p.wah_mix,
+    },
+    // 18–20: Compressor
     Knob {
         label: "SUSTAIN",
         param: |p| &p.cmp_sustain,
@@ -145,7 +165,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.cmp_level,
     },
-    // 17–19: Fuzz
+    // 21–23: Fuzz
     Knob {
         label: "FUZZ",
         param: |p| &p.fz_fuzz,
@@ -158,7 +178,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.fz_level,
     },
-    // 20–22: TS-808
+    // 24–26: TS-808
     Knob {
         label: "DRIVE",
         param: |p| &p.ts_drive,
@@ -171,7 +191,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ts_level,
     },
-    // 23–25: DS-1
+    // 27–29: DS-1
     Knob {
         label: "DRIVE",
         param: |p| &p.ds_drive,
@@ -184,7 +204,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ds_level,
     },
-    // 26–29: Boss ML-2 Metal Core
+    // 30–33: Boss ML-2 Metal Core
     Knob {
         label: "DIST",
         param: |p| &p.ml_dist,
@@ -201,7 +221,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "LEVEL",
         param: |p| &p.ml_level,
     },
-    // 30–32: Pre-amp EQ
+    // 34–36: Pre-amp EQ
     Knob {
         label: "LOW",
         param: |p| &p.peq_low,
@@ -215,7 +235,7 @@ pub(super) const KNOBS: &[Knob] = &[
         param: |p| &p.peq_high,
     },
     // ── Post-cab rack pedals (after the cab), in signal order ──
-    // 33–35: Parametric EQ
+    // 37–39: Parametric EQ
     Knob {
         label: "LOW",
         param: |p| &p.eq_low,
@@ -228,7 +248,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "HIGH",
         param: |p| &p.eq_high,
     },
-    // 36–39: Flanger
+    // 40–43: Flanger
     Knob {
         label: "RATE",
         param: |p| &p.fl_rate,
@@ -245,7 +265,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.fl_mix,
     },
-    // 40–42: Chorus
+    // 44–46: Chorus
     Knob {
         label: "RATE",
         param: |p| &p.ch_rate,
@@ -258,7 +278,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ch_mix,
     },
-    // 43–46: Phaser
+    // 47–50: Phaser
     Knob {
         label: "RATE",
         param: |p| &p.ph_rate,
@@ -275,7 +295,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ph_mix,
     },
-    // 47–49: Delay
+    // 51–53: Delay
     Knob {
         label: "TIME",
         param: |p| &p.delay_time,
@@ -288,7 +308,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.delay_mix,
     },
-    // 50–52: Reverb
+    // 54–56: Reverb
     Knob {
         label: "ROOM",
         param: |p| &p.rev_room,
@@ -320,6 +340,13 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: PITCH_START,
         end: PITCH_END,
         enabled: |p| &p.pitch_enabled,
+    },
+    Pedal {
+        name: "WAH",
+        color: PEDAL_ORCHID,
+        start: WAH_START,
+        end: WAH_END,
+        enabled: |p| &p.wah_enabled,
     },
     Pedal {
         name: "COMP",
@@ -507,7 +534,7 @@ mod tests {
     fn table_sizes_are_stable() {
         // Deliberate tripwire: bump these when you add or remove a pedal/knob so
         // the change is a conscious, reviewed edit rather than an accident.
-        assert_eq!(PEDALS.len(), 14, "pedal count changed");
-        assert_eq!(KNOBS.len(), 53, "knob count changed");
+        assert_eq!(PEDALS.len(), 15, "pedal count changed");
+        assert_eq!(KNOBS.len(), 57, "knob count changed");
     }
 }

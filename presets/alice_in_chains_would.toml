@@ -1,0 +1,94 @@
+name        = "Alice in Chains — Would?"
+description = "A restrained, moody lead with a subtle wah sweep and a slow phaser movement."
+
+# ── Noise Gate ────────────────────────────────────────────────────────────────
+# The riff feels intimate and compressed, so the gate stays light and open enough
+# to let the notes breathe while still keeping the amp hiss under control.
+[noise_gate]
+enabled   = true
+threshold = 0.18   # light — avoid choking the sustain
+release   = 0.30   # moderate — keeps the shape of the note intact
+
+# ── Compressor ────────────────────────────────────────────────────────────────
+# A little compression smooths the picking and gives the lead a more even, sad
+# and rounded attack without turning it into a wall of gain.
+[compressor]
+enabled = true
+sustain = 0.42   # gentle — smooths the dynamics
+attack  = 0.40   # lets the pick attack through before clamping
+level   = 0.55
+
+# ── Wah ──────────────────────────────────────────────────────────────────────
+# The wah is a restrained texture rather than a full-on sweep — just enough
+# movement to make the phrasing feel vocal and expressive.
+[wah]
+enabled = true
+freq    = 0.32   # midrange-focused sweep
+sens    = 0.38   # gentle auto-wah movement
+q       = 0.56   # a touch of quack for character
+mix     = 0.18   # low and natural, not a giant wah solo
+
+# ── Tube Screamer ─────────────────────────────────────────────────────────────
+# A light boost gives the tone a little extra bite without turning it bright or
+# overly processed.
+[tube_screamer]
+enabled = true
+drive   = 0.20   # mostly a boost
+ tone    = 0.58   # slightly dark for the rounded midrange
+level   = 0.72
+
+# ── Amp ───────────────────────────────────────────────────────────────────────
+# A mid-forward Mesa voice gives the tone weight and gloom without losing note
+# articulation; the gain stays moderate so the feel stays restrained and human.
+[amp]
+model    = "mesa"
+gain     = 0.56
+bass     = 0.56
+mid      = 0.60
+treble   = 0.46
+presence = 0.44
+master   = 0.62
+
+# ── Cabinet ───────────────────────────────────────────────────────────────────
+# The Mesa 4×12 V30s are miked fairly neutrally so the tone stays woody and
+# rich rather than overly bright or sterile.
+[cabinet]
+model     = "mesa"
+mic_pos   = 0.55   # a touch on-axis for detail
+mic_blend = 0.18   # a little ribbon warmth
+mic_room  = 0.16   # close and intimate, not washed out
+
+# ── Parametric EQ ─────────────────────────────────────────────────────────────
+# A small mid bump keeps the lead centered, while the top end is kept slightly
+# dark so the whole thing feels bruised and moody.
+[eq]
+enabled = true
+low     = 0.48
+mid     = 0.56
+high    = 0.44
+
+# ── Phaser ────────────────────────────────────────────────────────────────────
+# The phaser is slow and broad, giving the sustained notes a subtle, haunted sway.
+[phaser]
+enabled  = true
+rate     = 0.16   # slow and understated movement
+depth    = 0.40   # broad but not overbearing
+feedback = 0.20   # just enough resonance to feel alive
+mix      = 0.22   # present, but not dominating
+
+# ── Delay ─────────────────────────────────────────────────────────────────────
+# A short, dark repeat adds space without making the part feel too polished.
+[delay]
+enabled  = true
+time     = 0.22   # short and intimate
+feedback = 0.24
+mix      = 0.16
+
+# ── Reverb ────────────────────────────────────────────────────────────────────
+# A modest room keeps the tone from feeling dry and flat while still staying
+# close to the original phrasing.
+[reverb]
+enabled = true
+room    = 0.42   # medium-sized room
+damp    = 0.70   # slightly dark tail
+mix     = 0.16

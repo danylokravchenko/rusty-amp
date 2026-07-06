@@ -28,6 +28,7 @@ pub mod pitch;
 pub mod preamp_eq;
 pub mod reverb;
 pub mod tube_screamer;
+pub mod wah;
 
 pub use chorus::Chorus;
 pub use compressor::Compressor;
@@ -43,6 +44,7 @@ pub use pitch::Pitch;
 pub use preamp_eq::PreampEq;
 pub use reverb::Reverb;
 pub use tube_screamer::TubeScreamer;
+pub use wah::Wah;
 
 /// A knob is "dirty" — worth rebuilding filter coefficients for — only once it has
 /// moved by more than this. Filter rebuilds aren't free, so we skip them while a

@@ -150,6 +150,7 @@ fn render_header(
 
     let ng_on = params.ng_enabled.load(Relaxed);
     let pitch_on = params.pitch_enabled.load(Relaxed);
+    let wah_on = params.wah_enabled.load(Relaxed);
     let cmp_on = params.cmp_enabled.load(Relaxed);
     let fz_on = params.fz_enabled.load(Relaxed);
     let ts_on = params.ts_enabled.load(Relaxed);
@@ -171,6 +172,7 @@ fn render_header(
     let pre_pedals = [
         ("GATE", ng_on),
         ("WHAMMY", pitch_on),
+        ("WAH", wah_on),
         ("COMP", cmp_on),
         ("FUZZ", fz_on),
         ("TS-808", ts_on),

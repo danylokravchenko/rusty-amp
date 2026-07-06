@@ -3,10 +3,10 @@ layout: page.njk
 permalink: pedals.html
 title: "Pedals & effects · rusty-amp"
 ogTitle: "rusty-amp · pedals & effects"
-description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, compressor, fuzz, TS-808, DS-1, ML-2 Metal Core, pre-amp EQ, parametric EQ, flanger, chorus, phaser, delay, and stereo reverb — with full knob reference tables."
+description: "Every rusty-amp pedal explained: noise gate, whammy pitch shifter, auto-wah, compressor, fuzz, TS-808, DS-1, ML-2 Metal Core, pre-amp EQ, parametric EQ, flanger, chorus, phaser, delay, and stereo reverb — with full knob reference tables."
 eyebrow: "Pedals & effects"
 heading: "Configuring the board"
-lead: "Fourteen effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
+lead: "Fifteen effects you can add, remove, and bypass independently. Each knob runs 0–10; here's exactly what every one does."
 toc:
   - { href: "#board", label: "The board" }
   - { href: "#pedals", label: "All pedals" }
@@ -34,7 +34,7 @@ The **Guitar Rig** shows one compact tile per pedal that's on the board, followe
 
 <div class="note">
 <b>Chain order is fixed</b> and follows the signal flow shown on the header ribbon:
-Gate → Whammy → Comp → Fuzz → TS-808 → DS-1 → ML-2 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Phaser → Delay → Reverb.
+Gate → Whammy → Wah → Comp → Fuzz → TS-808 → DS-1 → ML-2 → Pre-EQ → <b>Amp</b> → <b>Cab</b> → Parametric EQ → Flanger → Chorus → Phaser → Delay → Reverb.
 Where a pedal sits in that order is part of its character — see <a href="how-it-works.html">How it works</a>.
 </div>
 
@@ -51,6 +51,10 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <button class="tile" style="--c:var(--cyan)" role="tab" aria-selected="false" data-tab="whammy">
       <div class="tile__name"><span class="tile__dot"></span>Whammy</div>
       <div class="tile__sub">Pitch · Mix · Tone</div>
+    </button>
+    <button class="tile" style="--c:var(--orchid)" role="tab" aria-selected="false" data-tab="wah">
+      <div class="tile__name"><span class="tile__dot"></span>Auto-Wah</div>
+      <div class="tile__sub">Freq · Sens · Q · Mix</div>
     </button>
     <button class="tile" style="--c:var(--gold)" role="tab" aria-selected="false" data-tab="comp">
       <div class="tile__name"><span class="tile__dot"></span>Compressor</div>
@@ -113,6 +117,14 @@ Pick a pedal to load it into the editor — exactly like tabbing to its tile in 
     <div class="kv"><span class="kv__k">Pitch</span><span class="kv__v"><span class="kv__r">0–10</span> Transpose interval. 0 = −12 semitones (octave down), 5 = unison, 10 = +12 semitones (octave up).</span></div>
     <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. 0 = dry, 10 = fully wet (full dive-bomb / pure interval).</span></div>
     <div class="kv"><span class="kv__k">Tone</span><span class="kv__v"><span class="kv__r">0–10</span> Low-pass on the wet path, taming the granular fizz. 0 = dark (~800 Hz), 10 = open (~10 kHz).</span></div>
+  </div>
+
+  <div class="tab-panel" style="--c:var(--orchid)" role="tabpanel" data-panel="wah">
+    <p class="muted">A resonant bandpass whose peak is swept by an envelope follower — the filter "opens" as you dig in and closes as the note decays. A real wah is treadle-swept, but a terminal has no expression pedal, so your picking dynamics drive it: with <b>Sens</b> at 0 it's a static "cocked wah" parked at the <b>Freq</b> position; turn Sens up and it's a dynamic, vocal auto-wah. Sits early — after the whammy, before the compressor and the drives — so it rides raw pick dynamics (a compressor ahead of it would flatten the envelope it sweeps on) and the vocal quack is what the distortion then saturates, the classic wah-into-fuzz voice. Built on a TPT state-variable filter so the peak can sweep continuously with no per-sample coefficient-rebuild cost.</p>
+    <div class="kv"><span class="kv__k">Freq</span><span class="kv__v"><span class="kv__r">0–10</span> Base peak position (the heel-down point), ~300 Hz–1.5 kHz. With Sens at 0 this is a fixed cocked-wah tone.</span></div>
+    <div class="kv"><span class="kv__k">Sens</span><span class="kv__v"><span class="kv__r">0–10</span> How far the envelope sweeps the peak up from the base (0 = static, 10 = a wide auto-sweep on your picking).</span></div>
+    <div class="kv"><span class="kv__k">Q</span><span class="kv__v"><span class="kv__r">0–10</span> Resonance — the sharpness of the peak. Higher = a narrower, more vocal "quack".</span></div>
+    <div class="kv"><span class="kv__k">Mix</span><span class="kv__v"><span class="kv__r">0–10</span> Dry/wet blend. A real wah is fully wet (10); a lower blend keeps some dry body under the filter.</span></div>
   </div>
 
   <div class="tab-panel" style="--c:var(--gold)" role="tabpanel" data-panel="comp">

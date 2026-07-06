@@ -41,7 +41,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <span class="panel__label">Signal chain</span>
       <p class="chain">
         <b>Guitar</b> <span class="arr">→</span> GATE <span class="arr">→</span> WHAMMY
-        <span class="arr">→</span> COMP <span class="arr">→</span> FUZZ <span class="arr">→</span> TS-808
+        <span class="arr">→</span> WAH <span class="arr">→</span> COMP <span class="arr">→</span> FUZZ <span class="arr">→</span> TS-808
         <span class="arr">→</span> DS-1 <span class="arr">→</span> ML-2 <span class="arr">→</span> PRE-EQ
         <span class="arr">→</span> <b>AMP</b> <span class="arr">→</span> <b>CAB</b>
         <span class="arr">→</span> EQ <span class="arr">→</span> FLANGER
@@ -153,6 +153,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
     <div class="pedalgrid" style="margin-top:18px">
       <div class="pedal" style="--c:var(--gray)"><div class="pedal__name"><span class="dot"></span>Noise Gate</div><div class="pedal__knobs">Thresh · Release</div><div class="pedal__desc">Envelope-follower gate that silences hum and hiss between riffs.</div></div>
       <div class="pedal" style="--c:var(--cyan)"><div class="pedal__name"><span class="dot"></span>Whammy</div><div class="pedal__knobs">Pitch · Mix · Tone</div><div class="pedal__desc">Octave-up/down pitch shifter in front of the amp — dive-bombs and fake-baritone heaviness.</div></div>
+      <div class="pedal" style="--c:var(--orchid)"><div class="pedal__name"><span class="dot"></span>Auto-Wah</div><div class="pedal__knobs">Freq · Sens · Q · Mix</div><div class="pedal__desc">Envelope-swept resonant filter — a vocal auto-wah that tracks your picking.</div></div>
       <div class="pedal" style="--c:var(--gold)"><div class="pedal__name"><span class="dot"></span>Compressor</div><div class="pedal__knobs">Sustain · Attack · Level</div><div class="pedal__desc">Hard-knee compressor with auto makeup — evens out picking, adds sustain.</div></div>
       <div class="pedal" style="--c:var(--magenta)"><div class="pedal__name"><span class="dot"></span>Fuzz</div><div class="pedal__knobs">Fuzz · Tone · Level</div><div class="pedal__desc">Big-Muff-style two-stage clipper with a scooped “wall of sound” voice.</div></div>
       <div class="pedal" style="--c:var(--green)"><div class="pedal__name"><span class="dot"></span>TS-808</div><div class="pedal__knobs">Drive · Tone · Level</div><div class="pedal__desc">The legendary Tube Screamer — asymmetric diode clip, mid-hump boost.</div></div>

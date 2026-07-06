@@ -109,6 +109,7 @@ The preset is written to `~/.config/rusty-amp/presets/<name>.toml` and appears i
 | `deftones.toml` | Mesa Dual Rectifier | Mesa V30 | Stephen Carpenter's thick, warm wall — un-scooped mids, compressed, chorus + reverb wash |
 | `crowbar.toml` | Marshall JCM800 | Orange PPC412 (V30) | Kirk Windstein's NOLA sludge — TS tightening boost, forward low-mid wall, cavernous room |
 | `cosmic_lead.toml` | Marshall JCM800 | Mesa V30 | Floating synth-like lead — octave-up whammy shimmer, liquid phaser swirl, deep delay + reverb wash |
+| `alice_in_chains_would.toml` | Mesa Dual Rectifier | Mesa V30 | Moody, dark lead — subtle wah sweep and slow phaser movement |
 | `detuned_doom_wash.toml` | Marshall JCM800 | Orange PPC412 (V30) | Seasick stoner-doom — octave-down whammy sub, Big-Muff fuzz wall, slow deep phaser, cavernous reverb |
 
 ## Writing your own preset {#write}
@@ -142,6 +143,15 @@ enabled = false     # optional, defaults to true when the section is present
 pitch = 0.50        # 0.0 – 1.0  (0 = −12 st, 0.5 = unison, 1 = +12 st)
 mix   = 0.50        # 0.0 – 1.0  (dry/wet blend)
 tone  = 0.70        # 0.0 – 1.0  (wet low-pass, 0 = dark, 1 = open)
+
+# Omit [wah] entirely to leave it off (the default for the bundled presets),
+# or include it with enabled = false to store values but keep it bypassed.
+[wah]
+enabled = false     # optional, defaults to true when the section is present
+freq = 0.40         # 0.0 – 1.0  (base peak position, ~300 Hz–1.5 kHz)
+sens = 0.55         # 0.0 – 1.0  (auto-sweep amount; 0 = static cocked wah)
+q    = 0.50         # 0.0 – 1.0  (resonance / sharpness of the quack)
+mix  = 0.90         # 0.0 – 1.0  (dry/wet; a real wah is fully wet)
 
 # Omit [fuzz] entirely to leave it off (the default for the bundled presets),
 # or include it with enabled = false to store values but keep it bypassed.

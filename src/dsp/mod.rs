@@ -19,7 +19,7 @@ use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
     Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, MetalCore, NoiseGate, ParametricEq,
-    Phaser, Pitch, PreampEq, Reverb, TubeScreamer,
+    Phaser, Pitch, PreampEq, Reverb, TubeScreamer, Wah,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -143,6 +143,12 @@ const DEFAULT_PITCH_PITCH: f32 = 0.50; // unison
 const DEFAULT_PITCH_MIX: f32 = 0.50;
 const DEFAULT_PITCH_TONE: f32 = 0.70;
 
+const DEFAULT_WAH_ENABLED: bool = false;
+const DEFAULT_WAH_FREQ: f32 = 0.40;
+const DEFAULT_WAH_SENS: f32 = 0.55;
+const DEFAULT_WAH_Q: f32 = 0.50;
+const DEFAULT_WAH_MIX: f32 = 0.90;
+
 const DEFAULT_PEQ_ENABLED: bool = false;
 const DEFAULT_PEQ_LOW: f32 = 0.50;
 const DEFAULT_PEQ_MID: f32 = 0.50;
@@ -259,6 +265,13 @@ pub struct Params {
     pub pitch_pitch: Arc<AtomicF32>,
     pub pitch_mix: Arc<AtomicF32>,
     pub pitch_tone: Arc<AtomicF32>,
+
+    // Auto-wah (after the whammy, before the compressor)
+    pub wah_enabled: Arc<AtomicBool>,
+    pub wah_freq: Arc<AtomicF32>,
+    pub wah_sens: Arc<AtomicF32>,
+    pub wah_q: Arc<AtomicF32>,
+    pub wah_mix: Arc<AtomicF32>,
 
     // Pre-amp EQ (before the amp)
     pub peq_enabled: Arc<AtomicBool>,
@@ -384,6 +397,12 @@ impl Params {
             pitch_mix: p!(DEFAULT_PITCH_MIX),
             pitch_tone: p!(DEFAULT_PITCH_TONE),
 
+            wah_enabled: b!(DEFAULT_WAH_ENABLED),
+            wah_freq: p!(DEFAULT_WAH_FREQ),
+            wah_sens: p!(DEFAULT_WAH_SENS),
+            wah_q: p!(DEFAULT_WAH_Q),
+            wah_mix: p!(DEFAULT_WAH_MIX),
+
             peq_enabled: b!(DEFAULT_PEQ_ENABLED),
             peq_low: p!(DEFAULT_PEQ_LOW),
             peq_mid: p!(DEFAULT_PEQ_MID),
@@ -481,6 +500,12 @@ impl Params {
         self.pitch_pitch.store(DEFAULT_PITCH_PITCH, Relaxed);
         self.pitch_mix.store(DEFAULT_PITCH_MIX, Relaxed);
         self.pitch_tone.store(DEFAULT_PITCH_TONE, Relaxed);
+
+        self.wah_enabled.store(DEFAULT_WAH_ENABLED, Relaxed);
+        self.wah_freq.store(DEFAULT_WAH_FREQ, Relaxed);
+        self.wah_sens.store(DEFAULT_WAH_SENS, Relaxed);
+        self.wah_q.store(DEFAULT_WAH_Q, Relaxed);
+        self.wah_mix.store(DEFAULT_WAH_MIX, Relaxed);
 
         self.peq_enabled.store(DEFAULT_PEQ_ENABLED, Relaxed);
         self.peq_low.store(DEFAULT_PEQ_LOW, Relaxed);
@@ -620,6 +645,7 @@ macro_rules! stereo_stage {
 pub struct DspChain {
     ng: NoiseGate,
     pitch: Pitch,
+    wah: Wah,
     cmp: Compressor,
     fz: Fuzz,
     ts: TubeScreamer,
@@ -658,6 +684,7 @@ impl DspChain {
         Self {
             ng: NoiseGate::new(sr),
             pitch: Pitch::new(sr),
+            wah: Wah::new(sr),
             cmp: Compressor::new(sr),
             fz: Fuzz::new(sr),
             ts: TubeScreamer::new(sr),
@@ -746,15 +773,17 @@ impl DspChain {
         self.rack(l, r)
     }
 
-    /// Mono pre-amp path: gate → pitch → compressor → fuzz → TS → DS → ML-2 → pre-amp EQ.
+    /// Mono pre-amp path: gate → pitch → wah → compressor → fuzz → TS → DS → ML-2 → pre-amp EQ.
     ///
     /// The pitch shifter sits right after the gate so it transposes a clean, tracked
-    /// note and the *shifted* signal is what everything downstream — compressor, drives,
-    /// amp — then works on (the classic whammy-in-front placement). Fuzz comes before
-    /// the screamers so it sees the rawest signal; the ML-2 Metal Core is the most
-    /// aggressive drive, last in the dirt chain, and the pre-amp EQ comes after it so
-    /// it shapes exactly what the amp's gain stage clips. This is the mono signal fed
-    /// to either the built-in amp or a hosted external amp.
+    /// note and the *shifted* signal is what everything downstream — wah, compressor,
+    /// drives, amp — then works on (the classic whammy-in-front placement). The auto-wah
+    /// comes before the compressor so its envelope follower rides the raw pick dynamics
+    /// (a compressor ahead of it would flatten the very envelope it sweeps on). Fuzz
+    /// comes before the screamers so it sees the rawest signal; the ML-2 Metal Core is
+    /// the most aggressive drive, last in the dirt chain, and the pre-amp EQ comes after
+    /// it so it shapes exactly what the amp's gain stage clips. This is the mono signal
+    /// fed to either the built-in amp or a hosted external amp.
     #[inline]
     fn pre_amp(&mut self, sample: f32) -> f32 {
         let p = &self.params;
@@ -769,6 +798,17 @@ impl DspChain {
             pitch_pitch,
             pitch_mix,
             pitch_tone
+        );
+        let x = mono_stage!(
+            self,
+            p,
+            x,
+            wah_enabled,
+            wah,
+            wah_freq,
+            wah_sens,
+            wah_q,
+            wah_mix
         );
         let x = mono_stage!(
             self,

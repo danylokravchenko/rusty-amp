@@ -63,6 +63,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--orchid)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Auto-Wah</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Envelope follower (fast attack / slow release) → sweeps a resonant TPT state-variable bandpass (~300 Hz–3 kHz) → dry/wet blend · FREQ base position · SENS auto-sweep · Q resonance.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--gold)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Compressor</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
