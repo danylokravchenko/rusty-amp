@@ -55,16 +55,32 @@ mic_pos = 0.65   # on-axis — Kerry King's tone is aggressive and cutting, need
 mic_blend = 0.00 # pure SM57 dynamic — maximum aggression and cut
 mic_room  = 0.05 # bone dry — nothing between the riff and your face
 
+# ── Graphic EQ ────────────────────────────────────────────────────────────────
+# The surgical scoop the description promises: a fixed-band smile a three-band
+# shelf can't cut. A deep, narrow dual notch at 470 Hz / 1 kHz hollows the mids
+# even harder than the layered-JCM800 studio trick, while a big 4.7 kHz / 10 kHz
+# lift is the ice-pick top that makes "Angel of Death" sound like it's attacking
+# you. Sits post-cab, in the effects loop.
+[graphic_eq]
+enabled = true
+band1 = 0.56   # 100 Hz  ≈ +1.4 dB — riff weight, kept tight by the Greenbacks
+band2 = 0.44   # 220 Hz  ≈ −1.4 dB — trims low-mid mud
+band3 = 0.28   # 470 Hz  ≈ −5.3 dB — deep narrow scoop
+band4 = 0.30   # 1 kHz   ≈ −4.8 dB — the hollow core, even harder than Pantera
+band5 = 0.60   # 2.2 kHz ≈ +2.4 dB — tremolo-pick attack
+band6 = 0.70   # 4.7 kHz ≈ +4.8 dB — the violent ice-pick cut
+band7 = 0.60   # 10 kHz  ≈ +2.4 dB — top-end sizzle
+level = 0.50   # unity — the scoop already trims the mids, no make-up needed
+
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
-# One final surgical cut in the mid-range — layering multiple JCM800s in
-# the studio created a combined tone that was even more scooped than a single
-# head. The extra treble lift adds the almost painful brightness that
-# makes "Angel of Death" and "Raining Blood" sound like they're attacking you.
-# mid=0.15 ≈ −10.5 dB at 800 Hz; high=0.65 ≈ +4.5 dB at 5 kHz.
+# Now that the graphic EQ carries the deep scoop (above), the parametric just
+# adds a light supporting cut around 800 Hz and keeps the treble lift, so the
+# two stages don't compound into a completely gutted, lifeless midrange.
+# mid=0.34 ≈ −3.8 dB at 800 Hz; high=0.65 ≈ +4.5 dB at 5 kHz.
 [eq]
 enabled = true
 low  = 0.50   # flat — the amp's bass knob already does the heavy lifting
-mid  = 0.15   # extreme additional scoop — layered-Marshall studio sound
+mid  = 0.34   # light extra scoop layered under the graphic EQ's dual notch
 high = 0.65   # brightness lift — that signature Slayer "ice pick" quality
 
 # ── Delay ─────────────────────────────────────────────────────────────────────
