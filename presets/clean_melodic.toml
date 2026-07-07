@@ -78,6 +78,18 @@ low  = 0.45   # gentle low trim — keeps the clean tone tight, not woolly
 mid  = 0.52   # a hair of mid presence to reinforce melodic note clarity
 high = 0.55   # a breath of air/sparkle on top, well below harsh
 
+# ── Tremolo / Vibrato ─────────────────────────────────────────────────────────
+# A gentle vibrato — pitch modulation's natural home is a clean tone. A slow,
+# shallow sway adds vintage Fender-amp movement and life to sustained notes,
+# well short of a seasick warble. MODE 1.0 = pure pitch vibrato (no amplitude
+# tremolo); SHAPE is inert here since it only shapes the amplitude side.
+[tremolo]
+enabled = true
+rate  = 0.45   # ~2.5 Hz — a musical, singing sway
+depth = 0.30   # subtle — a warm warble under the melody, not a wobble
+shape = 0.00   # sine (amplitude waveform; unused at full vibrato)
+mode  = 1.00   # pure vibrato (pitch modulation)
+
 # ── Delay ─────────────────────────────────────────────────────────────────────
 # A subtle quarter-note-ish delay low in the mix — the classic melodic-lead glue
 # that adds depth and sustain to single-note lines without turning into a wash or
