@@ -207,6 +207,19 @@ mic_pos   = 0.5       # 0.0 = edge/dark, 0.5 = neutral, 1.0 = center/bright (def
 mic_blend = 0.15      # 0.0 = SM57 dynamic, 1.0 = R121 ribbon (default 0.15)
 mic_room  = 0.15      # 0.0 = dry close mic, 1.0 = full room mic (default 0.15)
 
+# Graphic EQ (Boss GE-7): seven band faders + output level, all 0.0–1.0 with
+# 0.5 = flat/unity. Sits in the effects loop, just after the cab.
+[graphic_eq]
+enabled = false       # optional, defaults to true when the section is present
+band1 = 0.50          # 100 Hz   (0.0 = −12 dB, 0.5 = 0 dB, 1.0 = +12 dB)
+band2 = 0.50          # 220 Hz
+band3 = 0.50          # 470 Hz
+band4 = 0.50          # 1 kHz
+band5 = 0.50          # 2.2 kHz
+band6 = 0.50          # 4.7 kHz
+band7 = 0.50          # 10 kHz
+level = 0.50          # output make-up (0.0 = −15 dB, 0.5 = unity, 1.0 = +15 dB)
+
 [eq]
 enabled = true        # optional, defaults to true
 low  = 0.50           # 0.0 = −15 dB, 0.5 = 0 dB, 1.0 = +15 dB

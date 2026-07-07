@@ -18,8 +18,8 @@ use std::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize, Ordering::Relaxed};
 use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
-    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, MetalCore, NoiseGate, ParametricEq,
-    Phaser, Pitch, PreampEq, Reverb, TubeScreamer, Wah,
+    Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, GraphicEq, MetalCore, NoiseGate,
+    ParametricEq, Phaser, Pitch, PreampEq, Reverb, TubeScreamer, Wah,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -180,6 +180,11 @@ const DEFAULT_REV_ROOM: f32 = 0.55;
 const DEFAULT_REV_DAMP: f32 = 0.40;
 const DEFAULT_REV_MIX: f32 = 0.25;
 
+// Graphic EQ (Boss GE-7): seven band faders + output level, all default flat.
+const DEFAULT_GEQ_ENABLED: bool = false;
+const DEFAULT_GEQ_BAND: f32 = 0.50; // 0.5 = 0 dB (flat) for every band
+const DEFAULT_GEQ_LEVEL: f32 = 0.50; // 0.5 = unity output
+
 const DEFAULT_EQ_ENABLED: bool = false;
 const DEFAULT_EQ_LOW: f32 = 0.50;
 const DEFAULT_EQ_MID: f32 = 0.50;
@@ -310,6 +315,17 @@ pub struct Params {
     pub rev_damp: Arc<AtomicF32>,
     pub rev_mix: Arc<AtomicF32>,
 
+    // Graphic EQ (Boss GE-7, post-cab rack, before the parametric EQ)
+    pub geq_enabled: Arc<AtomicBool>,
+    pub geq_b1: Arc<AtomicF32>,
+    pub geq_b2: Arc<AtomicF32>,
+    pub geq_b3: Arc<AtomicF32>,
+    pub geq_b4: Arc<AtomicF32>,
+    pub geq_b5: Arc<AtomicF32>,
+    pub geq_b6: Arc<AtomicF32>,
+    pub geq_b7: Arc<AtomicF32>,
+    pub geq_level: Arc<AtomicF32>,
+
     // Parametric EQ
     pub eq_enabled: Arc<AtomicBool>,
     pub eq_low: Arc<AtomicF32>,
@@ -434,6 +450,16 @@ impl Params {
             rev_damp: p!(DEFAULT_REV_DAMP),
             rev_mix: p!(DEFAULT_REV_MIX),
 
+            geq_enabled: b!(DEFAULT_GEQ_ENABLED),
+            geq_b1: p!(DEFAULT_GEQ_BAND),
+            geq_b2: p!(DEFAULT_GEQ_BAND),
+            geq_b3: p!(DEFAULT_GEQ_BAND),
+            geq_b4: p!(DEFAULT_GEQ_BAND),
+            geq_b5: p!(DEFAULT_GEQ_BAND),
+            geq_b6: p!(DEFAULT_GEQ_BAND),
+            geq_b7: p!(DEFAULT_GEQ_BAND),
+            geq_level: p!(DEFAULT_GEQ_LEVEL),
+
             eq_enabled: b!(DEFAULT_EQ_ENABLED),
             eq_low: p!(DEFAULT_EQ_LOW),
             eq_mid: p!(DEFAULT_EQ_MID),
@@ -537,6 +563,16 @@ impl Params {
         self.rev_room.store(DEFAULT_REV_ROOM, Relaxed);
         self.rev_damp.store(DEFAULT_REV_DAMP, Relaxed);
         self.rev_mix.store(DEFAULT_REV_MIX, Relaxed);
+
+        self.geq_enabled.store(DEFAULT_GEQ_ENABLED, Relaxed);
+        self.geq_b1.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_b2.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_b3.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_b4.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_b5.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_b6.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_b7.store(DEFAULT_GEQ_BAND, Relaxed);
+        self.geq_level.store(DEFAULT_GEQ_LEVEL, Relaxed);
 
         self.eq_enabled.store(DEFAULT_EQ_ENABLED, Relaxed);
         self.eq_low.store(DEFAULT_EQ_LOW, Relaxed);
@@ -654,6 +690,7 @@ pub struct DspChain {
     peq: PreampEq,
     amp: AmpBank,
     cab: CabBank,
+    geq: GraphicEq,
     eq: ParametricEq,
     flanger: Flanger,
     chorus: Chorus,
@@ -693,6 +730,7 @@ impl DspChain {
             peq: PreampEq::new(sr),
             amp: AmpBank::new(sr),
             cab: CabBank::new(sr),
+            geq: GraphicEq::new(sr),
             eq: ParametricEq::new(sr),
             flanger: Flanger::new(sr),
             chorus: Chorus::new(sr),
@@ -875,12 +913,30 @@ impl DspChain {
         }
     }
 
-    /// Stereo rack (parametric EQ → flanger → chorus → phaser → ping-pong delay →
-    /// reverb). The flanger, chorus and phaser modulate the finished tone ahead of
-    /// the time-based ambience. Runs after both the built-in and external amp paths.
+    /// Stereo rack (graphic EQ → parametric EQ → flanger → chorus → phaser →
+    /// ping-pong delay → reverb). The two EQs shape the finished, mic'd tone (the
+    /// graphic EQ's fixed band bank first, then the parametric shelves) before the
+    /// flanger, chorus and phaser modulate it ahead of the time-based ambience.
+    /// Runs after both the built-in and external amp paths.
     #[inline]
     fn rack(&mut self, l: f32, r: f32) -> (f32, f32) {
         let p = &self.params;
+        let (l, r) = stereo_stage!(
+            self,
+            p,
+            l,
+            r,
+            geq_enabled,
+            geq,
+            geq_b1,
+            geq_b2,
+            geq_b3,
+            geq_b4,
+            geq_b5,
+            geq_b6,
+            geq_b7,
+            geq_level
+        );
         let (l, r) = stereo_stage!(self, p, l, r, eq_enabled, eq, eq_low, eq_mid, eq_high);
         let (l, r) = stereo_stage!(
             self,

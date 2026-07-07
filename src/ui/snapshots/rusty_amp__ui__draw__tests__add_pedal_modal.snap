@@ -29,6 +29,7 @@ expression: text
 ║│┃                                            ║  DS-1                                                                    ║                                            ┃│║
 ║│┃                                            ║  ML-2 METAL CORE                                                         ║                                            ┃│║
 ║│┃                                            ║  PRE-AMP EQ                                                              ║                                            ┃│║
+║│┃                                            ║  GRAPHIC EQ                                                              ║                                            ┃│║
 ║│┃                                            ║  PARAMETRIC EQ                                                           ║                                            ┃│║
 ║│┃                                            ║  FLANGER                                                                 ║                                            ┃│║
 ║│┃                                            ║  CHORUS                                                                  ║                                            ┃│║
@@ -37,7 +38,6 @@ expression: text
 ║│┃                                            ║                                                                          ║                                            ┃│║
 ║│┃                                            ║                    ↑/↓ navigate  Enter add  Esc close                    ║                                            ┃│║
 ║│┃                                            ╚══════════════════════════════════════════════════════════════════════════╝                                            ┃│║
-║│┃                                                                                                                                                                    ┃│║
 ║│┃                                                                                                                                                                    ┃│║
 ║│┃                                                                                                                                                                    ┃│║
 ║│┃                                                                                                                                                                    ┃│║

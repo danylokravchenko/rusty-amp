@@ -6,8 +6,8 @@ use ratatui::style::Color;
 
 use super::styles::{
     PEDAL_BLUE, PEDAL_CYAN, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE,
-    PEDAL_ORCHID, PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SILVER, PEDAL_STEEL, PEDAL_TEAL,
-    PEDAL_YELLOW,
+    PEDAL_ORCHID, PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SAND, PEDAL_SILVER, PEDAL_STEEL,
+    PEDAL_TEAL, PEDAL_YELLOW,
 };
 use crate::dsp::Params;
 
@@ -16,15 +16,26 @@ pub(super) struct Knob {
     pub(super) param: fn(&Params) -> &Arc<AtomicF32>,
 }
 
-/// A rig pedal: its livery, the slice of `KNOBS` it owns, and its on/off flag.
-/// `render_rig` walks this table to draw both the compact tiles and the detail
-/// editor, so adding a pedal is a single entry here (plus its knobs above).
+/// How a pedal's controls are drawn in the detail editor. Most pedals use rotary
+/// knobs; a graphic EQ reads far more naturally as a bank of vertical faders, so
+/// the table picks the widget per pedal rather than hardwiring it in `draw.rs`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum PedalUi {
+    Knobs,
+    Sliders,
+}
+
+/// A rig pedal: its livery, the slice of `KNOBS` it owns, its on/off flag, and the
+/// widget its controls render as. `render_rig` walks this table to draw both the
+/// compact tiles and the detail editor, so adding a pedal is a single entry here
+/// (plus its knobs above).
 pub(super) struct Pedal {
     pub(super) name: &'static str,
     pub(super) color: Color,
     pub(super) start: usize,
     pub(super) end: usize,
     pub(super) enabled: fn(&Params) -> &Arc<AtomicBool>,
+    pub(super) ui: PedalUi,
 }
 
 // Knob-index ranges: each section owns a contiguous `[START, END)` slice of the
@@ -60,18 +71,20 @@ pub(super) const ML_END: usize = 34;
 pub(super) const PEQ_START: usize = 34;
 pub(super) const PEQ_END: usize = 37;
 // Post-cab rack pedals (after the cab), in signal order.
-pub(super) const EQ_START: usize = 37;
-pub(super) const EQ_END: usize = 40;
-pub(super) const FL_START: usize = 40;
-pub(super) const FL_END: usize = 44;
-pub(super) const CH_START: usize = 44;
-pub(super) const CH_END: usize = 47;
-pub(super) const PH_START: usize = 47;
-pub(super) const PH_END: usize = 51;
-pub(super) const DELAY_START: usize = 51;
-pub(super) const DELAY_END: usize = 54;
-pub(super) const REV_START: usize = 54;
-pub(super) const REV_END: usize = 57;
+pub(super) const GEQ_START: usize = 37;
+pub(super) const GEQ_END: usize = 45;
+pub(super) const EQ_START: usize = 45;
+pub(super) const EQ_END: usize = 48;
+pub(super) const FL_START: usize = 48;
+pub(super) const FL_END: usize = 52;
+pub(super) const CH_START: usize = 52;
+pub(super) const CH_END: usize = 55;
+pub(super) const PH_START: usize = 55;
+pub(super) const PH_END: usize = 59;
+pub(super) const DELAY_START: usize = 59;
+pub(super) const DELAY_END: usize = 62;
+pub(super) const REV_START: usize = 62;
+pub(super) const REV_END: usize = 65;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -235,7 +248,40 @@ pub(super) const KNOBS: &[Knob] = &[
         param: |p| &p.peq_high,
     },
     // ── Post-cab rack pedals (after the cab), in signal order ──
-    // 37–39: Parametric EQ
+    // 37–44: Graphic EQ (Boss GE-7 — seven band faders + output level)
+    Knob {
+        label: "100",
+        param: |p| &p.geq_b1,
+    },
+    Knob {
+        label: "220",
+        param: |p| &p.geq_b2,
+    },
+    Knob {
+        label: "470",
+        param: |p| &p.geq_b3,
+    },
+    Knob {
+        label: "1K",
+        param: |p| &p.geq_b4,
+    },
+    Knob {
+        label: "2.2K",
+        param: |p| &p.geq_b5,
+    },
+    Knob {
+        label: "4.7K",
+        param: |p| &p.geq_b6,
+    },
+    Knob {
+        label: "10K",
+        param: |p| &p.geq_b7,
+    },
+    Knob {
+        label: "LEVEL",
+        param: |p| &p.geq_level,
+    },
+    // 45–47: Parametric EQ
     Knob {
         label: "LOW",
         param: |p| &p.eq_low,
@@ -248,7 +294,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "HIGH",
         param: |p| &p.eq_high,
     },
-    // 40–43: Flanger
+    // 48–51: Flanger
     Knob {
         label: "RATE",
         param: |p| &p.fl_rate,
@@ -265,7 +311,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.fl_mix,
     },
-    // 44–46: Chorus
+    // 52–54: Chorus
     Knob {
         label: "RATE",
         param: |p| &p.ch_rate,
@@ -278,7 +324,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ch_mix,
     },
-    // 47–50: Phaser
+    // 55–58: Phaser
     Knob {
         label: "RATE",
         param: |p| &p.ph_rate,
@@ -295,7 +341,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ph_mix,
     },
-    // 51–53: Delay
+    // 59–61: Delay
     Knob {
         label: "TIME",
         param: |p| &p.delay_time,
@@ -308,7 +354,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.delay_mix,
     },
-    // 54–56: Reverb
+    // 62–64: Reverb
     Knob {
         label: "ROOM",
         param: |p| &p.rev_room,
@@ -333,6 +379,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: NG_START,
         end: NG_END,
         enabled: |p| &p.ng_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "WHAMMY",
@@ -340,6 +387,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: PITCH_START,
         end: PITCH_END,
         enabled: |p| &p.pitch_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "WAH",
@@ -347,6 +395,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: WAH_START,
         end: WAH_END,
         enabled: |p| &p.wah_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "COMP",
@@ -354,6 +403,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: CMP_START,
         end: CMP_END,
         enabled: |p| &p.cmp_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "FUZZ",
@@ -361,6 +411,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: FUZZ_START,
         end: FUZZ_END,
         enabled: |p| &p.fz_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "TS-808",
@@ -368,6 +419,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: TS_START,
         end: TS_END,
         enabled: |p| &p.ts_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "DS-1",
@@ -375,6 +427,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: DS_START,
         end: DS_END,
         enabled: |p| &p.ds_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "ML-2 METAL CORE",
@@ -382,6 +435,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: ML_START,
         end: ML_END,
         enabled: |p| &p.ml_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "PRE-AMP EQ",
@@ -389,14 +443,24 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: PEQ_START,
         end: PEQ_END,
         enabled: |p| &p.peq_enabled,
+        ui: PedalUi::Knobs,
     },
     // Post-cab rack (after the cab), in signal order.
+    Pedal {
+        name: "GRAPHIC EQ",
+        color: PEDAL_SAND,
+        start: GEQ_START,
+        end: GEQ_END,
+        enabled: |p| &p.geq_enabled,
+        ui: PedalUi::Sliders,
+    },
     Pedal {
         name: "PARAMETRIC EQ",
         color: PEDAL_TEAL,
         start: EQ_START,
         end: EQ_END,
         enabled: |p| &p.eq_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "FLANGER",
@@ -404,6 +468,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: FL_START,
         end: FL_END,
         enabled: |p| &p.fl_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "CHORUS",
@@ -411,6 +476,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: CH_START,
         end: CH_END,
         enabled: |p| &p.ch_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "PHASER",
@@ -418,6 +484,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: PH_START,
         end: PH_END,
         enabled: |p| &p.ph_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "DELAY",
@@ -425,6 +492,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: DELAY_START,
         end: DELAY_END,
         enabled: |p| &p.delay_enabled,
+        ui: PedalUi::Knobs,
     },
     Pedal {
         name: "SPRING REVERB",
@@ -432,6 +500,7 @@ pub(super) const PEDALS: &[Pedal] = &[
         start: REV_START,
         end: REV_END,
         enabled: |p| &p.rev_enabled,
+        ui: PedalUi::Knobs,
     },
 ];
 
@@ -534,7 +603,7 @@ mod tests {
     fn table_sizes_are_stable() {
         // Deliberate tripwire: bump these when you add or remove a pedal/knob so
         // the change is a conscious, reviewed edit rather than an accident.
-        assert_eq!(PEDALS.len(), 15, "pedal count changed");
-        assert_eq!(KNOBS.len(), 57, "knob count changed");
+        assert_eq!(PEDALS.len(), 16, "pedal count changed");
+        assert_eq!(KNOBS.len(), 65, "knob count changed");
     }
 }

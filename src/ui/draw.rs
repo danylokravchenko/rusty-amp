@@ -9,7 +9,9 @@ use std::sync::atomic::Ordering::Relaxed;
 
 use crate::dsp::{AmpModel, CabModel, Levels, Params};
 
-use super::config::{ADD_TILE, AMP_END, AMP_START, KNOBS, MIC_END, MIC_START, PEDALS, Pedal};
+use super::config::{
+    ADD_TILE, AMP_END, AMP_START, KNOBS, MIC_END, MIC_START, PEDALS, Pedal, PedalUi,
+};
 use super::styles::*;
 
 #[allow(clippy::too_many_arguments)]
@@ -157,6 +159,7 @@ fn render_header(
     let ds_on = params.ds_enabled.load(Relaxed);
     let ml_on = params.ml_enabled.load(Relaxed);
     let peq_on = params.peq_enabled.load(Relaxed);
+    let geq_on = params.geq_enabled.load(Relaxed);
     let eq_on = params.eq_enabled.load(Relaxed);
     let fl_on = params.fl_enabled.load(Relaxed);
     let ch_on = params.ch_enabled.load(Relaxed);
@@ -181,6 +184,7 @@ fn render_header(
         ("PRE-EQ", peq_on),
     ];
     let post_pedals = [
+        ("G-EQ", geq_on),
         ("EQ", eq_on),
         ("FLANGER", fl_on),
         ("CHORUS", ch_on),
@@ -827,7 +831,11 @@ fn render_pedal_detail(f: &mut Frame, area: Rect, params: &Params, focus: Option
 
     for (i, ki) in (pedal.start..pedal.end).enumerate() {
         let val = (KNOBS[ki].param)(params).load(Relaxed);
-        render_compact_knob(
+        let render = match pedal.ui {
+            PedalUi::Knobs => render_compact_knob,
+            PedalUi::Sliders => render_compact_fader,
+        };
+        render(
             f,
             cols[i],
             KNOBS[ki].label,
@@ -922,6 +930,100 @@ fn render_compact_knob(
         Paragraph::new(label_line).alignment(Alignment::Center),
         rows[1],
     );
+}
+
+/// A single graphic-EQ band control drawn as a vertical fader instead of a rotary
+/// knob — the natural idiom for a slider bank. Same call signature as
+/// [`render_compact_knob`] so the detail editor can pick either per pedal.
+#[allow(clippy::too_many_arguments)]
+fn render_compact_fader(
+    f: &mut Frame,
+    area: Rect,
+    label: &str,
+    value: f32,
+    focused: bool,
+    active: bool,
+    accent: Color,
+) {
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(2), Constraint::Length(1)])
+        .split(area);
+
+    let track_color = if focused {
+        AMBER
+    } else if active {
+        accent
+    } else {
+        OFF
+    };
+
+    // Fill the whole editor height: a full-height track gives every fader the same
+    // size (so the bank reads evenly) and many more handle positions, so the value
+    // moves smoothly instead of snapping in coarse ~2-unit jumps.
+    let track_h = (rows[0].height as usize).max(2);
+    let art: Vec<Line> = build_fader(value, track_h)
+        .into_iter()
+        .map(|l| Line::from(Span::styled(l, Style::default().fg(track_color))))
+        .collect();
+    f.render_widget(Paragraph::new(art).alignment(Alignment::Center), rows[0]);
+
+    let num = value * 10.0;
+    let label_color = if focused {
+        AMBER
+    } else if active {
+        DIM
+    } else {
+        OFF
+    };
+    let value_color = if focused {
+        ORANGE
+    } else if active {
+        accent
+    } else {
+        OFF
+    };
+    let label_line = Line::from(vec![
+        Span::styled(
+            format!("{label} "),
+            Style::default()
+                .fg(label_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{num:.1}"),
+            Style::default()
+                .fg(value_color)
+                .add_modifier(Modifier::BOLD),
+        ),
+    ]);
+    f.render_widget(
+        Paragraph::new(label_line).alignment(Alignment::Center),
+        rows[1],
+    );
+}
+
+/// Builds an ASCII vertical fader `rows` lines tall: a slotted track with a handle
+/// that rides from the bottom (`value` 0) to the top (`value` 1). The midpoint
+/// (0.5 = flat, an EQ's "no change" detent) is marked so a centred band reads as
+/// neutral at a glance.
+fn build_fader(value: f32, rows: usize) -> Vec<String> {
+    let rows = rows.max(2);
+    let last = (rows - 1) as f32;
+    // Row 0 is the top (value 1.0); the handle drops as the value falls.
+    let handle = ((1.0 - value.clamp(0.0, 1.0)) * last).round() as usize;
+    let mid = (last / 2.0).round() as usize;
+    (0..rows)
+        .map(|r| {
+            if r == handle {
+                "━█━".to_string()
+            } else if r == mid {
+                " ┿ ".to_string()
+            } else {
+                " │ ".to_string()
+            }
+        })
+        .collect()
 }
 
 /// Two-row key hint footer. One row overflows once every hint — including the

@@ -44,7 +44,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
         <span class="arr">→</span> WAH <span class="arr">→</span> COMP <span class="arr">→</span> FUZZ <span class="arr">→</span> TS-808
         <span class="arr">→</span> DS-1 <span class="arr">→</span> ML-2 <span class="arr">→</span> PRE-EQ
         <span class="arr">→</span> <b>AMP</b> <span class="arr">→</span> <b>CAB</b>
-        <span class="arr">→</span> EQ <span class="arr">→</span> FLANGER
+        <span class="arr">→</span> G-EQ <span class="arr">→</span> EQ <span class="arr">→</span> FLANGER
         <span class="arr">→</span> CHORUS <span class="arr">→</span> PHASER <span class="arr">→</span> DELAY
         <span class="arr">→</span> REVERB <span class="arr">→</span> <b>OUTPUT</b>
       </p>
@@ -160,6 +160,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="pedal" style="--c:#e08840"><div class="pedal__name"><span class="dot"></span>DS-1</div><div class="pedal__knobs">Drive · Tone · Level</div><div class="pedal__desc">Aggressive cubic distortion with a bass↔treble tilt tone control.</div></div>
       <div class="pedal" style="--c:var(--steel)"><div class="pedal__name"><span class="dot"></span>ML-2 Metal Core</div><div class="pedal__knobs">Dist · Low · High · Level</div><div class="pedal__desc">Ultra-high-gain cascaded distortion with a powerful active two-band EQ.</div></div>
       <div class="pedal" style="--c:var(--lime)"><div class="pedal__name"><span class="dot"></span>Pre-amp EQ</div><div class="pedal__knobs">Low · Mid · High</div><div class="pedal__desc">Shapes the signal <em>before</em> the amp clips — tighten the chug or push leads.</div></div>
+      <div class="pedal" style="--c:var(--sand)"><div class="pedal__name"><span class="dot"></span>Graphic EQ</div><div class="pedal__knobs">100 · 220 · 470 · 1k · 2.2k · 4.7k · 10k · Level</div><div class="pedal__desc">Boss GE-7 style seven-band fader bank in the effects loop — draw a surgical curve.</div></div>
       <div class="pedal" style="--c:var(--teal)"><div class="pedal__name"><span class="dot"></span>Parametric EQ</div><div class="pedal__knobs">Low · Mid · High</div><div class="pedal__desc">Post-cabinet tone shaping of the final stereo mix.</div></div>
       <div class="pedal" style="--c:var(--indigo)"><div class="pedal__name"><span class="dot"></span>Flanger</div><div class="pedal__knobs">Rate · Depth · Feedback · Mix</div><div class="pedal__desc">LFO-swept comb filter — the classic metallic “jet plane” sweep, in stereo.</div></div>
       <div class="pedal" style="--c:var(--pink)"><div class="pedal__name"><span class="dot"></span>Chorus</div><div class="pedal__knobs">Rate · Depth · Mix</div><div class="pedal__desc">LFO-swept long delay, no feedback — lush, watery thickening in stereo.</div></div>

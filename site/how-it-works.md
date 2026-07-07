@@ -129,6 +129,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--sand)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Graphic EQ</span><span class="flow__badge flow__badge--stereo">Stereo</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">Boss GE-7 style seven-band peak bank (100 · 220 · 470 · 1k · 2.2k · 4.7k · 10k Hz, constant Q ≈ 2) in series, each fader ±12 dB → output level ±15 dB — a fixed-frequency curve you draw in the effects loop, before the parametric shelves.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--teal)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Parametric EQ</span><span class="flow__badge flow__badge--stereo">Stereo</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>

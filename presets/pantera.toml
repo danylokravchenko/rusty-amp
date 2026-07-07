@@ -62,14 +62,32 @@ mic_pos = 0.72   # well on-axis — Dimebag's Randall + V30 tone is famously bri
 mic_blend = 0.00 # pure SM57 dynamic — Dimebag's tone is all close-mic bite
 mic_room  = 0.06 # nearly dry — tight, in-your-face rhythm
 
+# ── Graphic EQ ────────────────────────────────────────────────────────────────
+# The real "Vulgar Display" secret weapon: Dimebag ran a graphic EQ (a Furman
+# PQ-3 / MXR six-band) for his scoop-and-boost curve. This is the surgical smile
+# a three-band shelf can't draw — a narrow dual notch at 470 Hz / 1 kHz for the
+# hollow mid scoop, a low-end bump for chunk, and a 2.2–4.7 kHz lift for the
+# glassy Randall pick attack. Sits post-cab, in the effects loop.
+[graphic_eq]
+enabled = true
+band1 = 0.60   # 100 Hz  ≈ +2.4 dB — palm-mute chunk / tightness
+band2 = 0.46   # 220 Hz  ≈ −1.0 dB — trims low-mid mud
+band3 = 0.30   # 470 Hz  ≈ −4.8 dB — narrow lower-mid scoop
+band4 = 0.34   # 1 kHz   ≈ −3.8 dB — hollows the honk (core of the scoop)
+band5 = 0.62   # 2.2 kHz ≈ +2.9 dB — pick attack / bite
+band6 = 0.66   # 4.7 kHz ≈ +3.8 dB — Dimebag glassy presence
+band7 = 0.54   # 10 kHz  ≈ +1.0 dB — a little air
+level = 0.50   # unity — the scoop already trims the mids, no make-up needed
+
 # ── Parametric EQ ─────────────────────────────────────────────────────────────
-# Recreates the Furman PQ-3 graphic EQ Dimebag used on "Vulgar Display" —
-# an additional mid cut and treble boost on top of the amp's own tone stack.
-# mid=0.18 ≈ −9 dB at 800 Hz; high=0.62 ≈ +3.6 dB at 5 kHz.
+# Now that the graphic EQ carries the deep mid scoop (above), the parametric
+# just adds a light supporting cut around 800 Hz and the treble lift, so the two
+# stages don't compound into a fully gutted, lifeless midrange.
+# mid=0.36 ≈ −3.4 dB at 800 Hz; high=0.62 ≈ +3.6 dB at 5 kHz.
 [eq]
 enabled = true
 low  = 0.50   # flat — bass is already massive from the amp
-mid  = 0.18   # deep additional scoop — the hollow Dimebag rhythm signature
+mid  = 0.36   # light extra scoop layered under the graphic EQ's dual notch
 high = 0.62   # slight treble lift — extra pick-attack definition
 
 # ── Delay ─────────────────────────────────────────────────────────────────────

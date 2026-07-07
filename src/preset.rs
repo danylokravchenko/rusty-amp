@@ -37,6 +37,7 @@ pub struct Preset {
     pub preamp_eq: Option<PeqSection>,
     pub amp: AmpSection,
     pub cabinet: Option<CabSection>,
+    pub graphic_eq: Option<GraphicEqSection>,
     pub eq: Option<EqSection>,
     pub flanger: Option<FlangerSection>,
     pub chorus: Option<ChorusSection>,
@@ -160,6 +161,21 @@ fn mic_blend_default() -> f32 {
 
 fn mic_room_default() -> f32 {
     0.15
+}
+
+/// Boss GE-7 graphic EQ: seven band faders (low → high) plus an output level,
+/// all 0–1 with 0.5 = flat/unity.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct GraphicEqSection {
+    pub enabled: Option<bool>,
+    pub band1: f32,
+    pub band2: f32,
+    pub band3: f32,
+    pub band4: f32,
+    pub band5: f32,
+    pub band6: f32,
+    pub band7: f32,
+    pub level: f32,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -318,6 +334,17 @@ impl Preset {
                 mic_pos: params.mic_pos.load(Relaxed),
                 mic_blend: params.mic_blend.load(Relaxed),
                 mic_room: params.mic_room.load(Relaxed),
+            }),
+            graphic_eq: Some(GraphicEqSection {
+                enabled: Some(params.geq_enabled.load(Relaxed)),
+                band1: params.geq_b1.load(Relaxed),
+                band2: params.geq_b2.load(Relaxed),
+                band3: params.geq_b3.load(Relaxed),
+                band4: params.geq_b4.load(Relaxed),
+                band5: params.geq_b5.load(Relaxed),
+                band6: params.geq_b6.load(Relaxed),
+                band7: params.geq_b7.load(Relaxed),
+                level: params.geq_level.load(Relaxed),
             }),
             eq: Some(EqSection {
                 enabled: Some(params.eq_enabled.load(Relaxed)),
@@ -499,6 +526,22 @@ impl Preset {
                 .mic_blend
                 .store(cab.mic_blend.clamp(0.0, 1.0), Relaxed);
             params.mic_room.store(cab.mic_room.clamp(0.0, 1.0), Relaxed);
+        }
+
+        if let Some(geq) = &self.graphic_eq {
+            params
+                .geq_enabled
+                .store(geq.enabled.unwrap_or(true), Relaxed);
+            params.geq_b1.store(geq.band1.clamp(0.0, 1.0), Relaxed);
+            params.geq_b2.store(geq.band2.clamp(0.0, 1.0), Relaxed);
+            params.geq_b3.store(geq.band3.clamp(0.0, 1.0), Relaxed);
+            params.geq_b4.store(geq.band4.clamp(0.0, 1.0), Relaxed);
+            params.geq_b5.store(geq.band5.clamp(0.0, 1.0), Relaxed);
+            params.geq_b6.store(geq.band6.clamp(0.0, 1.0), Relaxed);
+            params.geq_b7.store(geq.band7.clamp(0.0, 1.0), Relaxed);
+            params.geq_level.store(geq.level.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.geq_enabled.store(false, Relaxed);
         }
 
         if let Some(eq) = &self.eq {
