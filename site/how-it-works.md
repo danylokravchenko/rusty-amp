@@ -164,6 +164,13 @@ Every block below is processed per sample. Bracketed stages are `[bypassable]` �
     </div>
   </div>
 
+  <div class="flow__stage" style="--c:var(--rose)">
+    <div class="flow__card">
+      <div class="flow__head"><span class="flow__name">Tremolo / Vibrato</span><span class="flow__badge flow__badge--stereo">Stereo</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>
+      <div class="flow__sig">One LFO driving both modulations, blended by MODE — amplitude tremolo (shaped sine → soft-square chop) and pitch vibrato (a ±3 ms LFO-swept delay tap) · RATE 0.5–14 Hz · DEPTH · SHAPE sine→square · runs on both channels for a coherent pulse/wobble.</div>
+    </div>
+  </div>
+
   <div class="flow__stage" style="--c:var(--purple)">
     <div class="flow__card">
       <div class="flow__head"><span class="flow__name">Delay</span><span class="flow__badge flow__badge--bypass">Bypassable</span></div>

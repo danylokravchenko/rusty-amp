@@ -42,6 +42,7 @@ pub struct Preset {
     pub flanger: Option<FlangerSection>,
     pub chorus: Option<ChorusSection>,
     pub phaser: Option<PhaserSection>,
+    pub tremolo: Option<TremoloSection>,
     pub delay: Option<DelaySection>,
     pub reverb: ReverbSection,
 }
@@ -220,6 +221,17 @@ pub struct PhaserSection {
     pub mix: f32,
 }
 
+/// Tremolo / Vibrato: one LFO, blended between amplitude (tremolo) and pitch
+/// (vibrato) modulation. All fields 0.0–1.0.
+#[derive(Debug, Deserialize, Serialize)]
+pub struct TremoloSection {
+    pub enabled: Option<bool>,
+    pub rate: f32,
+    pub depth: f32,
+    pub shape: f32,
+    pub mode: f32,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ReverbSection {
     pub enabled: Option<bool>,
@@ -377,6 +389,13 @@ impl Preset {
                 depth: params.ph_depth.load(Relaxed),
                 feedback: params.ph_feedback.load(Relaxed),
                 mix: params.ph_mix.load(Relaxed),
+            }),
+            tremolo: Some(TremoloSection {
+                enabled: Some(params.trem_enabled.load(Relaxed)),
+                rate: params.trem_rate.load(Relaxed),
+                depth: params.trem_depth.load(Relaxed),
+                shape: params.trem_shape.load(Relaxed),
+                mode: params.trem_mode.load(Relaxed),
             }),
             reverb: ReverbSection {
                 enabled: Some(params.rev_enabled.load(Relaxed)),
@@ -597,6 +616,18 @@ impl Preset {
             params.ph_mix.store(ph.mix.clamp(0.0, 1.0), Relaxed);
         } else {
             params.ph_enabled.store(false, Relaxed);
+        }
+
+        if let Some(tr) = &self.tremolo {
+            params
+                .trem_enabled
+                .store(tr.enabled.unwrap_or(true), Relaxed);
+            params.trem_rate.store(tr.rate.clamp(0.0, 1.0), Relaxed);
+            params.trem_depth.store(tr.depth.clamp(0.0, 1.0), Relaxed);
+            params.trem_shape.store(tr.shape.clamp(0.0, 1.0), Relaxed);
+            params.trem_mode.store(tr.mode.clamp(0.0, 1.0), Relaxed);
+        } else {
+            params.trem_enabled.store(false, Relaxed);
         }
 
         let rev = &self.reverb;

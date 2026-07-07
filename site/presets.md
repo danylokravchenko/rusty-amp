@@ -252,6 +252,14 @@ depth    = 0.70       # 0.0 – 1.0  (sweep width; break freq glides ~200 Hz–1
 feedback = 0.40       # 0.0 – 1.0  (regeneration, capped at 90%; higher = resonant)
 mix      = 0.50       # 0.0 = dry, 0.5 = deepest phase, 1.0 = fully wet
 
+# Tremolo / Vibrato: one LFO, blended from amplitude tremolo to pitch vibrato.
+[tremolo]
+enabled = false       # optional, defaults to true when the section is present
+rate    = 0.35        # 0.0 – 1.0  (LFO speed, 0.5–14 Hz, exponential)
+depth   = 0.55        # 0.0 – 1.0  (modulation intensity)
+shape   = 0.00        # 0.0 = sine swell, 1.0 = soft-square on/off chop
+mode    = 0.00        # 0.0 = pure tremolo (amplitude), 1.0 = pure vibrato (pitch)
+
 [delay]
 enabled  = true       # optional, defaults to true
 time     = 0.30       # 0.0 = 0 ms, 1.0 = 500 ms

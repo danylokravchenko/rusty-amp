@@ -164,6 +164,7 @@ fn render_header(
     let fl_on = params.fl_enabled.load(Relaxed);
     let ch_on = params.ch_enabled.load(Relaxed);
     let ph_on = params.ph_enabled.load(Relaxed);
+    let trem_on = params.trem_enabled.load(Relaxed);
     let delay_on = params.delay_enabled.load(Relaxed);
     let rev_on = params.rev_enabled.load(Relaxed);
 
@@ -189,6 +190,7 @@ fn render_header(
         ("FLANGER", fl_on),
         ("CHORUS", ch_on),
         ("PHASER", ph_on),
+        ("TREM", trem_on),
         ("DELAY", delay_on),
         ("REVERB", rev_on),
     ];

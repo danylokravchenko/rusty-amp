@@ -28,6 +28,7 @@ pub mod phaser;
 pub mod pitch;
 pub mod preamp_eq;
 pub mod reverb;
+pub mod tremolo;
 pub mod tube_screamer;
 pub mod wah;
 
@@ -45,6 +46,7 @@ pub use phaser::Phaser;
 pub use pitch::Pitch;
 pub use preamp_eq::PreampEq;
 pub use reverb::Reverb;
+pub use tremolo::Tremolo;
 pub use tube_screamer::TubeScreamer;
 pub use wah::Wah;
 

@@ -19,7 +19,7 @@ use amp::AmpBank;
 use cab::{CabBank, ExternalIrCab};
 use effects::{
     Chorus, Compressor, Delay, Distortion, Flanger, Fuzz, GraphicEq, MetalCore, NoiseGate,
-    ParametricEq, Phaser, Pitch, PreampEq, Reverb, TubeScreamer, Wah,
+    ParametricEq, Phaser, Pitch, PreampEq, Reverb, Tremolo, TubeScreamer, Wah,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -212,6 +212,13 @@ const DEFAULT_PH_DEPTH: f32 = 0.70;
 const DEFAULT_PH_FEEDBACK: f32 = 0.40;
 const DEFAULT_PH_MIX: f32 = 0.50;
 
+// Tremolo / Vibrato (post-cab modulation, after the phaser, before the delay)
+const DEFAULT_TREM_ENABLED: bool = false;
+const DEFAULT_TREM_RATE: f32 = 0.35;
+const DEFAULT_TREM_DEPTH: f32 = 0.55;
+const DEFAULT_TREM_SHAPE: f32 = 0.00; // sine
+const DEFAULT_TREM_MODE: f32 = 0.00; // tremolo (amplitude)
+
 const DEFAULT_AMP_GAIN: f32 = 0.75;
 const DEFAULT_AMP_BASS: f32 = 1.00;
 const DEFAULT_AMP_MID: f32 = 0.0;
@@ -358,6 +365,13 @@ pub struct Params {
     pub ph_feedback: Arc<AtomicF32>,
     pub ph_mix: Arc<AtomicF32>,
 
+    // Tremolo / Vibrato (stereo rack, post-cab modulation, after the phaser)
+    pub trem_enabled: Arc<AtomicBool>,
+    pub trem_rate: Arc<AtomicF32>,
+    pub trem_depth: Arc<AtomicF32>,
+    pub trem_shape: Arc<AtomicF32>,
+    pub trem_mode: Arc<AtomicF32>,
+
     // Amp (shared by all models)
     pub amp_gain: Arc<AtomicF32>,
     pub amp_bass: Arc<AtomicF32>,
@@ -487,6 +501,12 @@ impl Params {
             ph_feedback: p!(DEFAULT_PH_FEEDBACK),
             ph_mix: p!(DEFAULT_PH_MIX),
 
+            trem_enabled: b!(DEFAULT_TREM_ENABLED),
+            trem_rate: p!(DEFAULT_TREM_RATE),
+            trem_depth: p!(DEFAULT_TREM_DEPTH),
+            trem_shape: p!(DEFAULT_TREM_SHAPE),
+            trem_mode: p!(DEFAULT_TREM_MODE),
+
             amp_gain: p!(DEFAULT_AMP_GAIN),
             amp_bass: p!(DEFAULT_AMP_BASS),
             amp_mid: p!(DEFAULT_AMP_MID),
@@ -601,6 +621,12 @@ impl Params {
         self.ph_feedback.store(DEFAULT_PH_FEEDBACK, Relaxed);
         self.ph_mix.store(DEFAULT_PH_MIX, Relaxed);
 
+        self.trem_enabled.store(DEFAULT_TREM_ENABLED, Relaxed);
+        self.trem_rate.store(DEFAULT_TREM_RATE, Relaxed);
+        self.trem_depth.store(DEFAULT_TREM_DEPTH, Relaxed);
+        self.trem_shape.store(DEFAULT_TREM_SHAPE, Relaxed);
+        self.trem_mode.store(DEFAULT_TREM_MODE, Relaxed);
+
         self.amp_gain.store(DEFAULT_AMP_GAIN, Relaxed);
         self.amp_bass.store(DEFAULT_AMP_BASS, Relaxed);
         self.amp_mid.store(DEFAULT_AMP_MID, Relaxed);
@@ -695,6 +721,7 @@ pub struct DspChain {
     flanger: Flanger,
     chorus: Chorus,
     phaser: Phaser,
+    tremolo: Tremolo,
     delay: Delay,
     reverb: Reverb,
     params: Arc<Params>,
@@ -735,6 +762,7 @@ impl DspChain {
             flanger: Flanger::new(sr),
             chorus: Chorus::new(sr),
             phaser: Phaser::new(sr),
+            tremolo: Tremolo::new(sr),
             delay: Delay::new(sr),
             reverb: Reverb::new(sr),
             params,
@@ -914,10 +942,10 @@ impl DspChain {
     }
 
     /// Stereo rack (graphic EQ → parametric EQ → flanger → chorus → phaser →
-    /// ping-pong delay → reverb). The two EQs shape the finished, mic'd tone (the
-    /// graphic EQ's fixed band bank first, then the parametric shelves) before the
-    /// flanger, chorus and phaser modulate it ahead of the time-based ambience.
-    /// Runs after both the built-in and external amp paths.
+    /// tremolo/vibrato → ping-pong delay → reverb). The two EQs shape the finished,
+    /// mic'd tone (the graphic EQ's fixed band bank first, then the parametric
+    /// shelves) before the flanger, chorus, phaser and tremolo modulate it ahead of
+    /// the time-based ambience. Runs after both the built-in and external amp paths.
     #[inline]
     fn rack(&mut self, l: f32, r: f32) -> (f32, f32) {
         let p = &self.params;
@@ -962,6 +990,18 @@ impl DspChain {
             ph_depth,
             ph_feedback,
             ph_mix
+        );
+        let (l, r) = stereo_stage!(
+            self,
+            p,
+            l,
+            r,
+            trem_enabled,
+            tremolo,
+            trem_rate,
+            trem_depth,
+            trem_shape,
+            trem_mode
         );
         let (l, r) = stereo_stage!(
             self,

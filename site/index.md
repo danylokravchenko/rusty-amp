@@ -45,7 +45,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
         <span class="arr">→</span> DS-1 <span class="arr">→</span> ML-2 <span class="arr">→</span> PRE-EQ
         <span class="arr">→</span> <b>AMP</b> <span class="arr">→</span> <b>CAB</b>
         <span class="arr">→</span> G-EQ <span class="arr">→</span> EQ <span class="arr">→</span> FLANGER
-        <span class="arr">→</span> CHORUS <span class="arr">→</span> PHASER <span class="arr">→</span> DELAY
+        <span class="arr">→</span> CHORUS <span class="arr">→</span> PHASER <span class="arr">→</span> TREM <span class="arr">→</span> DELAY
         <span class="arr">→</span> REVERB <span class="arr">→</span> <b>OUTPUT</b>
       </p>
       <div class="meter"></div>
@@ -165,6 +165,7 @@ description: "rusty-amp recreates classic tube and solid-state guitar amps, a fu
       <div class="pedal" style="--c:var(--indigo)"><div class="pedal__name"><span class="dot"></span>Flanger</div><div class="pedal__knobs">Rate · Depth · Feedback · Mix</div><div class="pedal__desc">LFO-swept comb filter — the classic metallic “jet plane” sweep, in stereo.</div></div>
       <div class="pedal" style="--c:var(--pink)"><div class="pedal__name"><span class="dot"></span>Chorus</div><div class="pedal__knobs">Rate · Depth · Mix</div><div class="pedal__desc">LFO-swept long delay, no feedback — lush, watery thickening in stereo.</div></div>
       <div class="pedal" style="--c:var(--yellow)"><div class="pedal__name"><span class="dot"></span>Phaser</div><div class="pedal__knobs">Rate · Depth · Feedback · Mix</div><div class="pedal__desc">Four-stage all-pass sweep — the hollow, vocal “whoosh”, in stereo.</div></div>
+      <div class="pedal" style="--c:var(--rose)"><div class="pedal__name"><span class="dot"></span>Tremolo / Vibrato</div><div class="pedal__knobs">Rate · Depth · Shape · Mode</div><div class="pedal__desc">One LFO blended from amplitude tremolo to pitch vibrato — swell, chop, or wobble.</div></div>
       <div class="pedal" style="--c:var(--purple)"><div class="pedal__name"><span class="dot"></span>Delay</div><div class="pedal__knobs">Time · Feedback · Mix</div><div class="pedal__desc">Stereo ping-pong — repeats bounce L↔R, up to 500 ms.</div></div>
       <div class="pedal" style="--c:var(--blue)"><div class="pedal__name"><span class="dot"></span>Stereo Reverb</div><div class="pedal__knobs">Room · Damp · Mix</div><div class="pedal__desc">Dual decorrelated Freeverb cores for a wide, deep tail.</div></div>
     </div>

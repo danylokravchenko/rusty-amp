@@ -6,8 +6,8 @@ use ratatui::style::Color;
 
 use super::styles::{
     PEDAL_BLUE, PEDAL_CYAN, PEDAL_GOLD, PEDAL_GREEN, PEDAL_INDIGO, PEDAL_LIME, PEDAL_ORANGE,
-    PEDAL_ORCHID, PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_SAND, PEDAL_SILVER, PEDAL_STEEL,
-    PEDAL_TEAL, PEDAL_YELLOW,
+    PEDAL_ORCHID, PEDAL_PINK, PEDAL_PURPLE, PEDAL_RED, PEDAL_ROSE, PEDAL_SAND, PEDAL_SILVER,
+    PEDAL_STEEL, PEDAL_TEAL, PEDAL_YELLOW,
 };
 use crate::dsp::Params;
 
@@ -81,10 +81,12 @@ pub(super) const CH_START: usize = 52;
 pub(super) const CH_END: usize = 55;
 pub(super) const PH_START: usize = 55;
 pub(super) const PH_END: usize = 59;
-pub(super) const DELAY_START: usize = 59;
-pub(super) const DELAY_END: usize = 62;
-pub(super) const REV_START: usize = 62;
-pub(super) const REV_END: usize = 65;
+pub(super) const TREM_START: usize = 59;
+pub(super) const TREM_END: usize = 63;
+pub(super) const DELAY_START: usize = 63;
+pub(super) const DELAY_END: usize = 66;
+pub(super) const REV_START: usize = 66;
+pub(super) const REV_END: usize = 69;
 
 pub(super) const KNOBS: &[Knob] = &[
     // 0–5: Amp tone stack
@@ -341,7 +343,24 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.ph_mix,
     },
-    // 59–61: Delay
+    // 59–62: Tremolo / Vibrato
+    Knob {
+        label: "RATE",
+        param: |p| &p.trem_rate,
+    },
+    Knob {
+        label: "DEPTH",
+        param: |p| &p.trem_depth,
+    },
+    Knob {
+        label: "SHAPE",
+        param: |p| &p.trem_shape,
+    },
+    Knob {
+        label: "MODE",
+        param: |p| &p.trem_mode,
+    },
+    // 63–65: Delay
     Knob {
         label: "TIME",
         param: |p| &p.delay_time,
@@ -354,7 +373,7 @@ pub(super) const KNOBS: &[Knob] = &[
         label: "MIX",
         param: |p| &p.delay_mix,
     },
-    // 62–64: Reverb
+    // 66–68: Reverb
     Knob {
         label: "ROOM",
         param: |p| &p.rev_room,
@@ -487,6 +506,14 @@ pub(super) const PEDALS: &[Pedal] = &[
         ui: PedalUi::Knobs,
     },
     Pedal {
+        name: "TREMOLO / VIBRATO",
+        color: PEDAL_ROSE,
+        start: TREM_START,
+        end: TREM_END,
+        enabled: |p| &p.trem_enabled,
+        ui: PedalUi::Knobs,
+    },
+    Pedal {
         name: "DELAY",
         color: PEDAL_PURPLE,
         start: DELAY_START,
@@ -603,7 +630,7 @@ mod tests {
     fn table_sizes_are_stable() {
         // Deliberate tripwire: bump these when you add or remove a pedal/knob so
         // the change is a conscious, reviewed edit rather than an accident.
-        assert_eq!(PEDALS.len(), 16, "pedal count changed");
-        assert_eq!(KNOBS.len(), 65, "knob count changed");
+        assert_eq!(PEDALS.len(), 17, "pedal count changed");
+        assert_eq!(KNOBS.len(), 69, "knob count changed");
     }
 }
