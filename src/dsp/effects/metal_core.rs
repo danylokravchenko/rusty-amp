@@ -7,26 +7,31 @@ use crate::dsp::oversample::Oversampler8;
 /// powerful active two-band (Low/High) EQ instead of a single tone control.
 ///
 /// Signal path:
-///   DC block → input HP → fixed mid-scoop → [8× OS: pre-clip HP → two cascaded
-///   soft-clip stages] → post-clip HP → active Low shelf → active High shelf →
-///   post-clip LP → level
+///   DC block → input HP → fixed mid-scoop → [8× OS: pre-clip HP → pre-clip LP →
+///   two cascaded soft-clip stages] → post-clip HP → active Low shelf →
+///   active High shelf → post-clip LP → level
 ///
 /// Character & authenticity:
 ///   • The ML-2 is a *tight, brutal* pedal designed to make any amp sound metal on
-///     its own. Its enormous gain comes from **two cascaded clipping stages**: the
-///     first saturates, the second squares it off into the long, singing, compressed
-///     sustain metal rhythm and lead lean on. One stage alone can't reach that
-///     saturation without going loose and fizzy.
+///     its own. Its gain comes from **two cascaded clipping stages**: the first
+///     saturates, the second thickens it into the long, singing, compressed sustain
+///     metal rhythm and lead lean on. But driven flat-out the cascade squares the
+///     wave into a fizzy, all-odd buzz that turns chords to mud — so both the first
+///     stage's gain (≤56×, was 101×) and the second's push (2.2×, was 3×) are kept
+///     sane, sitting the voice in smooth saturation instead of a permanent square.
 ///   • A **fixed mid-scoop** (~650 Hz) is baked into the voice — the ML-2's scooped,
 ///     aggressive tonality — but kept moderate so the tone stays articulate rather
 ///     than hollow. The player's own scoop lives in the active EQ on top.
 ///   • Tightened on both sides of the clipper like the DS-1: a pre-clip high-pass
-///     trims low-mud before the massive gain, and a post-clip high-pass strips the
-///     woof the clipper generates, so the low end stays defined for palm-mute chug.
-///   • **Near-symmetric** cascaded clipping with a slight asymmetry (the negative
-///     half saturates a hair later) so the voice keeps a touch of 2nd-harmonic warmth
-///     instead of the purely-odd, clinical buzz a perfectly symmetric clipper makes.
-///     The tiny DC that asymmetry leaves is removed by the post-clip high-pass.
+///     trims low-mud before the massive gain, a **pre-clip low-pass** rounds the top
+///     off the wave so a chord's upper harmonics don't intermodulate into fizz, and
+///     a post-clip high-pass strips the woof the clipper generates, so the low end
+///     stays defined for palm-mute chug.
+///   • Genuine 2nd-harmonic warmth comes from **asymmetric rail levels** (the
+///     negative half saturates toward −1.3 vs +1.0), which survive the cascade's
+///     hard saturation — unlike a DC bias, which just washes out to a DC offset the
+///     post-clip HP removes. A purely-symmetric clipper makes only the clinical odd
+///     buzz; the tiny DC this asymmetry leaves is removed by the post-clip high-pass.
 ///   • The **active Low/High EQ** is a wide-range shelving pair (±15 dB): the ML-2's
 ///     EQ is powerful enough to reshape the whole voice, from a bass-heavy wall to a
 ///     bright, cutting lead. 8× oversampling keeps the aggressive clip harmonics from
@@ -40,6 +45,11 @@ pub struct MetalCore {
     os: Oversampler8,
     // Pre-clip HP at 8× rate — tightens the low end before the cascaded gain.
     pre_clip_hp: Biquad,
+    // Pre-clip LP at 8× rate — rounds the top off the wave *before* the clipper so
+    // the cascade generates a shorter harmonic ladder: much of the fizzy top-octave
+    // buzz and high-order intermod is never created in the first place, the
+    // studio-console way to keep high gain smooth rather than brittle.
+    pre_clip_lp: Biquad,
     // Post-clip HP (base rate) — strips the blubber the clipper generates and the
     // small DC the clip asymmetry leaves.
     post_clip_hp: Biquad,
@@ -67,6 +77,11 @@ impl MetalCore {
             os: Oversampler8::new(sr),
             // 150 Hz pre-clip HP: keeps the cascade from turning low notes to mush.
             pre_clip_hp: Biquad::highpass(sr8, 150.0, 0.707),
+            // 3.8 kHz pre-clip LP: rounds the top off the wave before the huge gain
+            // so a chord's upper harmonics don't intermodulate into fizz, while
+            // leaving the voice its metal cut. (It can't shorten the ladder the
+            // cascade makes below it — that's what the lower gain is for.)
+            pre_clip_lp: Biquad::lowpass(sr8, 3800.0, 0.707),
             // 120 Hz post-clip HP: keeps the low E present but strips the woof and
             // the clip asymmetry's DC.
             post_clip_hp: Biquad::highpass(sr, 120.0, 0.707),
@@ -109,19 +124,23 @@ impl MetalCore {
         let x = self.input_hp.process(x);
         let x = self.mid_scoop.process(x);
 
-        // First-stage gain (1×–101×); the second stage adds a fixed further push, so
-        // the two together reach the ML-2's enormous saturation.
-        let gain = 1.0 + dist * 100.0;
+        // First-stage gain (1×–56×); the second stage adds a fixed further push, so
+        // the two together reach the ML-2's high-gain saturation without squaring.
+        let gain = 1.0 + dist * 55.0;
 
-        // 8× oversampled cascaded clip: tighten (pre-clip HP), saturate, then square
-        // off. `pre_clip_hp` is borrowed directly so it doesn't alias the `os` borrow.
+        // 8× oversampled cascaded clip: tighten (pre-clip HP), saturate, then push
+        // into a second, gentler stage. `pre_clip_hp` is borrowed directly so it
+        // doesn't alias the `os` borrow.
         let pre_clip_hp = &mut self.pre_clip_hp;
+        let pre_clip_lp = &mut self.pre_clip_lp;
         let x = self.os.process(x, |u| {
-            let u = pre_clip_hp.process(u);
+            let u = pre_clip_lp.process(pre_clip_hp.process(u));
             let s1 = ml2_stage(u * gain);
-            // Second cascaded stage: more gain into another soft-clip for the long,
-            // compressed metal sustain. Normalised so the output stays controlled.
-            ml2_stage(s1 * 3.0) * 0.7
+            // Second cascaded stage adds the long, compressed metal sustain. Its
+            // gain is kept modest (2.2×, was 3×) so the cascade saturates smoothly
+            // instead of squaring the wave into a fizzy, all-odd buzz that turns
+            // chords to intermod mud. Normalised so the output stays controlled.
+            ml2_stage(s1 * 2.2) * 0.7
         });
 
         // Tighten the low end the clipper produced (and strip the asymmetry DC).
@@ -143,11 +162,17 @@ impl MetalCore {
 /// the small DC the asymmetry leaves is removed by the post-clip high-pass.
 #[inline]
 fn ml2_stage(x: f32) -> f32 {
+    // The negative half saturates toward a higher rail (−1.3 vs +1.0). Asymmetric
+    // *rail levels* (unlike a DC bias, which just shifts a slammed square and
+    // washes out to DC the post-clip HP removes) survive the cascade's hard
+    // saturation, so they inject a genuine, audible 2nd harmonic — the warmth that
+    // keeps the voice from the clinical, purely-odd buzz of a symmetric clipper.
+    // The DC the asymmetry leaves is removed downstream by the post-clip HP.
     if x >= 0.0 {
         x.tanh()
     } else {
-        let t = 1.08_f32;
-        t * (x / t).tanh()
+        const T: f32 = 1.3;
+        T * (x / T).tanh()
     }
 }
 
@@ -259,6 +284,36 @@ mod tests {
             let out = render(f0, 0.5, 0.7, 0.5, 0.5, 0.65);
             let mean = out.iter().map(|&x| x as f64).sum::<f64>() / out.len() as f64;
             assert!(mean.abs() < 1e-3, "{f0} Hz: DC offset {mean:.6}");
+        }
+    }
+
+    /// The ML-2 is an odd-harmonic pedal, but the asymmetric rail levels must add a
+    /// *measurable* dose of even-harmonic warmth so the voice isn't the clinical,
+    /// purely-odd buzz a symmetric clipper makes. Odd content still clearly
+    /// dominates (keeps the metal character); a real even component is present (the
+    /// warmth). Guards against the asymmetry washing back out to nothing.
+    #[test]
+    fn clip_has_even_harmonic_warmth_but_stays_odd_dominant() {
+        for (f0, dist) in [(196.0f32, 0.5f32), (330.0, 0.7)] {
+            let out = render(f0, 0.3, dist, 0.5, 0.5, 0.65);
+            let h1 = goertzel(&out, f0, SR);
+            let even: f32 = (2..=8)
+                .step_by(2)
+                .map(|k| goertzel(&out, f0 * k as f32, SR))
+                .sum();
+            let odd: f32 = (3..=9)
+                .step_by(2)
+                .map(|k| goertzel(&out, f0 * k as f32, SR))
+                .sum();
+            assert!(
+                odd > even * 3.0,
+                "{f0} Hz: not odd-dominant (odd {odd:.4}, even {even:.4})"
+            );
+            assert!(
+                even > h1 * 0.01,
+                "{f0} Hz: no even-harmonic warmth (even/h1 {:.4}) — asymmetry washed out?",
+                even / h1
+            );
         }
     }
 

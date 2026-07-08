@@ -5,7 +5,8 @@ use crate::dsp::oversample::Oversampler4;
 /// Boss DS-1 Distortion simulation.
 ///
 /// Signal path:
-///   DC block → input HP → mid-emphasis → [4× OS: pre-clip HP → symmetric clip] → tilt tone → level
+///   DC block → input HP → mid-emphasis → [4× OS: pre-clip HP → pre-clip LP →
+///   asymmetric tanh clip] → post-clip HP → tilt tone → post-clip LP → level
 ///
 /// DS-1 character & authenticity:
 ///   • The real DS-1 is a **thin, tight, mid-forward** pedal — it is not a
@@ -16,14 +17,21 @@ use crate::dsp::oversample::Oversampler4;
 ///     stays articulate going into the amp.
 ///   • A small mid-emphasis before the clipper gives the DS-1 its characteristic
 ///     mid honk and note definition (without pumping the output level).
-///   • **Near-symmetric** clipping with a tight cubic knee that preserves note
-///     definition. A perfectly symmetric clipper produces *only odd harmonics* —
-///     the buzzy, clinical, "electronic" sound. The real DS-1's op-amp clipping
-///     stage is slightly asymmetric, so we clip the negative half a hair later than
-///     the positive half. That adds a touch of **2nd-harmonic warmth** (the
-///     difference between "production-grade" and "fizzy solid-state") while staying
-///     tight; the small DC the asymmetry creates is removed by the 150 Hz post-clip
-///     high-pass, so there is still no DC offset to fart out.
+///   • The clipper is a **`tanh` soft-clip**, not a cubic-onto-a-hard-flat-top.
+///     A flat top squares the wave when driven, producing a long, slowly-decaying
+///     odd-harmonic ladder — the harsh, fizzy "buzz", and the source of the heavy
+///     intermodulation that turns chords to mud. `tanh` saturates *asymptotically*,
+///     so its ladder rolls off far faster and the crunch stays articulate. The
+///     drive is also kept sane (≤41×, was 61×) so typical playing sits in musical
+///     saturation instead of a permanent square wave.
+///   • Genuine **2nd-harmonic warmth** comes from *asymmetric rail levels* (the
+///     negative half saturates toward −1.22, the positive toward +1.0), which —
+///     unlike a DC bias — survive hard saturation instead of washing out to a DC
+///     offset. A pure-symmetric clipper makes only the clinical odd buzz; the small
+///     DC this asymmetry leaves is removed by the 150 Hz post-clip high-pass.
+///   • A **pre-clip low-pass** rounds the top off the wave before the clipper so a
+///     chord's upper harmonics don't intermodulate into fizz on the way in — the
+///     studio-console way to keep the drive smooth rather than brittle.
 ///   • The tone control is a **tilt** (bass↔treble seesaw around ~1 kHz), like the
 ///     real pedal — NOT a mid scoop. The old LP/HP-blend tone scooped the mids,
 ///     which is exactly what left the low end loose and the top fizzy.
@@ -40,6 +48,10 @@ pub struct Distortion {
     os: Oversampler4,
     // Pre-clip HP at 4× rate — tightens the low end before the clipper.
     pre_clip_hp: Biquad,
+    // Pre-clip LP at 4× rate — rounds the top off the wave before the clipper so it
+    // generates a shorter harmonic ladder: less fizzy top-octave buzz and less
+    // high-order intermod, the studio way to keep the crunch smooth not brittle.
+    pre_clip_lp: Biquad,
     // Post-clip HP (base rate) — removes the blubber the clipper generates so the
     // DS-1 doesn't dump a woofy low end into the amp.
     post_clip_hp: Biquad,
@@ -65,6 +77,11 @@ impl Distortion {
             os: Oversampler4::new(sr),
             // 130 Hz pre-clip HP: trims low-mid mud before the clipper.
             pre_clip_hp: Biquad::highpass(sr4, 130.0, 0.707),
+            // 4.5 kHz pre-clip LP: rounds the top off the wave before the clipper so
+            // a chord's upper harmonics don't intermodulate into fizz, while leaving
+            // the crunch its cut. (It can't shorten the ladder the clipper makes
+            // *below* it — that is what the lower gain and soft knee are for.)
+            pre_clip_lp: Biquad::lowpass(sr4, 4500.0, 0.707),
             // 150 Hz post-clip HP: the decisive tightener — keeps the low E present
             // but strips the loose, blubbery woof the clipper produces.
             post_clip_hp: Biquad::highpass(sr, 150.0, 0.707),
@@ -99,14 +116,15 @@ impl Distortion {
         let x = self.input_hp.process(x);
         let x = self.mid_emphasis.process(x);
 
-        let gain = 1.0 + drive * 60.0;
+        let gain = 1.0 + drive * 40.0;
 
         // 4× oversampled clip stage — tighten lows (pre-clip HP) then clip, per
         // high-rate sample. `pre_clip_hp` is borrowed directly so it doesn't alias
         // the `os` borrow inside the closure.
         let pre_clip_hp = &mut self.pre_clip_hp;
+        let pre_clip_lp = &mut self.pre_clip_lp;
         let x = self.os.process(x, |u| {
-            let u = pre_clip_hp.process(u);
+            let u = pre_clip_lp.process(pre_clip_hp.process(u));
             ds1_clip(u * gain) / gain.sqrt()
         });
 
@@ -121,36 +139,27 @@ impl Distortion {
     }
 }
 
-/// DS-1 diode clipper: near-symmetric silicon clipping with a tight cubic knee.
+/// DS-1 silicon clipper: an asymmetric `tanh` soft-clip.
 ///
-/// Each half-cycle is shaped by a cubic soft-clip up to its threshold, then hard
-/// limited: `t·(1.5u − 0.5u³)` with `u = x/t`. That curve has unit-ish small-signal
-/// gain (slope 1.5 at the origin) and reaches the limit `t` with *zero* slope, so
-/// it joins the flat top with no derivative kink — a tight, defined knee instead of
-/// the compressed "mush" a slow asymptotic knee produces, which keeps low notes
-/// articulate instead of loose.
+/// `tanh` saturates *asymptotically* rather than onto a hard flat top. A flat top
+/// squares the wave when driven, giving a long, slowly-decaying odd-harmonic ladder
+/// (the harsh fizzy buzz, and the source of the intermod that muds up chords); the
+/// `tanh` ladder rolls off far faster, so the crunch stays articulate.
 ///
-/// The negative half clips a hair later than the positive half (threshold 1.12 vs
-/// 1.0), mirroring the DS-1 op-amp clipping stage's slight asymmetry. A perfectly
-/// symmetric clipper makes only odd harmonics — the buzzy, electronic sound; the
-/// asymmetry adds the warm 2nd harmonic. The tiny resulting DC bias is removed
-/// downstream by the 150 Hz post-clip high-pass, so there is still no DC to fart.
+/// The negative half saturates toward a higher rail (−1.22 vs +1.0). Unlike a DC
+/// bias — which only shifts a slammed square and washes out to a DC offset the
+/// post-clip HP removes — *asymmetric rail levels* survive hard saturation, so they
+/// inject a genuine, audible 2nd harmonic (warmth) at every drive; a perfectly
+/// symmetric clipper makes only the clinical odd buzz. The small DC this asymmetry
+/// leaves is removed downstream by the 150 Hz post-clip high-pass, so there is no
+/// DC to fart out.
 #[inline]
 fn ds1_clip(x: f32) -> f32 {
-    /// Cubic soft-clip of a non-negative value `v` toward threshold `t`.
-    #[inline]
-    fn knee(v: f32, t: f32) -> f32 {
-        if v >= t {
-            t
-        } else {
-            let u = v / t;
-            t * (1.5 * u - 0.5 * u * u * u)
-        }
-    }
     if x >= 0.0 {
-        knee(x, 1.0)
+        x.tanh()
     } else {
-        -knee(-x, 1.12)
+        const T: f32 = 1.22;
+        T * (x / T).tanh()
     }
 }
 
@@ -267,10 +276,10 @@ mod tests {
 
     // ── Clip transfer (unit tests on the diode model itself) ──────────────────
 
-    /// The cubic diode clipper must be a bipolar saturator: sign-preserving, bounded
-    /// by its two thresholds (+1.0 / −1.12), monotonic, and *smooth* (no derivative
-    /// kink where the cubic knee meets the flat top — a kink injects buzzy high
-    /// harmonics). The deeper negative threshold is the deliberate asymmetry.
+    /// The `tanh` clipper must be a bipolar saturator: sign-preserving, bounded by
+    /// its two asymptotic rails (+1.0 / −1.22), monotonic, and *smooth* (no
+    /// derivative kink — a kink injects buzzy high harmonics). The deeper negative
+    /// rail is the deliberate asymmetry that gives the 2nd-harmonic warmth.
     #[test]
     fn clip_is_bounded_sign_preserving_monotonic_and_smooth() {
         let mut prev = f32::NEG_INFINITY;
@@ -281,7 +290,7 @@ mod tests {
             let y = ds1_clip(x);
             assert!(y.is_finite(), "clip non-finite at {x}");
             assert!(
-                (-1.1201..=1.0001).contains(&y),
+                (-1.2201..=1.0001).contains(&y),
                 "clip out of bounds at {x}: {y}"
             );
             if x > 0.01 {
@@ -302,22 +311,19 @@ mod tests {
             prev = y;
             x += 0.005;
         }
-        // Small-signal slope is ~1.5, so the step over dx=0.005 is ~0.0075; a hard
-        // corner at the knee would blow well past this.
+        // Small-signal slope is ~1.0 (tanh'(0)), so the step over dx=0.005 is
+        // ~0.005; a hard corner at a knee would blow well past this.
         assert!(
             max_step < 0.02,
             "clip transfer has a kink (max step {max_step:.4})"
         );
-        // Asymmetry (warmth) and the two diode thresholds.
+        // Asymmetry (warmth) and the two saturation rails.
         assert!(
             ds1_clip(-0.5).abs() > ds1_clip(0.5).abs(),
             "clip not asymmetric"
         );
-        assert!((ds1_clip(5.0) - 1.0).abs() < 1e-4, "positive threshold off");
-        assert!(
-            (ds1_clip(-5.0) + 1.12).abs() < 1e-4,
-            "negative threshold off"
-        );
+        assert!((ds1_clip(5.0) - 1.0).abs() < 1e-3, "positive rail off");
+        assert!((ds1_clip(-5.0) + 1.22).abs() < 1e-2, "negative rail off");
     }
 
     // ── Full-stage spectral behaviour ─────────────────────────────────────────
