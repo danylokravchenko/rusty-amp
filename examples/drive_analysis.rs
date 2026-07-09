@@ -296,6 +296,71 @@ fn note_shape(dut: &mut dyn Dut, f0: f32, name: &str) {
     );
 }
 
+/// Realistic power-chord fizz probe. Feeds two *harmonically-rich, plucked*
+/// notes (a power fifth) — not pure sines — through the pedal and measures how
+/// much of the sustained output sits up in the "fizz/hash" band (> 5 kHz). A
+/// pure-sine test can't show this: cascaded clip stages re-clip each other's
+/// dense harmonics into high-frequency intermod hash that reads as *noise*, and
+/// that only appears when the input already carries many partials. Reports the
+/// > 5 kHz energy fraction and the broadband spectral centroid of the sustain.
+fn chord_fizz(dut: &mut dyn Dut, f_lo: f32, f_hi: f32) -> (f32, f32) {
+    let a = pluck_di(f_lo, 0.28);
+    let b = pluck_di(f_hi, 0.28);
+    dut.reset();
+    let out: Vec<f32> = a
+        .iter()
+        .zip(&b)
+        .map(|(&x, &y)| dut.process(x + y))
+        .collect();
+    // Sustain window only (skip the pick transient): 50–450 ms.
+    let s = &out[(SR * 0.05) as usize..((SR * 0.45) as usize).min(out.len())];
+    // Dense log-frequency power grid, 60 Hz – 16 kHz.
+    let (mut total, mut hf, mut num, mut den) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    let mut f = 60.0f32;
+    while f < 16_000.0 {
+        let p = goertzel(s, f).powi(2);
+        total += p;
+        if f > 4000.0 {
+            hf += p;
+        }
+        num += f * p.sqrt();
+        den += p.sqrt();
+        f *= 2.0_f32.powf(1.0 / 24.0); // 1/24-octave grid
+    }
+    (100.0 * hf / total.max(1e-12), num / den.max(1e-9))
+}
+
+/// Noise-floor gain. A real guitar DI carries a quiet bed of pickup hiss and
+/// mains hum under the notes; a high-gain pedal amplifies it. Feeds a low-level
+/// (~−50 dBFS) broadband-noise + 60 Hz-hum bed and reports the output RMS in
+/// dBFS — how loud the pedal makes "silence". This is the between-notes and
+/// decay-tail "noise" that sustained-tone probes can't show.
+fn noise_floor(dut: &mut dyn Dut) -> f32 {
+    dut.reset();
+    let mut seed = 0x9E3779B9u32;
+    let mut rng = || {
+        // xorshift → [−1, 1)
+        seed ^= seed << 13;
+        seed ^= seed >> 17;
+        seed ^= seed << 5;
+        (seed as f32 / u32::MAX as f32) * 2.0 - 1.0
+    };
+    let warm = (SR * 0.1) as usize;
+    let keep = (SR * 0.5) as usize;
+    let mut out = Vec::with_capacity(keep);
+    for i in 0..warm + keep {
+        let t = i as f32 / SR;
+        // −50 dBFS hiss + a touch of 60 Hz hum + its 120/180 Hz harmonics.
+        let hum = 0.0015 * ((2.0 * PI * 60.0 * t).sin() + 0.5 * (2.0 * PI * 120.0 * t).sin());
+        let x = 0.003 * rng() + hum;
+        let y = dut.process(x);
+        if i >= warm {
+            out.push(y);
+        }
+    }
+    db(rms(&out))
+}
+
 fn analyse(dut: &mut dyn Dut) {
     println!("── {} ──", dut.name());
     harmonics(dut, 196.0); // G3, a common riff/lead note
@@ -316,6 +381,20 @@ fn analyse(dut: &mut dyn Dut) {
     let fifth = imd(dut, 82.41, 123.47, 0.35); // E2 + B2 power chord
     let third = imd(dut, 196.0, 246.94, 0.35); // G3 + B3 major third
     println!("    power 5th (E2+B2) {fifth:>5.1}%      major 3rd (G3+B3) {third:>5.1}%");
+
+    // Fizz: HF hash on realistic plucked power chords, low and mid position (the
+    // "noise" a cascaded clipper makes that pure sines hide).
+    let (hf_lo, cen_lo) = chord_fizz(dut, 82.41, 123.47); // E2+B2
+    let (hf_mid, cen_mid) = chord_fizz(dut, 220.0, 329.63); // A3+E4
+    println!(
+        "  power-chord fizz > 4 kHz:  E2+B2 {hf_lo:>4.1}% (cen {cen_lo:>5.0} Hz)   A3+E4 {hf_mid:>4.1}% (cen {cen_mid:>5.0} Hz)"
+    );
+
+    // Noise floor: how loud the pedal makes a quiet hiss+hum bed (−50 dBFS in).
+    println!(
+        "  noise floor: {:>6.1} dBFS out from a −50 dBFS hiss+hum bed",
+        noise_floor(dut)
+    );
 
     // Note shape + decay-tail fizz.
     note_shape(dut, 82.41, "E2");
